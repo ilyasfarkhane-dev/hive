@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from 'react-i18next';
 
 type StepFoorProps = {
   subServices: { id: string; title: string; desc: string, description_subservice: string }[];
@@ -16,6 +17,7 @@ const StepFoor: React.FC<StepFoorProps> = ({
   selectedSubService = null,
   goalColorIndex = null,
 }) => {
+  const { t } = useTranslation('common');
   const [selected, setSelected] = useState<string | null>(selectedSubService);
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -39,10 +41,10 @@ const StepFoor: React.FC<StepFoorProps> = ({
     <div className="w-full max-w-7xl mx-auto px-4 py-8">
       <div className="text-center mb-12">
         <h3 className="text-3xl font-bold text-gray-800 mb-3">
-          Select Your Strategic Sub-Service
+          {t('selectStrategicSubService')}
         </h3>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Choose the sub-service that best aligns with your selected service
+          {t('selectStrategicSubServiceDesc')}
         </p>
       </div>
 

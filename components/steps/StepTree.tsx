@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from 'react-i18next';
 
 export interface Service {
   id: string;
@@ -95,6 +96,7 @@ const StepThree: React.FC<StepThreeProps> = ({
   selectedService = null,
   goalColorIndex = null,
 }) => {
+  const { t } = useTranslation('common');
   const [selected, setSelected] = useState<string | null>(selectedService);
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -106,9 +108,9 @@ const StepThree: React.FC<StepThreeProps> = ({
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8">
       <div className="text-center mb-12">
-        <h3 className="text-3xl font-bold text-gray-800 mb-3">Select Your Service</h3>
+        <h3 className="text-3xl font-bold text-gray-800 mb-3">{t('selectService')}</h3>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Choose the service that best matches your project’s focus
+          {t('selectServiceDesc')}
         </p>
       </div>
 

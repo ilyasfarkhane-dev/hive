@@ -14,8 +14,10 @@ import axios from "axios";
 import { gsap } from "gsap";
 import { steps } from "@/Data/index";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { useTranslation } from 'react-i18next';
 
 const Rooms = () => {
+  const { t } = useTranslation('common');
   const [currentStep, setCurrentStep] = useState(1);
 
   const stepFiveRef = useRef<StepFiveRef>(null);
@@ -295,11 +297,23 @@ const Rooms = () => {
 
   const getCardTitle = (type: string) => {
     switch (type) {
-      case "goal": return "Goal";
-      case "pillar": return "Pillar";
-      case "service": return "Service";
-      case "subService": return "Sub-Service";
-      default: return "Item";
+      case "goal": return t('goal');
+      case "pillar": return t('pillar');
+      case "service": return t('service');
+      case "subService": return t('subService');
+      default: return t('item');
+    }
+  };
+
+  const getStepTitle = (stepId: number) => {
+    switch (stepId) {
+      case 1: return t('strategicGoal');
+      case 2: return t('pillar');
+      case 3: return t('service');
+      case 4: return t('subService');
+      case 5: return t('projectDetails');
+      case 6: return t('reviewSubmit');
+      default: return t('item');
     }
   };
 
@@ -314,10 +328,10 @@ const Rooms = () => {
     <section id="next-section" className="bg-white-100 py-10 lg:py-14 w-full px-5 md:px-[1.9rem] largesceen:px-14 fourk:px-44 relative">
       <div className="text-center mt-12 sm:mt-20 xl:mt-0">
         <h2 className="text-gradient uppercase text-3xl xs:text-[3.2rem] leading-none lg:text-[6.25rem] desktop:text-[7.813rem] largesceen:text-[4.375rem]">
-          Take part in 2026 – 2030 Strategy
+          {t('takePartInStrategy')}
         </h2>
         <p className="uppercase mt-12 text-gradient lg:text-base 2xl:text-lg largesceen:text-[1.625rem] max-lg:hidden">
-          Submit and track your project proposal
+          {t('submitAndTrackProposal')}
         </p>
       </div>
 
@@ -329,7 +343,7 @@ const Rooms = () => {
               <div className={`w-12 h-12 flex items-center justify-center rounded-full text-white font-bold transition-all duration-500 ${currentStep >= step.id ? "bg-[#0e7378]" : "bg-gray-300 text-gray-600"}`}>
                 {step.id}
               </div>
-              <p className="mt-4 text-sm font-semibold text-center text-gray-800">{step.title}</p>
+              <p className="mt-4 text-sm font-semibold text-center text-gray-800">{getStepTitle(step.id)}</p>
             </div>
           ))}
         </div>
@@ -341,7 +355,7 @@ const Rooms = () => {
             <div className="w-full flex-col justify-between md:w-1/3 mt-18 mb-6 md:mb-0">
               <div className="h-[150px]"></div>
               <div className="sticky top-4 space-y-4">
-                <div className="text-sm font-semibold text-gray-600 mb-2">Your Selections</div>
+                <div className="text-sm font-semibold text-gray-600 mb-2">{t('yourSelections')}</div>
                 <div className="relative min-h-[200px] flex flex-col gap-4">
                   <AnimatePresence>
                     {selectedCards.map((card, index) => (
@@ -505,7 +519,7 @@ const Rooms = () => {
       }}
       className="px-6 py-2 bg-gray-300 rounded-lg text-sm hover:bg-gray-400 disabled:opacity-50"
     >
-      Previous
+      {t('previous')}
     </button>
           )}
            {currentStep === 5 && (
@@ -514,7 +528,7 @@ const Rooms = () => {
       onClick={handleProjectDetails}
       className="px-6 py-2 bg-primary text-white rounded-lg text-sm hover:bg-[#1B3B36]"
     >
-      Next
+      {t('next')}
     </button>
   )}
 

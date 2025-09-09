@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from 'react-i18next';
 
 type Pillar = { id: string; title: string; desc: string };
 
@@ -19,6 +20,7 @@ const StepTwo: React.FC<StepTwoProps> = ({
   goalColorIndex = null,
   pillars,
 }) => {
+  const { t } = useTranslation('common');
   const [selected, setSelected] = useState<string | null>(selectedPillar);
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -40,11 +42,11 @@ const StepTwo: React.FC<StepTwoProps> = ({
     <div className="w-full max-w-7xl mx-auto px-4 py-8">
       <div className="text-center mb-12">
         <h3 className="text-3xl font-bold text-gray-800 mb-3">
-          Select Your Strategic Pillar
+          {t('selectStrategicPillar')}
         </h3>
        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-  Choose the pillar that best aligns with your project&apos;s focus area and strategic direction
-</p>
+          {t('selectStrategicPillarDesc')}
+        </p>
 
       </div>
 

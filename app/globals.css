@@ -27,6 +27,71 @@ body {
   font-family: "TWKEverett";
 }
 
+/* RTL Support */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .rtl\:text-right {
+  text-align: right;
+}
+
+[dir="rtl"] .rtl\:text-left {
+  text-align: left;
+}
+
+[dir="rtl"] .rtl\:mr-2 {
+  margin-right: 0;
+  margin-left: 0.5rem;
+}
+
+[dir="rtl"] .rtl\:ml-2 {
+  margin-left: 0;
+  margin-right: 0.5rem;
+}
+
+[dir="rtl"] .rtl\:pr-3 {
+  padding-right: 0;
+  padding-left: 0.75rem;
+}
+
+[dir="rtl"] .rtl\:pl-3 {
+  padding-left: 0;
+  padding-right: 0.75rem;
+}
+
+[dir="rtl"] .rtl\:right-0 {
+  right: auto;
+  left: 0;
+}
+
+[dir="rtl"] .rtl\:left-0 {
+  left: auto;
+  right: 0;
+}
+
+[dir="rtl"] .rtl\:text-right {
+  text-align: right;
+}
+
+[dir="rtl"] .rtl\:text-left {
+  text-align: left;
+}
+
+/* Arabic font support */
+[dir="rtl"] body {
+  font-family: "TWKEverett", "Arial", "Tahoma", sans-serif;
+}
+
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h5,
+[dir="rtl"] h6 {
+  font-family: "Miracle", "Arial", "Tahoma", sans-serif;
+}
+
 h1,
 h2,
 h3,

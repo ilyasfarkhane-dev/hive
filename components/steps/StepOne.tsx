@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from 'react-i18next';
 
 type StepOneProps = {
   goals: { id: string; title: string; desc: string }[];
@@ -14,6 +15,7 @@ const StepOne: React.FC<StepOneProps> = ({
   onNext,
   selectedGoal = null,
 }) => {
+  const { t } = useTranslation('common');
   const [selected, setSelected] = useState<string | null>(selectedGoal);
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -38,11 +40,10 @@ const StepOne: React.FC<StepOneProps> = ({
     <div className="w-full max-w-7xl mx-auto px-4 py-8">
       <div className="text-center mb-12">
         <h3 className="text-3xl font-bold text-gray-800 mb-3">
-          Select Your Strategic Goal
+          {t('selectStrategicGoal')}
         </h3>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Choose the goal that best represents your project&apos;s focus and
-          strategic direction
+          {t('selectStrategicGoalDesc')}
         </p>
       </div>
 

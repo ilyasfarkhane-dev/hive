@@ -7,10 +7,12 @@ import { ChevronDown } from "lucide-react"
 import vector14 from "@/public/about.png"
 import image1 from "@/public/Logo-01.svg"
 import BurgerMenu from "./BurgerMenu"
+import { useTranslation } from 'react-i18next'
 
 gsap.registerPlugin(ScrollToPlugin)
 
 const About = () => {
+  const { t } = useTranslation('common')
   const containerRef = useRef<HTMLElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const scrollIconRef = useRef<HTMLDivElement>(null)
@@ -146,9 +148,9 @@ const handleScrollDown = () => {
           >
             <span className="block">ICESCO</span>
             <span className="text-[32px] text-secondary leading-none block mt-2 gap-2">
-              Member States Portal
+              {t('memberStatesPortal')}
               <br />
-             <span className="text-white"> Powered by</span> <span className="text-secondary">HiveFlow</span>
+             <span className="text-white"> {t('poweredBy')}</span> <span className="text-secondary">{t('hiveFlow')}</span>
             </span>
             <h3 className="text-[32px] desktop:text-text-[32px] largesceen:text-text-[32px] text-white-100 tracking-[0.094rem] mb-8 w-fit capitalize">
              
@@ -161,8 +163,7 @@ const handleScrollDown = () => {
           >
           
             <p className="text-white-100 text-[1.813rem] desktop:text-base 2xl:text-3xl leading-[155.556%] w-[95%] sm:w-[80%] lg:w-[400px] text-justify desktop:w-[52rem]  leading-[155.556%] text-opacity-[0.64] ">
-              Take part in shaping the 2026–2030 Strategy by sharing your project proposals. Your needs and priorities
-              set the vision and drive impact across the Islamic world and beyond.
+              {t('takePartStrategy')}
             </p>
           </div>
         </div>
@@ -183,7 +184,7 @@ const handleScrollDown = () => {
           className="flex flex-col items-center gap-2 text-secondary group"
           aria-label="Scroll down"
         >
-          <span className="text-2xl font-light tracking-wider">Scroll Down</span>
+          <span className="text-2xl font-light tracking-wider">{t('scrollDown')}</span>
           <div className="w-14 h-14 border border-secondary rounded-full flex items-center justify-center group-hover:border-secondary transition">
             <ChevronDown className="w-8 h-8" />
           </div>

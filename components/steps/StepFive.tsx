@@ -1,4 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useTranslation } from 'react-i18next';
 
 type Step5Props = {
   onNext?: (details: any) => void;
@@ -10,6 +11,7 @@ export type StepFiveRef = {
 };
 
 const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
+  const { t } = useTranslation('common');
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [formValues, setFormValues] = useState({
     title: "",
@@ -184,7 +186,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="block font-medium text-gray-900">
-                  Project Title <span className="text-red-500">*</span>
+                  {t('title')} <span className="text-red-500">*</span>
                   <span className="block text-gray-500 text-sm">
                     A clear, descriptive name for your project
                   </span>
@@ -230,12 +232,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                   <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
-                <p className="text-xl font-semibold">Rationale & Impact</p>
+                <p className="text-xl font-semibold">{t('rationaleImpact')}</p>
               </div>
 
               <div className="mb-6">
                 <label className="block mb-2 font-medium text-gray-900">
-                  Problem Statement & Rationale
+                  {t('problemStatement')}
                 </label>
                 <textarea
                   id="rationale"
@@ -249,7 +251,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               </div>
               {/* Target Beneficiaries */}
               <label className="block mb-2 font-medium text-gray-900">
-                Target Beneficiaries <span className="text-red-500">*</span>
+                {t('beneficiaries')} <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="beneficiaries">
                 {[
@@ -331,13 +333,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <line x1="16" y1="2" x2="16" y2="6" />
               <line x1="8" y1="2" x2="8" y2="6" />
             </svg>
-            <p className="text-xl font-semibold">Implementation & Budget</p>
+            <p className="text-xl font-semibold">{t('implementationBudget')}</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="block mb-1 font-medium text-gray-900">
-                Start Date <span className="text-gray-400 text-sm">(optional)</span>
+                {t('startDate')} <span className="text-gray-400 text-sm">(optional)</span>
               </label>
               <input
                 type="date"
@@ -352,7 +354,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
 
             <div>
               <label className="block mb-1 font-medium text-gray-900">
-                End Date <span className="text-gray-400 text-sm">(optional)</span>
+                {t('endDate')} <span className="text-gray-400 text-sm">(optional)</span>
               </label>
               <input
                 type="date"
@@ -437,13 +439,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            <p className="text-xl font-semibold">Partners & Collaboration</p>
+            <p className="text-xl font-semibold">{t('partnersCollaboration')}</p>
           </div>
 
           <div className="form-group space-y-2">
             <label className="block">
               <span className="label-text font-medium text-gray-800">
-                Project Partners <span className="text-red-500">*</span>
+                {t('partners')} <span className="text-red-500">*</span>
               </span>
               <span className="block text-gray-500 text-sm">institutions</span>
             </label>
@@ -681,7 +683,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
-            <p className="text-xl font-semibold">Project Contact Information</p>
+            <p className="text-xl font-semibold">{t('contactInformation')}</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -785,7 +787,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
           <div className="form-group space-y-3">
             <label className="block">
               <span className="label-text font-medium text-gray-800">
-                Project Milestones <span className="text-gray-400 text-sm">(optional)</span>
+                {t('milestones')} <span className="text-gray-400 text-sm">(optional)</span>
               </span>
               <span className="block text-gray-500 text-sm">Key checkpoints and deliverable dates</span>
             </label>
@@ -1064,5 +1066,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
 
   );
 });
+
+StepFive.displayName = 'StepFive';
 
 export default StepFive;

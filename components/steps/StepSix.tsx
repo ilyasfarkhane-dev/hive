@@ -1,6 +1,7 @@
 // Step6.tsx
 import React, { useState } from "react";
 import { Paperclip } from "lucide-react";
+import { useTranslation } from 'react-i18next';
 
 type Step6Props = {
   selectedGoal: string | null;
@@ -27,6 +28,7 @@ const Step6: React.FC<Step6Props> = ({
   subServices,
   onClearData,
 }) => {
+  const { t } = useTranslation('common');
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   // Debug log
@@ -50,27 +52,27 @@ const Step6: React.FC<Step6Props> = ({
   };
 
   const getLabelFromId = (id: string | null, items: { id: string; title: string, desc: string }[]) => {
-    if (!id) return "Not selected";
+    if (!id) return t('notSelected');
     const item = items.find((item) => item.id === id);
-    return item ? item.desc : "Not found";
+    return item ? item.desc : t('notFound');
   };
 
   const getPillarTitle = () => {
-    if (!selectedPillar) return "Not selected";
+    if (!selectedPillar) return t('notSelected');
     const pillar = pillars.find((p) => p.id === selectedPillar);
-    return pillar ? pillar.desc : "Not found";
+    return pillar ? pillar.desc : t('notFound');
   };
 
   const getServiceTitle = () => {
-    if (!selectedService) return "Not selected";
+    if (!selectedService) return t('notSelected');
     const service = services.find((s) => s.id === selectedService);
-    return service ? service.desc : "Not found";
+    return service ? service.desc : t('notFound');
   };
 
   const getSubServiceTitle = () => {
-    if (!selectedSubService) return "Not selected";
+    if (!selectedSubService) return t('notSelected');
     const subService = subServices.find((s) => s.id === selectedSubService);
-    return subService ? subService.desc : "Not found";
+    return subService ? subService.desc : t('notFound');
   };
 
  if (isSubmitted) {
@@ -94,10 +96,10 @@ const Step6: React.FC<Step6Props> = ({
             </svg>
           </div>
           <h3 className="text-2xl font-bold text-green-600 mb-4">
-            Project Submitted Successfully!
+            {t('projectSubmittedSuccessfully')}
           </h3>
           <p className="text-gray-600 mb-6">
-            Your project proposal has been received and is being processed.
+            {t('projectSubmittedDesc')}
           </p>
         </div>
 
@@ -109,7 +111,7 @@ const Step6: React.FC<Step6Props> = ({
           }}
           className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
         >
-          OK
+          {t('ok')}
         </button>
       </div>
     </div>
@@ -120,41 +122,41 @@ const Step6: React.FC<Step6Props> = ({
   return (
     <div className="mt-16 w-full max-w-6xl">
       <h3 className="text-2xl font-semibold text-center mb-4 text-[#0e7378]">
-        Review Your Project Proposal
+        {t('reviewProjectProposal')}
       </h3>
       <p className="text-center text-gray-600 mb-8">
-        Please review all the information before submitting your project
+        {t('reviewProjectProposalDesc')}
       </p>
 
       <div className="bg-white rounded-2xl shadow-lg p-8 space-y-8">
         {/* Strategic Goal */}
         <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">Strategic Goal</p>
+          <p className="text-xl font-semibold text-teal-700 mb-4">{t('strategicGoal')}</p>
           <p className="text-gray-800">{getLabelFromId(selectedGoal, goals)}</p>
         </div>
 
         {/* Pillar */}
         <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">Pillar</p>
+          <p className="text-xl font-semibold text-teal-700 mb-4">{t('pillar')}</p>
           <p className="text-gray-800">{getPillarTitle()}</p>
         </div>
 
         {/* Service */}
         <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">Service</p>
+          <p className="text-xl font-semibold text-teal-700 mb-4">{t('service')}</p>
           <p className="text-gray-800">{getServiceTitle()}</p>
         </div>
 
         {/* Sub-Service */}
         <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">Sub-Service</p>
+          <p className="text-xl font-semibold text-teal-700 mb-4">{t('subService')}</p>
           <p className="text-gray-800">{getSubServiceTitle()}</p>
         </div>
 
         {/* Project Details */}
         {projectDetails && (
           <div className="space-y-6">
-            <p className="text-xl font-semibold text-teal-700 mb-4">Project Details</p>
+            <p className="text-xl font-semibold text-teal-700 mb-4">{t('projectDetails')}</p>
 
             {/* Overview */}
             <div className="border-b pb-6">
@@ -293,7 +295,7 @@ const Step6: React.FC<Step6Props> = ({
           onClick={handleSubmit}
           className="px-8 py-3 bg-teal-600 justify-center text-center flex items-center mx-auto text-white rounded-xl hover:bg-teal-700 transition shadow-md font-medium"
         >
-          Submit Project
+          {t('submitProject')}
         </button>
       </div>
     </div>

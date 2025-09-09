@@ -5,6 +5,7 @@ import "aos/dist/aos.css";
 import { useAuth } from '@/context/AuthContext';
 import { AuthProvider } from '@/context/AuthContext';
 import AuthWrapper from '@/context/AuthWrapper';
+import { I18nProvider } from '@/context/I18nProvider';
 
 
 
@@ -21,11 +22,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <AuthWrapper>
-            {children}
-          </AuthWrapper>
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <AuthWrapper>
+              {children}
+            </AuthWrapper>
+          </AuthProvider>
+        </I18nProvider>
         <ScrollToTop />
       </body>
     </html>

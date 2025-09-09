@@ -160,109 +160,108 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Overview */}
             <div className="border-b pb-6">
-              <p className="font-medium text-gray-800 mb-2">Project Overview</p>
+              <p className="font-medium text-gray-800 mb-2">{t('projectOverview')}</p>
               <p>
-                <strong>Title:</strong> {projectDetails.title}
+                <strong>{t('title')}:</strong> {projectDetails.title}
               </p>
               <p>
-                <strong>Brief:</strong> {projectDetails.brief}
+                <strong>{t('brief')}:</strong> {projectDetails.brief}
               </p>
             </div>
 
             {/* Rationale */}
             <div className="border-b pb-6">
-              <p className="font-medium text-gray-800 mb-2">Rationale & Impact</p>
+              <p className="font-medium text-gray-800 mb-2">{t('rationaleImpact')}</p>
               <p>
-                <strong>Problem Statement:</strong> {projectDetails.rationale}
+                <strong>{t('problemStatement')}:</strong> {projectDetails.rationale}
               </p>
               <p>
-                <strong>Beneficiaries:</strong> {projectDetails.beneficiaries.join(", ")}
+                <strong>{t('beneficiaries')}:</strong> {projectDetails.beneficiaries.join(", ")}
               </p>
               {projectDetails.otherBeneficiary && (
                 <p>
-                  <strong>Other Beneficiaries:</strong> {projectDetails.otherBeneficiary}
+                  <strong>{t('otherBeneficiaries')}:</strong> {projectDetails.otherBeneficiary}
                 </p>
               )}
             </div>
 
             {/* Implementation */}
             <div className="border-b pb-6">
-              <p className="font-medium text-gray-800 mb-2">Implementation & Budget</p>
+              <p className="font-medium text-gray-800 mb-2">{t('implementationBudget')}</p>
               <p>
-                <strong>Start Date:</strong> {projectDetails.startDate}
+                <strong>{t('startDate')}:</strong> {projectDetails.startDate}
               </p>
               <p>
-                <strong>End Date:</strong> {projectDetails.endDate}
+                <strong>{t('endDate')}:</strong> {projectDetails.endDate}
               </p>
               <p>
-                <strong>Budget:</strong> ICESCO: {projectDetails.budget.icesco} USD, Member
-                State: {projectDetails.budget.member_state} USD, Sponsorship:{" "}
+                <strong>{t('budget')}:</strong> {projectDetails.budget.icesco} USD, {t('memberState')}: {projectDetails.budget.member_state} USD, {t('sponsorship')}:{" "}
                 {projectDetails.budget.sponsorship} USD
               </p>
               <p>
-                <strong>Frequency:</strong> {projectDetails.projectFrequency}{" "}
+                <strong>{t('frequency')}:</strong> {projectDetails.projectFrequency}{" "}
                 {projectDetails.frequencyDuration && `(${projectDetails.frequencyDuration})`}
               </p>
             </div>
 
             {/* Partners */}
             <div className="border-b pb-6">
-              <p className="font-medium text-gray-800 mb-2">Partners & Collaboration</p>
+              <p className="font-medium text-gray-800 mb-2">{t('partnersCollaboration')}</p>
               <p>
-                <strong>Partners:</strong> {projectDetails.partners.join(", ")}
+                <strong>{t('partners')}:</strong> {projectDetails.partners.join(", ")}
               </p>
             </div>
 
             {/* Scope */}
             <div className="border-b pb-6">
-              <p className="font-medium text-gray-800 mb-2">Project Scope & Modality</p>
+              <p className="font-medium text-gray-800 mb-2">{t('projectScopeModality')}</p>
               <p>
-                <strong>Delivery Modality:</strong> {projectDetails.deliveryModality}
+                <strong>{t('deliveryModality')}:</strong> {projectDetails.deliveryModality}
               </p>
               <p>
-                <strong>Geographic Scope:</strong> {projectDetails.geographicScope}
+                <strong>{t('geographicScope')}:</strong> {projectDetails.geographicScope}
               </p>
               <p>
-                <strong>Convening Method:</strong> {projectDetails.conveningMethod}{" "}
+                <strong>{t('conveningMethod')}:</strong> {projectDetails.conveningMethod}{" "}
                 {projectDetails.conveningMethodOther && `(${projectDetails.conveningMethodOther})`}
               </p>
             </div>
 
             {/* Monitoring */}
             <div className="border-b pb-6">
-              <p className="font-medium text-gray-800 mb-2">Monitoring & Evaluation</p>
+              <p className="font-medium text-gray-800 mb-2">{t('monitoringEvaluation')}</p>
               <p>
-                <strong>Milestones:</strong> {projectDetails.milestones.join(", ")}
+                <strong>{t('milestones')}:</strong> {projectDetails.milestones.join(", ")}
               </p>
               <p>
-                <strong>Expected Outputs:</strong> {projectDetails.expectedOutputs}
+                <strong>{t('expectedOutputs')}:</strong> {projectDetails.expectedOutputs}
               </p>
               <p>
-                <strong>KPIs:</strong> {projectDetails.kpis.join(", ")}
+                <strong>{t('kpis')}:</strong> {projectDetails.kpis.join(", ")}
               </p>
             </div>
 
             {/* Contact */}
             <div className="border-b pb-6">
-              <p className="font-medium text-gray-800 mb-2">Contact Information</p>
+              <p className="font-medium text-gray-800 mb-2">{t('contactInformation')}</p>
               <p>
-                <strong>Name:</strong> {projectDetails.contact?.name}
+                <strong>{t('name')}:</strong> {projectDetails.contact?.name}
               </p>
               <p>
-                <strong>Email:</strong> {projectDetails.contact?.email}
+                <strong>{t('email')}:</strong> {projectDetails.contact?.email}
               </p>
               <p>
-                <strong>Phone:</strong> {projectDetails.contact?.phone}
+                <strong>{t('phone')}:</strong> {projectDetails.contact?.phone}
               </p>
               <p>
-                <strong>Role:</strong> {projectDetails.contact?.role}
+                <strong>{t('role')}:</strong> {projectDetails.contact?.role}
               </p>
             </div>
 
             {/* Files */}
             {projectDetails.files && projectDetails.files.length > 0 && (
               <div className="border-b pb-6">
-                <p className="font-medium text-gray-800 mb-2">Supporting Documents</p>
+                <p className="font-medium text-gray-800 mb-2">{t('supportingDocuments')}</p>
                 <div className="space-y-2">
                   {projectDetails.files.map((file: any, index: number) => (
                     <div
@@ -283,7 +282,7 @@ const Step6: React.FC<Step6Props> = ({
             {/* Comments */}
             {projectDetails.comments && (
               <div className="border-b pb-6">
-                <p className="font-medium text-gray-800 mb-2">Comments</p>
+                <p className="font-medium text-gray-800 mb-2">{t('comments')}</p>
                 <p>{projectDetails.comments}</p>
               </div>
             )}

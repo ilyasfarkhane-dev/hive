@@ -113,9 +113,7 @@ const StepFoor: React.FC<StepFoorProps> = ({
                       <h4 className="text-xl font-semibold text-white leading-tight">
                         {subService.desc}
                       </h4>
-                      <p className="text-white text-sm mt-4 text-justify">
-                        {subService.description_subservice}
-                      </p>
+                     
                     </div>
 
                     <div

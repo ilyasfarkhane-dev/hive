@@ -19,6 +19,7 @@
     "french": "Français",
     "arabic": "العربية",
     "loading": "Chargement...",
+    "loadingGoals": "Chargement des objectifs...",
     "error": "Erreur",
     "success": "Succès",
     "cancel": "Annuler",
@@ -42,7 +43,7 @@
     "yes": "Oui",
     "no": "Non",
     "selectStrategicGoal": "Sélectionnez Votre Objectif Stratégique",
-    "selectStrategicGoalDesc": "Choisissez l'objectif qui représente le mieux l'orientation et la direction stratégique de votre projet",
+    "selectStrategicGoalDesc": "Choisissez l’objectif qui représente le mieux l’orientation et la stratégie de votre projet",
     "selectStrategicPillar": "Sélectionnez Votre Pilier Stratégique",
     "selectStrategicPillarDesc": "Choisissez le pilier qui s'aligne le mieux avec le domaine d'orientation de votre projet et la direction stratégique",
     "selectService": "Sélectionnez Votre Service",
@@ -95,8 +96,8 @@
     "poweredBy": "Propulsé par",
     "hiveFlow": "HiveFlow",
     "takePartStrategy": "Participez à l'élaboration de la Stratégie 2026-2030 en partageant vos propositions de projets. Vos besoins et priorités définissent la vision et stimulent l'impact dans le monde islamique et au-delà.",
-    "scrollDown": "Faire défiler vers le bas",
-    "takePartInStrategy": "Participez à la Stratégie 2026 – 2030",
+    "scrollDown": "Faites défiler vers le bas",
+    "takePartInStrategy": "Participez à la Stratégie 2026 - 2030",
     "submitAndTrackProposal": "Soumettez et suivez votre proposition de projet",
     "yourSelections": "Vos Sélections",
     "goal": "Objectif",
@@ -111,6 +112,6 @@
     "service": "Service",
     "subService": "Sous-Service",
     "projectDetails": "Détails du Projet",
-    "reviewSubmit": "Examen et Soumission"
+    "reviewSubmit": "Vérifier et soumettre"
   }
 }

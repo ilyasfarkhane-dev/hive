@@ -81,18 +81,50 @@ export async function getContactByLogin(sessionId: string, login: string) {
 }
 
 // 🎯 Fetch goals
-export async function getGoals(sessionId: string) {
+export async function getGoals(sessionId: string, language: string = 'en') {
+  // Determine which fields to select based on language
+  let selectFields: string[];
+  switch (language) {
+    case 'fr':
+      selectFields = ["id", "name", "name_goal_fr_c"];
+      break;
+    case 'ar':
+      selectFields = ["id", "name", "name_goal_ar_c"];
+      break;
+    case 'en':
+    default:
+      selectFields = ["id", "name", "description"];
+      break;
+  }
+
   const rawGoals = await getModuleEntries(
     sessionId,
     "ms_goal",
-    ["id", "name", "description"],
+    selectFields,
     "",
     50
   );
 
-  return rawGoals.map((g: any) => ({
-    id: g.id,
-    title: g.name,
-    desc: g.description,
-  }));
+  return rawGoals.map((g: any) => {
+    // Map the description field based on language
+    let descriptionField: string;
+    switch (language) {
+      case 'fr':
+        descriptionField = g.name_goal_fr_c || g.description || '';
+        break;
+      case 'ar':
+        descriptionField = g.name_goal_ar_c || g.description || '';
+        break;
+      case 'en':
+      default:
+        descriptionField = g.description || '';
+        break;
+    }
+
+    return {
+      id: g.id,
+      title: g.name,
+      desc: descriptionField,
+    };
+  });
 }

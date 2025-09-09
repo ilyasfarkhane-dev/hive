@@ -15,6 +15,7 @@ import { gsap } from "gsap";
 import { steps } from "@/Data/index";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useTranslation } from 'react-i18next';
+import i18n from 'i18next';
 
 const Rooms = () => {
   const { t } = useTranslation('common');
@@ -36,8 +37,10 @@ const Rooms = () => {
   const [services, setServices] = useState<any[]>([]);
   const [subServices, setSubServices] = useState<any[]>([]);
 
+  const [loadingGoals, setLoadingGoals] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
   const [loadingSubServices, setLoadingSubServices] = useState(false);
+  const [lastLanguage, setLastLanguage] = useState<string>('');
 
   // Two-column layout & right column animation
   const [showTwoColumns, setShowTwoColumns] = useState(false);
@@ -112,10 +115,77 @@ const Rooms = () => {
   useEffect(() => {
     if (!sessionId) return;
 
-    axios.get("/api/goals", { params: { sessionId } })
-      .then(res => setGoals(res.data))
-      .catch(err => console.error(err));
-  }, [sessionId]);
+    // Get current language from i18n
+    const currentLanguage = i18n.language || 'en';
+    
+    console.log('Content.tsx - Language changed:', currentLanguage, 'Last language:', lastLanguage);
+    
+    // Only fetch if language actually changed or it's the first load
+    if (currentLanguage !== lastLanguage) {
+      console.log('Fetching goals for language:', currentLanguage);
+      // Clear goals immediately when language changes to show loading state
+      setGoals([]);
+      setLoadingGoals(true);
+      setLastLanguage(currentLanguage);
+      
+      axios.get("/api/goals", { params: { sessionId, language: currentLanguage } })
+        .then(res => {
+          console.log('Goals fetched successfully:', res.data.length, 'goals');
+          setGoals(res.data);
+          setLoadingGoals(false);
+        })
+        .catch(err => {
+          console.error('Error fetching goals:', err);
+          setLoadingGoals(false);
+        });
+    }
+  }, [sessionId, i18n.language, lastLanguage]);
+
+  // Rebuild selected cards on language/data change so labels re-translate
+  useEffect(() => {
+    if (!showTwoColumns || selectedCards.length === 0) return;
+    const rebuilt: { type: string; id: string; title: string; desc: string; colorIndex: number }[] = [];
+    let colorIndex = selectedColorIndex ?? 0;
+    // goal
+    if (selectedGoal) {
+      const goal = goals.find(g => g.id === selectedGoal);
+      if (goal) rebuilt.push({ type: 'goal', id: goal.id, title: goal.title, desc: goal.desc, colorIndex: colorIndex ?? 0 });
+    }
+    // pillar
+    if (selectedPillar) {
+      const pillar = pillars.find(p => p.id === selectedPillar);
+      if (pillar) rebuilt.push({ type: 'pillar', id: pillar.id, title: pillar.title, desc: pillar.desc, colorIndex: colorIndex ?? 0 });
+    }
+    // service
+    if (selectedService) {
+      const service = services.find(s => s.id === selectedService);
+      if (service) rebuilt.push({ type: 'service', id: service.id, title: service.title, desc: service.desc, colorIndex: colorIndex ?? 0 });
+    }
+    // subservice
+    if (selectedSubService) {
+      const sub = subServices.find(s => s.id === selectedSubService);
+      if (sub) rebuilt.push({ type: 'subService', id: sub.id, title: sub.title, desc: sub.desc, colorIndex: colorIndex ?? 0 });
+    }
+    if (rebuilt.length > 0) setSelectedCards(rebuilt);
+  }, [i18n.language, goals, pillars, services, subServices]);
+
+  // Initial load effect - ensure goals are fetched on first render
+  useEffect(() => {
+    if (sessionId && goals.length === 0 && !loadingGoals) {
+      const currentLanguage = i18n.language || 'en';
+      setLoadingGoals(true);
+      
+      axios.get("/api/goals", { params: { sessionId, language: currentLanguage } })
+        .then(res => {
+          setGoals(res.data);
+          setLoadingGoals(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setLoadingGoals(false);
+        });
+    }
+  }, [sessionId, goals.length, loadingGoals]);
 
 
   // Fetch pillars when goal changes
@@ -123,20 +193,24 @@ const Rooms = () => {
     if (!selectedGoal) return;
     async function fetchPillars() {
       try {
-        const resp = await axios.get(`/api/pillars?goalId=${selectedGoal}`);
+        // Get current language from i18n
+        const currentLanguage = i18n.language || 'en';
+        console.log('Content.tsx - Fetching pillars for goal:', selectedGoal, 'language:', currentLanguage);
+        const resp = await axios.get(`/api/pillars?goalId=${selectedGoal}&language=${currentLanguage}`);
         // map API data to { id, title, desc } structure
         const mappedPillars = resp.data.map((p: any) => ({
           id: p.id,
           title: p.name,
           desc: p.description
         }));
+        console.log('Content.tsx - Pillars fetched successfully:', mappedPillars.length, 'pillars');
         setPillars(mappedPillars);
       } catch (error) {
         console.error("Failed to load pillars:", error);
       }
     }
     fetchPillars();
-  }, [selectedGoal]);
+  }, [selectedGoal, i18n.language]);
 
   // Fetch services when pillar changes
   useEffect(() => {
@@ -145,8 +219,9 @@ const Rooms = () => {
     const fetchServices = async () => {
       setLoadingServices(true);
       try {
+        const currentLanguage = i18n.language || 'en';
         const resp = await axios.get(`/api/services`, {
-          params: { pillarId: selectedPillar },
+          params: { pillarId: selectedPillar, language: currentLanguage },
         });
         setServices(resp.data);
       } catch (error) {
@@ -158,17 +233,18 @@ const Rooms = () => {
     };
 
     fetchServices();
-  }, [selectedPillar]);
+  }, [selectedPillar, i18n.language]);
 
-  // Fetch sub-services when service changes
+  // Fetch sub-services when service or language changes
   useEffect(() => {
     if (!selectedService) return;
     setLoadingSubServices(true);
-    axios.get(`/api/subservices?serviceId=${selectedService}`)
+    const currentLanguage = i18n.language || 'en';
+    axios.get(`/api/subservices?serviceId=${selectedService}&language=${currentLanguage}`)
       .then(res => setSubServices(res.data))
       .catch(() => setSubServices([]))
       .finally(() => setLoadingSubServices(false));
-  }, [selectedService]);
+  }, [selectedService, i18n.language]);
 
   const handleGoalSelect = (goalId: string, colorIndex: number) => {
     setSelectedGoal(goalId);
@@ -205,7 +281,7 @@ const Rooms = () => {
   const handleServiceSelect = (serviceId: string) => {
     setSelectedService(serviceId);
     const service = services.find(s => s.id === serviceId);
-    if (service && selectedColorIndex !== null) addSelectedCard("service", service.id, service.desc, service.desc, selectedColorIndex);
+    if (service && selectedColorIndex !== null) addSelectedCard("service", service.id, service.title, service.desc, selectedColorIndex);
 
     saveToLocalStorage({
       selectedGoal,
@@ -395,7 +471,11 @@ const Rooms = () => {
             <AnimatePresence mode="wait">
               {currentStep === 1 && !showTwoColumns && (
                 <motion.div key="step1" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
-                  {goals.length === 0 ? <LoadingSpinner /> : <StepOne goals={goals} selectedGoal={selectedGoal} onNext={handleGoalSelect} />}
+                  {loadingGoals || goals.length === 0 ? (
+                    <LoadingSpinner message={loadingGoals ? t('loadingGoals') : t('loading')} />
+                  ) : (
+                    <StepOne goals={goals} selectedGoal={selectedGoal} onNext={handleGoalSelect} />
+                  )}
                 </motion.div>
               )}
 

@@ -1,10 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en', 'fr', 'ar'],
-    localeDetection: false,
-  },
+  // Removed Next.js i18n config to avoid conflicts with custom i18n setup
   reactStrictMode: true,
   swcMinify: true,
 };

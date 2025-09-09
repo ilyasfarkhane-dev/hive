@@ -6,7 +6,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST")
     return res.status(405).json({ message: "Method not allowed" });
 
-  const { email, password } = req.body;
+  const { email, password, language = 'en' } = req.body;
   if (!email || !password)
     return res.status(400).json({ message: "Missing email or password" });
 
@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!contactInfo)
       return res.status(404).json({ message: "Contact not found" });
 
-    const goals = await getGoals(sessionId);
+    const goals = await getGoals(sessionId, language);
 
     const hashedEmail = md5(email);
     return res.status(200).json({ hashedEmail, sessionId, contactInfo, goals });

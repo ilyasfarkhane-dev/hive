@@ -6,6 +6,7 @@ import Image from "next/image";
 import logo from "@/public/Logo-01.svg";
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import i18n from 'i18next';
 
 import axios from "axios";
 
@@ -36,7 +37,8 @@ const LoginPage = () => {
     try {
       const response = await axios.post("/api/login", {
         email: credentials.login, // map login_c to email in API
-        password: credentials.password
+        password: credentials.password,
+        language: i18n.language || 'en'
       });
 
     

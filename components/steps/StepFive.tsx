@@ -1,5 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next'
 
 type Step5Props = {
   onNext?: (details: any) => void;
@@ -168,7 +168,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
       {/* Section Header */}
       <div className="text-center">
         <h3 className="text-4xl md:text-3xl font-extrabold text-[#0f7378]  mt-12">
-          Enter your project details
+          {t('enterProjectDetails')}
         </h3>
       </div>
 
@@ -179,7 +179,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 6L9 17l-5-5" />
             </svg>
-            <p className="text-xl font-semibold">Project Overview</p>
+            <p className="text-xl font-semibold">{t('projectOverview')}</p>
           </div>
 
           <div>
@@ -187,9 +187,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <div className="space-y-2">
                 <label className="block font-medium text-gray-900">
                   {t('title')} <span className="text-red-500">*</span>
-                  <span className="block text-gray-500 text-sm">
-                    A clear, descriptive name for your project
-                  </span>
+                  <span className="block text-gray-500 text-sm">{t('titleHelp')}</span>
                 </label>
                 <input
                   id="title"
@@ -197,14 +195,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   onChange={(e) => setFormValues({ ...formValues, title: e.target.value })}
                   type="text"
                   required
-                  placeholder="Enter project title"
+                  placeholder={t('titlePlaceholder')}
                   className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm"
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="block font-medium text-gray-900">
-                  Project Brief <span className="text-red-500">*</span>
+                  {t('projectBrief')} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="brief"
@@ -212,7 +210,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   rows={4}
                   value={formValues.brief}
                   onChange={(e) => setFormValues({ ...formValues, brief: e.target.value })}
-                  placeholder="Provide a concise summary..."
+                  placeholder={t('projectBriefPlaceholder')}
                   className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm"
                 ></textarea>
               </div>
@@ -245,7 +243,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   required
                   value={formValues.rationale}
                   onChange={(e) => setFormValues({ ...formValues, rationale: e.target.value })}
-                  placeholder="Describe the problem this project addresses..."
+                  placeholder={t('problemStatementPlaceholder')}
                   className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition"
                 ></textarea>
               </div>
@@ -255,12 +253,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="beneficiaries">
                 {[
-                  { label: "Students", desc: "Educational beneficiaries", value: "Students" },
-                  { label: "Teachers", desc: "Government officials", value: "Teachers" },
-                  { label: "Youth", desc: "Young people and communities", value: "Youth" },
-                  { label: "General Public", desc: "Broader community impact", value: "General Public" },
-                  { label: "Policymakers", desc: "Educational decision-makers", value: "Policymakers" },
-                  { label: "Other", desc: "Specify custom beneficiaries", value: "Other" },
+                  { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: t('beneficiaryStudents') },
+                  { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: t('beneficiaryTeachers') },
+                  { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: t('beneficiaryYouth') },
+                  { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: t('beneficiaryPublic') },
+                  { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: t('beneficiaryPolicymakers') },
+                  { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: t('beneficiaryOther') },
                 ].map((benef) => (
                   <label
                     key={benef.value}
@@ -288,8 +286,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                         }
                       }}
                     />
-                    <div>
-                      <span className="font-medium text-gray-900 mr-2">{benef.label}</span>
+                    <div className="flex gap-4 items-center">
+                      <span className="font-medium text-gray-900 ">{benef.label}</span>
                       <span className="text-gray-500 text-sm">{benef.desc}</span>
                     </div>
                   </label>
@@ -302,7 +300,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   <input
                     type="text"
                     className="ml-2 px-3 py-2 border border-gray-300 rounded-xl"
-                    placeholder="Please specify other beneficiary"
+                    placeholder={t('otherBeneficiaryPlaceholder')}
                     value={formValues.otherBeneficiary}
                     onChange={(e) =>
                       setFormValues((prev) => ({
@@ -339,7 +337,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="block mb-1 font-medium text-gray-900">
-                {t('startDate')} <span className="text-gray-400 text-sm">(optional)</span>
+                {t('startDate')} <span className="text-gray-400 text-sm">{t('optional')}</span>
               </label>
               <input
                 type="date"
@@ -354,7 +352,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
 
             <div>
               <label className="block mb-1 font-medium text-gray-900">
-                {t('endDate')} <span className="text-gray-400 text-sm">(optional)</span>
+                {t('endDate')} <span className="text-gray-400 text-sm">{t('optional')}</span>
               </label>
               <input
                 type="date"
@@ -372,12 +370,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               return (
                 <div className="flex items-center gap-4" key={item}>
                   <label className="text-gray-700 text-sm min-w-[120px]">
-                    {item} <span className="text-red-500">*</span>
+                    {t(`budgetLabel_${key}`)} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative w-full">
                     <input
                       type="text"
-                      placeholder="0.00"
+                      placeholder={t('amountPlaceholder')}
                       required
                       className="w-full px-5 py-3 pr-16 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out"
                       id={`budget_${key}`}
@@ -390,7 +388,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                       }
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
-                      USD
+                      {t('currencyUSD')}
                     </span>
                   </div>
                 </div>
@@ -399,7 +397,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
 
             <div className="md:col-span-2 space-y-2">
               <label className="block mb-1 font-medium text-gray-900">
-                Project Frequency <span className="text-red-500">*</span>
+                {t('projectFrequency')} <span className="text-red-500">*</span>
               </label>
               <select
                 id="project_frequency"
@@ -409,15 +407,15 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                 onChange={(e) => setFormValues({ ...formValues, projectFrequency: e.target.value })}
                 required
               >
-                <option value="">Select frequency</option>
-                <option value="One-time">One-time</option>
-                <option value="Continuous">Continuous</option>
+                <option value="">{t('frequencySelect')}</option>
+                <option value="One-time">{t('frequencyOneTime')}</option>
+                <option value="Continuous">{t('frequencyContinuous')}</option>
               </select>
               {formValues.projectFrequency === "Continuous" && (
                 <input
                   type="text"
                   id="frequency_duration"
-                  placeholder="Duration (e.g., 1 year, 2 years...)"
+                  placeholder={t('frequencyDurationPlaceholder')}
                   className={`w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out mt-2 ${formValues.freqError ? "border-red-500" : ""
                     }`}
                   value={formValues.frequencyDuration}
@@ -447,7 +445,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <span className="label-text font-medium text-gray-800">
                 {t('partners')} <span className="text-red-500">*</span>
               </span>
-              <span className="block text-gray-500 text-sm">institutions</span>
+              <span className="block text-gray-500 text-sm">{t('institutions')}</span>
             </label>
             <div className="tag-input-container flex flex-col gap-2">
               <div id="partners-list" className="flex flex-wrap gap-2">
@@ -476,7 +474,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Add partner organization..."
+                  placeholder={t('addPartnerPlaceholder')}
                   className="enhanced-input flex-1 px-4 py-2 border border-gray-300 rounded-xl ..."
                   value={formValues.partnerInput}
                   onChange={(e) => setFormValues({ ...formValues, partnerInput: e.target.value })}
@@ -505,17 +503,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <path d="M2 12h20" />
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
             </svg>
-            <p className="text-xl font-semibold">Project Scope & Modality</p>
+            <p className="text-xl font-semibold">{t('projectScopeModality')}</p>
           </div>
 
           <div className="form-group space-y-2 my-6">
             <label htmlFor="convening_method" className="block">
-              <span className="label-text font-medium text-gray-800">
-                Project Type <span className="text-red-500">*</span>
-              </span>
-              <span className="block text-gray-500 text-sm">
-                What is the nature of your project?
-              </span>
+              <span className="label-text font-medium text-gray-800">{t('projectType')} <span className="text-red-500">*</span></span>
+              <span className="block text-gray-500 text-sm">{t('projectTypeHelp')}</span>
             </label>
             <select
               id="convening_method"
@@ -526,13 +520,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                 setFormValues({ ...formValues, conveningMethod: e.target.value })
               }
             >
-              <option value="">Select the format your project will take</option>
-              <option value="Training">Training Program</option>
-              <option value="Workshop">Workshop Series</option>
-              <option value="Conference">Conference/Summit</option>
-              <option value="Campaign">Awareness Campaign</option>
-              <option value="Research">Research Initiative</option>
-              <option value="Other">Other</option>
+              <option value="">{t('projectTypeSelect')}</option>
+              <option value="Training">{t('typeTraining')}</option>
+              <option value="Workshop">{t('typeWorkshop')}</option>
+              <option value="Conference">{t('typeConference')}</option>
+              <option value="Campaign">{t('typeCampaign')}</option>
+              <option value="Research">{t('typeResearch')}</option>
+              <option value="Other">{t('other')}</option>
             </select>
 
             {formValues.conveningMethod === "Other" && (
@@ -540,7 +534,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                 type="text"
                 id="convening_method_other"
                 required
-                placeholder="Please specify the project format..."
+                placeholder={t('projectTypeOtherPlaceholder')}
                 className="mt-3 w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition"
                 value={formValues.conveningMethodOther}
                 onChange={(e) =>
@@ -557,11 +551,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="form-group space-y-3">
               <label className="block">
                 <span className="label-text font-medium text-gray-800">
-                  Delivery Modality <span className="text-red-500">*</span>
+                  {t('deliveryModality')} <span className="text-red-500">*</span>
                 </span>
-                <span className="block text-gray-500 text-sm">
-                  How will the project be conducted?
-                </span>
+                <span className="block text-gray-500 text-sm">{t('deliveryModalityHelp')}</span>
               </label>
               <div className="radio-group flex flex-col gap-3">
                 <label className="radio-item flex items-center gap-3 p-3 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
@@ -576,7 +568,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                       setFormValues({ ...formValues, deliveryModality: e.target.value })
                     }
                   />
-                  <span className="font-medium text-gray-900">Physical</span>
+                  <span className="font-medium text-gray-900">{t('modalityPhysical')}</span>
                 </label>
 
                 <label className="radio-item flex items-center gap-3 p-3 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
@@ -591,7 +583,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                       setFormValues({ ...formValues, deliveryModality: e.target.value })
                     }
                   />
-                  <span className="font-medium text-gray-900">Virtual</span>
+                  <span className="font-medium text-gray-900">{t('modalityVirtual')}</span>
                 </label>
 
                 <label className="radio-item flex items-center gap-3 p-3 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
@@ -606,7 +598,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                       setFormValues({ ...formValues, deliveryModality: e.target.value })
                     }
                   />
-                  <span className="font-medium text-gray-900">Hybrid</span>
+                  <span className="font-medium text-gray-900">{t('modalityHybrid')}</span>
                 </label>
               </div>
             </div>
@@ -614,11 +606,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="form-group space-y-3">
               <label className="block">
                 <span className="label-text font-medium text-gray-800">
-                  Geographic Scope <span className="text-red-500">*</span>
+                  {t('geographicScope')} <span className="text-red-500">*</span>
                 </span>
-                <span className="block text-gray-500 text-sm">
-                  Project&apos;s geographic reach
-                </span>
+                <span className="block text-gray-500 text-sm">{t('geographicScopeHelp')}</span>
               </label>
               <div className="checkbox-grid-small grid grid-cols-1 gap-2">
                 <label className="checkbox-item-small flex items-center gap-2 p-2 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
@@ -633,7 +623,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                       setFormValues({ ...formValues, geographicScope: e.target.value })
                     }
                   />
-                  <span className="text-gray-900 font-medium">National</span>
+                  <span className="text-gray-900 font-medium">{t('scopeNational')}</span>
                 </label>
 
                 <label className="checkbox-item-small flex items-center gap-2 p-2 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
@@ -648,7 +638,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                       setFormValues({ ...formValues, geographicScope: e.target.value })
                     }
                   />
-                  <span className="text-gray-900 font-medium">Regional</span>
+                  <span className="text-gray-900 font-medium">{t('scopeRegional')}</span>
                 </label>
 
                 <label className="checkbox-item-small flex items-center gap-2 p-2 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
@@ -663,7 +653,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                       setFormValues({ ...formValues, geographicScope: e.target.value })
                     }
                   />
-                  <span className="text-gray-900 font-medium">International</span>
+                  <span className="text-gray-900 font-medium">{t('scopeInternational')}</span>
                 </label>
               </div>
             </div>
@@ -690,14 +680,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="form-group space-y-2">
               <label className="block">
                 <span className="label-text font-medium text-gray-800">
-                  Full Name <span className="text-red-500">*</span>
+                {t('contactFullName')}<span className="text-red-500">*</span>
                 </span>
-                <span className="block text-gray-500 text-sm">Primary project contact</span>
+                <span className="block text-gray-500 text-sm">{t('contactFullNameHelp')}</span>
               </label>
               <input
                 type="text"
                 id="contact_name"
-                placeholder="Enter full name"
+                placeholder={t('contactFullNamePlaceholder')}
                 required
                 value={formValues.contact.name}
                 onChange={(e) => setFormValues({
@@ -711,14 +701,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="form-group space-y-2">
               <label className="block">
                 <span className="label-text font-medium text-gray-800">
-                  Email Address <span className="text-red-500">*</span>
+                  {t('contactEmail')} <span className="text-red-500">*</span>
                 </span>
-                <span className="block text-gray-500 text-sm">Primary contact email</span>
+                <span className="block text-gray-500 text-sm">{t('contactEmailHelp')}</span>
               </label>
               <input
                 type="email"
                 id="contact_email"
-                placeholder="Enter email address"
+                placeholder={t('contactEmailPlaceholder')}
                 required
                 value={formValues.contact.email}
                 onChange={(e) => setFormValues({
@@ -732,14 +722,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="form-group space-y-2">
               <label className="block">
                 <span className="label-text font-medium text-gray-800">
-                  Phone Number <span className="text-red-500">*</span>
+                  {t('contactPhone')} <span className="text-red-500">*</span>
                 </span>
-                <span className="block text-gray-500 text-sm">Contact phone number</span>
+                <span className="block text-gray-500 text-sm">{t('contactPhoneHelp')}</span>
               </label>
               <input
                 type="tel"
                 id="contact_phone"
-                placeholder="Enter phone number"
+                placeholder={t('contactPhonePlaceholder')}
                 required
                 value={formValues.contact.phone}
                 onChange={(e) => setFormValues({
@@ -753,14 +743,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="form-group space-y-2">
               <label className="block">
                 <span className="label-text font-medium text-gray-800">
-                  Position/Role <span className="text-red-500">*</span>
+                  {t('contactRole')} <span className="text-red-500">*</span>
                 </span>
-                <span className="block text-gray-500 text-sm">Your role in the organization</span>
+                <span className="block text-gray-500 text-sm">{t('contactRoleHelp')}</span>
               </label>
               <input
                 type="text"
                 id="contact_role"
-                placeholder="Enter position or role"
+                placeholder={t('contactRolePlaceholder')}
                 required
                 value={formValues.contact.role}
                 onChange={(e) => setFormValues({
@@ -781,15 +771,15 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <line x1="12" y1="20" x2="12" y2="4" />
               <line x1="6" y1="20" x2="6" y2="14" />
             </svg>
-            <p className="text-xl font-semibold">Monitoring & Evaluation</p>
+            <p className="text-xl font-semibold">{t('monitoringEvaluation')}</p>
           </div>
 
           <div className="form-group space-y-3">
             <label className="block">
               <span className="label-text font-medium text-gray-800">
-                {t('milestones')} <span className="text-gray-400 text-sm">(optional)</span>
+                {t('milestones')} <span className="text-gray-400 text-sm">{t('optional')}</span>
               </span>
-              <span className="block text-gray-500 text-sm">Key checkpoints and deliverable dates</span>
+              <span className="block text-gray-500 text-sm">{t('milestonesHelp')}</span>
             </label>
             <div className="milestone-container flex flex-col gap-2">
               <div id="milestones-list" className="flex flex-col gap-2">
@@ -819,7 +809,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                 <input
                   type="text"
                   id="milestone-input"
-                  placeholder="Milestone name..."
+                  placeholder={t('milestoneNamePlaceholder')}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
                   value={formValues.milestoneInput}
                   onChange={(e) =>
@@ -859,16 +849,16 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
           <div className="form-group space-y-2 mb-8">
             <label className="block">
               <span className="label-text font-medium text-gray-800">
-                Expected Outputs & Deliverables <span className="text-gray-400 text-sm">(optional)</span>
+                {t('expectedOutputsDeliverables')} <span className="text-gray-400 text-sm">{t('optional')}</span>
               </span>
               <span className="block text-gray-500 text-sm">
-                Concrete results and deliverables from this project
+                {t('expectedOutputsDeliverablesHelp')}
               </span>
             </label>
             <textarea
               id="expected_outputs"
               rows={3}
-              placeholder="List the expected outputs and deliverables..."
+              placeholder={t('expectedOutputsDeliverablesPlaceholder')}
               value={formValues.expectedOutputs}
               onChange={(e) => setFormValues({ ...formValues, expectedOutputs: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
@@ -878,9 +868,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
           <div className="form-group space-y-2">
             <label className="block">
               <span className="label-text font-medium text-gray-800">
-                Key Performance Indicators <span className="text-gray-400 text-sm">(optional)</span>
+                {t('keyPerformanceIndicators')} <span className="text-gray-400 text-sm">{t('optional')}</span>
               </span>
-              <span className="block text-gray-500 text-sm">How will success be measured?</span>
+              <span className="block text-gray-500 text-sm">{t('keyPerformanceIndicatorsHelp')}</span>
             </label>
             <div className="tag-input-container flex flex-col gap-2">
               <div id="kpis-list" className="flex flex-wrap gap-2">
@@ -910,7 +900,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                 <input
                   type="text"
                   id="kpi-input"
-                  placeholder="Add success metric..."
+                  placeholder={t('keyPerformanceIndicatorsPlaceholder')}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
                   value={formValues.kpiInput}
                   onChange={(e) =>
@@ -963,7 +953,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
             </svg>
-            <p className="text-xl font-semibold">Supporting Documents</p>
+            <p className="text-xl font-semibold">{t('supportingDocuments')}</p>
           </div>
 
           <div
@@ -990,13 +980,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-              <p className="text-lg font-medium text-gray-700">
-                Drop files here or{" "}
-                <span className="text-teal-600 font-semibold">browse</span>
-              </p>
-              <p className="text-sm text-gray-500">
-                PDF, DOCX, PNG, JPG, XLSX, PPTX up to 10MB each
-              </p>
+              <p className="text-lg font-medium text-gray-700">{t('uploadDropOrBrowse')}</p>
+              <p className="text-sm text-gray-500">{t('uploadTypesLimit')}</p>
             </div>
           </div>
 
@@ -1035,22 +1020,18 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
               <line x1="12" y1="20" x2="12" y2="4" />
               <line x1="6" y1="20" x2="6" y2="14" />
             </svg>
-            <p className="text-xl font-semibold">Comments </p>
+            <p className="text-xl font-semibold">{t('comments')}</p>
           </div>
 
           <div className="form-group space-y-3">
             <label className="block">
-              <span className="label-text font-medium text-gray-800">
-                Comments <span className="text-gray-400 text-sm">(optional)</span>
-              </span>
-              <span className="block text-gray-500 text-sm mb-4">
-                Add any relevant comments or feedback
-              </span>
+              <span className="label-text font-medium text-gray-800">{t('comments')} <span className="text-gray-400 text-sm">{t('optional')}</span></span>
+              <span className="block text-gray-500 text-sm mb-4">{t('commentsHelp')}</span>
 
               <textarea
                 id="comments"
                 rows={4}
-                placeholder="Add any additional comments or feedback..."
+                placeholder={t('commentsPlaceholder')}
                 className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition"
                 value={formValues.comments}
                 onChange={(e) =>

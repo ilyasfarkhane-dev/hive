@@ -2,25 +2,28 @@
 import React, { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
+import type { Pillar } from "@/types";
 
-type Pillar = { id: string; title: string; desc: string };
+
 
 type StepTwoProps = {
   onNext: (pillarId: string) => void;
+  onPrevious?: () => void;
   selectedPillar?: string | null;
   goalColorIndex?: number | null;
   selectedGoal: string;
-  pillars: Pillar[]; // ✅ pillars passed from parent
+  pillars?: Pillar[];
 };
 
 const StepTwo: React.FC<StepTwoProps> = ({
   onNext,
+  onPrevious,
   selectedPillar = null,
   goalColorIndex = null,
-  pillars,
+  pillars = [],
 }) => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation("common");
   const [selected, setSelected] = useState<string | null>(selectedPillar);
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -42,12 +45,11 @@ const StepTwo: React.FC<StepTwoProps> = ({
     <div className="w-full max-w-7xl mx-auto px-4 py-8">
       <div className="text-center mb-12">
         <h3 className="text-3xl font-bold text-gray-800 mb-3">
-          {t('selectStrategicPillar')}
+          {t("selectStrategicPillar")}
         </h3>
-       <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          {t('selectStrategicPillarDesc')}
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          {t("selectStrategicPillarDesc")}
         </p>
-
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -56,6 +58,9 @@ const StepTwo: React.FC<StepTwoProps> = ({
             const isSelected = selected === pillar.id;
             const isHovered = hovered === pillar.id;
             const colorIndex = goalColorIndex !== null ? goalColorIndex : index;
+
+            // pick correct language
+            const title = pillar.title[i18n.language as "en" | "fr" | "ar"] ?? pillar.title.en;
 
             return (
               <motion.div
@@ -72,7 +77,6 @@ const StepTwo: React.FC<StepTwoProps> = ({
                 onMouseLeave={() => setHovered(null)}
                 onClick={() => handleSelect(pillar.id)}
               >
-                {/* Card */}
                 <div
                   className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${
                     cardColors[colorIndex % cardColors.length].bg
@@ -80,9 +84,13 @@ const StepTwo: React.FC<StepTwoProps> = ({
                 >
                   <div className="p-6 pb-4 flex items-start justify-between">
                     <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-xl font-bold shadow-md">
-                      {pillar.title}
+                      {pillar.code}
                     </div>
-                    <div className={`transition-all duration-300 ${isSelected ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}>
+                    <div
+                      className={`transition-all duration-300 ${
+                        isSelected ? "opacity-100 scale-100" : "opacity-0 scale-90"
+                      }`}
+                    >
                       <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white shadow-lg">
                         <Check className="w-6 h-6 text-green-600" />
                       </div>
@@ -91,11 +99,15 @@ const StepTwo: React.FC<StepTwoProps> = ({
 
                   <div className="p-6 pt-2">
                     <div className="mb-12">
-                      <h4 className="text-xl font-semibold text-white leading-tight">
-                        {pillar.desc}
+                      <h4 className="text-xl font-semibold text-justify text-white leading-tight">
+                        {title}
                       </h4>
                     </div>
-                    <div className={`absolute bottom-6 right-6 transition-all duration-300 ${isSelected ? "opacity-0 scale-90" : "opacity-100 scale-100"}`}>
+                    <div
+                      className={`absolute bottom-6 right-6 transition-all duration-300 ${
+                        isSelected ? "opacity-0 scale-90" : "opacity-100 scale-100"
+                      }`}
+                    >
                       <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
                         <Plus className="w-6 h-6 text-white" />
                       </div>
@@ -110,6 +122,21 @@ const StepTwo: React.FC<StepTwoProps> = ({
             );
           })}
         </AnimatePresence>
+      </div>
+
+      {/* Navigation Buttons */}
+      <div className="flex justify-start items-center mt-12 pt-8 border-t border-gray-200">
+        {onPrevious && (
+          <button
+            onClick={onPrevious}
+            className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {t('previous')}
+          </button>
+        )}
       </div>
     </div>
   );

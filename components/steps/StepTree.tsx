@@ -3,17 +3,12 @@ import React, { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from 'react-i18next';
-
-export interface Service {
-  id: string;
-  title: string;
-  desc: string;
-  description_service: string;
-}
+import type { Service } from "@/types";
 
 interface StepThreeProps {
   services: Service[];
   onNext: (serviceId: string) => void;
+  onPrevious?: () => void;
   selectedService?: string | null;
   goalColorIndex?: number | null;
 }
@@ -34,7 +29,30 @@ const ServiceCard: React.FC<{
   isHovered: boolean;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
-}> = ({ service, colorIndex, isSelected, isHovered, onHover, onSelect }) => {
+  language: string;
+}> = ({ service, colorIndex, isSelected, isHovered, onHover, onSelect, language }) => {
+  // Get localized content based on language
+  const getLocalizedTitle = () => {
+    switch (language) {
+      case 'ar':
+        return service.name_service_ar_c || service.title;
+      case 'fr':
+        return service.name_service_fr_c || service.title;
+      default:
+        return service.title;
+    }
+  };
+
+  const getLocalizedDescription = () => {
+    switch (language) {
+      case 'ar':
+        return service.description_service_ar_c || service.desc;
+      case 'fr':
+        return service.description_service_fr_c || service.desc;
+      default:
+        return service.desc;
+    }
+  };
   return (
     <motion.div
       layout
@@ -57,7 +75,7 @@ const ServiceCard: React.FC<{
         {/* Header */}
         <div className="p-6 pb-4 flex items-start justify-between">
           <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-xl font-bold shadow-md">
-            {service.title}
+            {service.code}
           </div>
 
           {/* Selected check */}
@@ -70,8 +88,8 @@ const ServiceCard: React.FC<{
 
         {/* Content */}
         <div className="p-6 pt-2 pb-24 relative">
-          <h4 className="text-xl font-semibold text-white leading-tight">{service.desc}</h4>
-          <p className="text-white text-sm mt-4 text-justify">{service.description_service}</p>
+          <h4 className="text-2xl text-justify font-semibold text-white leading-tight">{getLocalizedTitle()}</h4>
+          <p className="text-white text-lg mt-4 text-justify">{getLocalizedDescription()}</p>
 
           {/* Plus icon for hover */}
           {!isSelected && (
@@ -93,16 +111,20 @@ const ServiceCard: React.FC<{
 const StepThree: React.FC<StepThreeProps> = ({
   services,
   onNext,
+  onPrevious,
   selectedService = null,
   goalColorIndex = null,
 }) => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const [selected, setSelected] = useState<string | null>(selectedService);
   const [hovered, setHovered] = useState<string | null>(null);
+  
+  // Get current language
+  const currentLanguage = i18n.language || 'en';
 
   const handleSelect = (id: string) => {
     setSelected(id);
-    onNext(id); // Immediately go to next step
+    setTimeout(() => onNext(id), 400);
   };
 
   return (
@@ -125,9 +147,25 @@ const StepThree: React.FC<StepThreeProps> = ({
               isHovered={hovered === service.id}
               onHover={setHovered}
               onSelect={handleSelect}
+              language={currentLanguage}
             />
           ))}
         </AnimatePresence>
+      </div>
+
+      {/* Navigation Buttons */}
+      <div className="flex justify-start items-center mt-12 pt-8 border-t border-gray-200">
+        {onPrevious && (
+          <button
+            onClick={onPrevious}
+            className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {t('previous')}
+          </button>
+        )}
       </div>
     </div>
   );

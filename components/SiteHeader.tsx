@@ -1,40 +1,36 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { gsap } from "gsap"
 import { ScrollToPlugin } from "gsap/ScrollToPlugin"
 import Image from "next/image"
-import { ChevronDown } from "lucide-react"
-import vector14 from "@/public/about.png"
+import Lottie from "lottie-react"
+import vector14 from "@/public/maquettes.png"
 import image1 from "@/public/Logo-01.svg"
 import BurgerMenu from "./BurgerMenu"
-import { useTranslation } from 'react-i18next'
+import { useTranslation } from "react-i18next"
+import { useI18n } from "@/context/I18nProvider"
+import scrollDownAnimation from "@/public/scroll-down.json"
+import LanguageSwitcher from "./LanguageSwitcher"
 
 gsap.registerPlugin(ScrollToPlugin)
 
 const About = () => {
-  const { t } = useTranslation('common')
+  const { t } = useTranslation("common")
+  const { isRTL } = useI18n()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
   const containerRef = useRef<HTMLElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
-  const scrollIconRef = useRef<HTMLDivElement>(null)
   const logoRef = useRef<HTMLImageElement>(null)
   const textRefs = useRef<HTMLDivElement[]>([])
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Logo animation (fade, slide, scale)
       gsap.fromTo(
         logoRef.current,
         { opacity: 0, y: 40, scale: 0.9 },
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 1.4,
-          ease: "power3.out",
-        }
+        { opacity: 1, y: 0, scale: 1, duration: 1.4, ease: "power3.out" }
       )
 
-      // Floating effect on logo (infinite subtle movement)
       gsap.to(logoRef.current, {
         y: "+=8",
         duration: 3,
@@ -44,152 +40,101 @@ const About = () => {
         delay: 1.6,
       })
 
-      // Stagger text animation
       gsap.fromTo(
         textRefs.current,
         { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1.2,
-          stagger: 0.3,
-          ease: "power3.out",
-          delay: 0.4,
-        }
+        { opacity: 1, y: 0, duration: 1.2, stagger: 0.3, ease: "power3.out", delay: 0.4 }
       )
-
-      // Scroll icon fade-in
-      gsap.fromTo(
-        scrollIconRef.current,
-        { opacity: 0, y: 20 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1,
-          delay: 1.5,
-          ease: "power2.out",
-        }
-      )
-
-      // Bounce scroll icon
-      gsap.to(scrollIconRef.current, {
-        y: "+=10",
-        duration: 1.5,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
-        delay: 2,
-      })
     }, containerRef)
 
     return () => ctx.revert()
   }, [])
 
-const handleScrollDown = () => {
-  const nextSection = document.querySelector("#next-section");
-  if (nextSection) {
-    const offsetTop = (nextSection as HTMLElement).offsetTop;
-    gsap.to(window, {
-      duration: 0,
-      scrollTo: { y: offsetTop, offsetY: 0 },
-      ease: "power3.inOut",
-    });
+  const handleScrollDown = () => {
+    const nextSection = document.querySelector("#next-section")
+    if (nextSection) {
+      const offsetTop = (nextSection as HTMLElement).offsetTop
+      gsap.to(window, {
+        duration: 0.8,
+        scrollTo: { y: offsetTop, offsetY: 0 },
+        ease: "power3.inOut",
+      })
+    }
   }
-};
-  
 
   return (
     <main
       ref={containerRef}
       id="about"
-      className="bg-primary h-screen mt-0 sm:py-14 relative w-full px-5 md:px-[1.9rem] largesceen:px-14 fourk:px-44"
+      className="bg-[#00797d] h-screen relative w-full px-5 sm:px-8 md:px-12 lg:px-20 xl:px-32 overflow-hidden"
     >
-
-      
-      {/* Background vector image (keep visible as in your version) */}
+      {/* Background vector */}
       <Image
-        src={vector14 || "/placeholder.svg"}
-        alt="vector-line"
-        className="absolute right-0 top-0 h-full max-lg:hidden overflow-hidden"
+        src={vector14}
+        alt={t("vectorLine")}
+        className="absolute right-0 top-0 h-full w-full object-cover block opacity-80"
       />
 
-      <div
-        ref={contentRef}
-        className="desktop:pt-24 flex flex-col lg:flex-row justify-between relative z-10"
-      >
-        {/* Left empty space (kept as in your original) */}
-        <div className="flex flex-col justify-between items-center">
-           {/* Burger Menu in top right corner */}
-       <div className="absolute top-4 right-4 z-50 focus:outline-none">
-        <BurgerMenu />
-      </div>
-          <div className="w-18 h-48 hidden xl:block"></div>
-        </div>
-
-        {/* Main Logo */}
-        <div>
+      {/* Two-column layout */}
+      <div className="flex flex-col lg:flex-row gap-8 items-center lg:justify-between justify-center h-full relative z-10 lg:gap-6">
+        {/* Left: Logo */}
+        <div className="flex justify-center items-center lg:flex-1">
           <Image
             ref={logoRef}
             priority
-            src={image1 || "/placeholder.svg"}
-            alt="Logo"
-            width={250}
-            height={100}
+            src={image1}
+            alt={t("logo")}
+            width={200}
+            height={80}
+            className="w-35 sm:w-28 md:w-40 lg:w-96 h-auto"
           />
         </div>
 
-        {/* Text Section */}
-        <div className="flex flex-col justify-end gap-24 relative max-lg:mt-4">
-          <h1
-           ref={(el) => {
-  if (el) textRefs.current.push(el)
-}}
-            className="lg:translate-y-20 lg:-translate-x-56 desktop:-translate-x-40 largesceen:translate-x-0 md:text-[6.25rem] desktop:text-[7.813rem] largesceen:text-[9.375rem] text-white-100 leading-none text-right w-fit uppercase max-lg:hidden"
-          >
-            <span className="block">ICESCO</span>
-            <span className="text-[32px] text-secondary leading-none block mt-2 gap-2">
-              {t('memberStatesPortal')}
-              <br />
-             <span className="text-white"> {t('poweredBy')}</span> <span className="text-secondary">{t('hiveFlow')}</span>
-            </span>
-            <h3 className="text-[32px] desktop:text-text-[32px] largesceen:text-text-[32px] text-white-100 tracking-[0.094rem] mb-8 w-fit capitalize">
-             
-            </h3>
-          </h1>
+        {/* Burger menu */}
+        {/* Burger menu + Language Switcher */}
+        <div className="absolute top-6 right-6 flex flex-row-reverse items-end gap-3 z-50">
+          {/* Burger */}
+          <BurgerMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />
 
-          <div
-             ref={(el) => { if (el) textRefs.current.push(el) }}
-            className="sm:ml-10 lg:ml-24 desktop:ml-0 relative "
-          >
-          
-            <p className="text-white-100 text-[1.813rem] desktop:text-base 2xl:text-3xl leading-[155.556%] w-[95%] sm:w-[80%] lg:w-[400px] text-justify desktop:w-[52rem]  leading-[155.556%] text-opacity-[0.64] ">
-              {t('takePartStrategy')}
-            </p>
-          </div>
+          {/* Language Switcher */}
+        
         </div>
 
-        {/* Right empty space (kept as in your original) */}
-        <div className="flex flex-col justify-between items-center">
-          <div className="w-48 h-48 hidden xl:block"></div>
+
+
+        {/* Right: Text */}
+        <div className="flex flex-col items-center lg:items-start lg:flex-1 relative lg:gap-4">
+          <div className="flex flex-col lg:justify-center items-center lg:items-end lg:flex-1 relative lg:gap-0">
+            <h4
+              ref={(el) => { if (el) textRefs.current.push(el); }}
+              className={`uppercase text-white text-center lg:${isRTL ? 'text-start' : 'text-end'}
+                        text-5xl sm:text-2xl md:text-4xl lg:text-8xl xl:text-8xl`}
+            >
+              ICESCO
+            </h4>
+            <h4 className={`block text-sm sm:text-base md:text-xl text-center lg:${isRTL ? 'text-start' : 'text-end'} text-secondary mt-1 font-bold`}>
+              {t("memberStatesPortal")} <br />
+              <span className="text-white">{t("poweredBy")}</span>{" "}
+              <span className="text-secondary">{t("hiveFlow")}</span>
+            </h4>
+          </div>
+
+          <p
+            ref={(el) => { if (el) textRefs.current.push(el); }}
+            className={`text-white text-opacity-70 text-xs sm:text-sm md:text-base lg:text-2xl mt-8 
+                        max-w-md text-center lg:${isRTL ? 'text-right' : 'text-left'}`}
+          >
+            {t("takePartStrategy")}
+          </p>
         </div>
       </div>
 
-      {/* Scroll icon */}
-      <div
-        ref={scrollIconRef}
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20"
-      >
-        <button
-          onClick={handleScrollDown}
-          className="flex flex-col items-center gap-2 text-secondary group"
-          aria-label="Scroll down"
-        >
-          <span className="text-2xl font-light tracking-wider">{t('scrollDown')}</span>
-          <div className="w-14 h-14 border border-secondary rounded-full flex items-center justify-center group-hover:border-secondary transition">
-            <ChevronDown className="w-8 h-8" />
-          </div>
-        </button>
-      </div>
+      {/* Scroll Lottie Animation */}
+      {!isMenuOpen && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 cursor-pointer z-20" onClick={handleScrollDown}>
+          <Lottie animationData={scrollDownAnimation} loop={true} className="w-18 h-18" />
+        </div>
+      )}
     </main>
   )
 }

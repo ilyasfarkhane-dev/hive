@@ -2,22 +2,27 @@
 import React, { useState } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
+
+type Goal = {
+  id: string;
+  code: string; // this is the name field
+  title: Record<string, string>; // en/fr/ar
+  desc: Record<string, string>; // en/fr/ar
+};
 
 type StepOneProps = {
-  goals: { id: string; title: string; desc: string }[];
+  goals: Goal[];
   onNext: (goalId: string, colorIndex: number) => void;
   selectedGoal?: string | null;
 };
 
-const StepOne: React.FC<StepOneProps> = ({
-  goals,
-  onNext,
-  selectedGoal = null,
-}) => {
-  const { t } = useTranslation('common');
+const StepOne: React.FC<StepOneProps> = ({ goals, onNext, selectedGoal = null }) => {
+  const { t, i18n } = useTranslation("common");
   const [selected, setSelected] = useState<string | null>(selectedGoal);
   const [hovered, setHovered] = useState<string | null>(null);
+
+  const currentLang = i18n.language || "en";
 
   const cardColors = [
     { bg: "bg-[#3870ba]", hover: "hover:bg-[#2c5a95]" },
@@ -40,10 +45,10 @@ const StepOne: React.FC<StepOneProps> = ({
     <div className="w-full max-w-7xl mx-auto px-4 py-8">
       <div className="text-center mb-12">
         <h3 className="text-3xl font-bold text-gray-800 mb-3">
-          {t('selectStrategicGoal')}
+          {t("selectStrategicGoal")}
         </h3>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          {t('selectStrategicGoalDesc')}
+          {t("selectStrategicGoalDesc")}
         </p>
       </div>
 
@@ -58,41 +63,23 @@ const StepOne: React.FC<StepOneProps> = ({
                 key={goal.id}
                 layout
                 initial={{ opacity: 0, y: 20 }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                  scale: isSelected ? 1.02 : 1,
-                }}
+                animate={{ opacity: 1, y: 0, scale: isSelected ? 1.02 : 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}
-                className={`relative group cursor-pointer transition-all duration-300 ${
-                  isSelected ? "ring-4 ring-white ring-opacity-30 transform" : ""
-                }`}
+                className={`relative group cursor-pointer transition-all duration-300 ${isSelected ? "ring-4 ring-white ring-opacity-30 transform" : ""}`}
                 onMouseEnter={() => setHovered(goal.id)}
                 onMouseLeave={() => setHovered(null)}
                 onClick={() => handleSelect(goal.id)}
               >
                 <div
-                  className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${
-                    cardColors[index % cardColors.length].bg
-                  } ${
-                    isHovered && !isSelected
-                      ? cardColors[index % cardColors.length].hover
-                      : ""
-                  }`}
+                  className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${cardColors[index % cardColors.length].bg} ${isHovered && !isSelected ? cardColors[index % cardColors.length].hover : ""}`}
                 >
                   <div className="p-6 pb-4 flex items-start justify-between">
                     <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-xl font-bold shadow-md">
-                      {goal.title}
+                      {goal.code}
                     </div>
 
-                    <div
-                      className={`transition-all duration-300 ${
-                        isSelected
-                          ? "opacity-100 scale-100"
-                          : "opacity-0 scale-90"
-                      }`}
-                    >
+                    <div className={`transition-all duration-300 ${isSelected ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}>
                       <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white shadow-lg">
                         <Check className="w-6 h-6 text-green-600" />
                       </div>
@@ -101,18 +88,13 @@ const StepOne: React.FC<StepOneProps> = ({
 
                   <div className="p-6 pt-2">
                     <div className="mb-12">
-                      <p className="text-white text-sm opacity-90 mt-2">
-                        {goal.desc}
+                      <p className="text-white text-xl text-justify font-semibold opacity-90 mt-2">
+                        {goal.desc?.[currentLang] || goal.title?.[currentLang] || goal.code}
                       </p>
+
                     </div>
 
-                    <div
-                      className={`absolute bottom-6 right-6 transition-all duration-300 ${
-                        isSelected
-                          ? "opacity-0 scale-90"
-                          : "opacity-100 scale-100"
-                      }`}
-                    >
+                    <div className={`absolute bottom-6 right-6 transition-all duration-300 ${isSelected ? "opacity-0 scale-90" : "opacity-100 scale-100"}`}>
                       <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
                         <Plus className="w-6 h-6 text-white" />
                       </div>

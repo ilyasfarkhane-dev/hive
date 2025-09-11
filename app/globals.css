@@ -14,6 +14,58 @@
   font-style: normal;
 }
 
+.scrolldown-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.scrolldown {
+  border: 2px solid #fac402;
+  border-radius: 30px;
+  height: 55px;
+  width: 32px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.scrolldown svg {
+  margin-top: 10px;
+}
+
+.scrolldown-p1,
+.scrolldown-p2 {
+  fill: #fac402;
+  opacity: 0;
+  animation: scrolldown 2s infinite;
+}
+
+.scrolldown-p2 {
+  animation-delay: 1s;
+}
+
+@keyframes scrolldown {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  60% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+
 * {
   padding: 0;
   margin: 0;

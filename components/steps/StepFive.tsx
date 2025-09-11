@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 type Step5Props = {
   onNext?: (details: any) => void;
+  onPrevious?: () => void;
   initialValues?: any;
 };
 
@@ -10,7 +11,7 @@ export type StepFiveRef = {
   getFormValues: () => any;
 };
 
-const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
+const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, initialValues }, ref) => {
   const { t } = useTranslation('common');
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [formValues, setFormValues] = useState({
@@ -59,12 +60,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
         const savedData = localStorage.getItem("projectDetails");
         if (savedData) {
           const parsedData = JSON.parse(savedData);
-          
+
           // Check if "Other" beneficiary is selected to show the input
           if (parsedData.beneficiaries && parsedData.beneficiaries.includes("Other")) {
             setShowOtherInput(true);
           }
-          
+
           setFormValues(prev => ({
             ...prev,
             ...parsedData,
@@ -87,13 +88,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
 
   // Handle initialValues from props (when coming back from next step)
   useEffect(() => {
-    if (props.initialValues && isInitialized) {
+    if (initialValues && isInitialized) {
       setFormValues(prev => ({
         ...prev,
-        ...props.initialValues,
+        ...initialValues,
       }));
     }
-  }, [props.initialValues, isInitialized]);
+  }, [initialValues, isInitialized]);
 
   // Save to localStorage - but only after initialization
   useEffect(() => {
@@ -162,6 +163,49 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
       }));
     }
   };
+
+  // Form validation function
+  const isFormValid = () => {
+    const requiredFields = [
+      formValues.title,
+      formValues.brief,
+      formValues.beneficiaries.length > 0,
+      formValues.budget.icesco,
+      formValues.budget.member_state,
+      formValues.budget.sponsorship,
+      formValues.projectFrequency,
+      formValues.partners.length > 0,
+      formValues.conveningMethod,
+      formValues.deliveryModality,
+      formValues.geographicScope,
+      formValues.contact.name,
+      formValues.contact.email,
+      formValues.contact.phone,
+      formValues.contact.role,
+    ];
+
+    // Check if "Other" beneficiary is selected but no input provided
+    if (formValues.beneficiaries.includes("Other") && !formValues.otherBeneficiary.trim()) {
+      return false;
+    }
+
+    // Check if "Other" convening method is selected but no input provided
+    if (formValues.conveningMethod === "Other" && !formValues.conveningMethodOther.trim()) {
+      return false;
+    }
+
+    // Check if continuous frequency is selected but no duration provided
+    if (formValues.projectFrequency === "Continuous" && !formValues.frequencyDuration.trim()) {
+      return false;
+    }
+
+    return requiredFields.every(field => field);
+  };
+
+  // Helper function to get field validation class
+  const getFieldValidationClass = (isValid: boolean) => {
+    return isValid ? "" : "border-red-500 focus:border-red-500 focus:ring-red-100";
+  };
   return (
 
     <div id="step5Content" className="space-y-16">
@@ -196,7 +240,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   type="text"
                   required
                   placeholder={t('titlePlaceholder')}
-                  className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm"
+                  className={`w-full px-5 py-3 border rounded-2xl focus:ring-2 shadow-sm ${
+                    getFieldValidationClass(!!formValues.title)
+                  }`}
                 />
               </div>
 
@@ -211,7 +257,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   value={formValues.brief}
                   onChange={(e) => setFormValues({ ...formValues, brief: e.target.value })}
                   placeholder={t('projectBriefPlaceholder')}
-                  className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm"
+                  className={`w-full px-5 py-3 border rounded-2xl focus:ring-2 shadow-sm ${
+                    getFieldValidationClass(!!formValues.brief)
+                  }`}
                 ></textarea>
               </div>
             </div>
@@ -244,7 +292,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
                   value={formValues.rationale}
                   onChange={(e) => setFormValues({ ...formValues, rationale: e.target.value })}
                   placeholder={t('problemStatementPlaceholder')}
-                  className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition"
+                  className={`w-full px-5 py-3 border rounded-2xl focus:ring-2 shadow-sm transition ${
+                    getFieldValidationClass(!!formValues.rationale)
+                  }`}
                 ></textarea>
               </div>
               {/* Target Beneficiaries */}
@@ -680,7 +730,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
             <div className="form-group space-y-2">
               <label className="block">
                 <span className="label-text font-medium text-gray-800">
-                {t('contactFullName')}<span className="text-red-500">*</span>
+                  {t('contactFullName')}<span className="text-red-500">*</span>
                 </span>
                 <span className="block text-gray-500 text-sm">{t('contactFullNameHelp')}</span>
               </label>
@@ -939,7 +989,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
         </div>
 
         {/* Supporting Documents */}
-        <div className="my-12 bg-white backdrop-blur-lg rounded-3xl shadow-xl p-8 space-y-6">
+        <div className="my-12  p-8 space-y-6">
           <div className="card-header flex items-center gap-3 mb-4 text-teal-700">
             <svg
               className="w-5 h-5"
@@ -1043,6 +1093,44 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>((props, ref) => {
         </div>
       </div>
 
+      {/* Navigation Buttons */}
+      <div className="mt-12 pt-8 border-t border-gray-200">
+        <div className="flex justify-between items-center">
+          <button
+            onClick={onPrevious}
+            className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {t('previous')}
+          </button>
+
+          <button
+            onClick={() => onNext && onNext(formValues)}
+            disabled={!isFormValid()}
+            className={`flex items-center px-6 py-3 rounded-lg transition-colors duration-200 font-medium ${
+              isFormValid()
+                ? "bg-[#0e7378] text-white hover:bg-[#0a5d61] cursor-pointer"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            {t('next')}
+            <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Validation Message */}
+        {!isFormValid() && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-600">
+              {t('pleaseFillAllRequiredFields')}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
 
   );

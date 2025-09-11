@@ -210,6 +210,8 @@ if (!i18n.isInitialized) {
           keyPerformanceIndicators: "Key Performance Indicators (KPIs)",
           keyPerformanceIndicatorsPlaceholder: "Enter KPI...",
           keyPerformanceIndicatorsHelp: "Define measurable indicators to track project success",
+          vectorLine: "Vector line",
+          logo: "Logo",
 
         },
       },
@@ -401,6 +403,8 @@ if (!i18n.isInitialized) {
           goal: "Objectif",
           item: "Élément",
           reviewSubmit: "Examen et Soumission",
+          vectorLine: "Ligne vectorielle",
+          logo: "Logo",
         },
       },
       ar: {
@@ -588,6 +592,8 @@ if (!i18n.isInitialized) {
           goal: "الهدف",
           item: "العنصر",
           reviewSubmit: "مراجعة وإرسال",
+          vectorLine: "خط متجه",
+          logo: "الشعار",
         },
       },
     },

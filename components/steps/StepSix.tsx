@@ -2,121 +2,88 @@
 import React, { useState } from "react";
 import { Paperclip } from "lucide-react";
 import { useTranslation } from 'react-i18next';
+import Lottie from "lottie-react";
+import successAnimation from "@/public/success.json"; 
+
+// Update the types to match your new data structure
+type Goal = {
+  id: string;
+  title: Record<string, string>;
+  desc: Record<string, string>;
+};
 
 type Step6Props = {
-  selectedGoal: string | null;
-  selectedPillar: string | null;
-  selectedService: string | null;
-  selectedSubService: string | null;
+  selectedCards: any[];
   projectDetails: any;
-  goals: { id: string; title: string; desc: string }[];
-  pillars: { id: string; title: string; desc: string }[];     // ✅ now arrays
-  services: { id: string; title: string; desc: string }[];    // ✅
-  subServices: { id: string; title: string; desc: string }[]; // ✅
   onClearData?: () => void;
+  onPrevious?: () => void;
+  onEditProjectDetails?: () => void;
 };
 
 const Step6: React.FC<Step6Props> = ({
-  selectedGoal,
-  selectedPillar,
-  selectedService,
-  selectedSubService,
+  selectedCards,
   projectDetails,
-  goals,
-  pillars,
-  services,
-  subServices,
   onClearData,
+  onPrevious,
+  onEditProjectDetails,
 }) => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const [isSubmitted, setIsSubmitted] = useState(false);
-
-  // Debug log
-  console.log({
-    selectedGoal,
-    selectedPillar,
-    selectedService,
-    selectedSubService,
-    goals,
-    pillars,
-    services,
-    subServices,
-  });
+  const currentLanguage = i18n.language || 'en';
 
   const handleSubmit = () => {
     setIsSubmitted(true);
-
-   
-
-  
   };
 
-  const getLabelFromId = (id: string | null, items: { id: string; title: string, desc: string }[]) => {
-    if (!id) return t('notSelected');
-    const item = items.find((item) => item.id === id);
-    return item ? item.desc : t('notFound');
+  // Helper function to get the translated value
+  const getTranslatedValue = (value: Record<string, string> | string, fallback: string = t('notFound')): string => {
+    if (typeof value === 'string') return value;
+    return value[currentLanguage] || value.en || fallback;
   };
 
-  const getPillarTitle = () => {
-    if (!selectedPillar) return t('notSelected');
-    const pillar = pillars.find((p) => p.id === selectedPillar);
-    return pillar ? pillar.desc : t('notFound');
+  const getCardTitle = (type: string) => {
+    switch (type) {
+      case "goal":
+        return t("strategicGoal");
+      case "pillar":
+        return t("pillar");
+      case "service":
+        return t("service");
+      case "subService":
+        return t("subService");
+      default:
+        return t("item");
+    }
   };
 
-  const getServiceTitle = () => {
-    if (!selectedService) return t('notSelected');
-    const service = services.find((s) => s.id === selectedService);
-    return service ? service.desc : t('notFound');
-  };
-
-  const getSubServiceTitle = () => {
-    if (!selectedSubService) return t('notSelected');
-    const subService = subServices.find((s) => s.id === selectedSubService);
-    return subService ? subService.desc : t('notFound');
-  };
-
- if (isSubmitted) {
-  return (
-    <div className="mt-16 w-full max-w-4xl mx-auto">
-      <div className="p-12 text-center bg-white rounded-2xl shadow-lg">
-        <div className="mb-8">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg
-              className="w-10 h-10 text-green-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
+  if (isSubmitted) {
+    return (
+      <div className="mt-16 w-full max-w-4xl mx-auto">
+        <div className="p-12 text-center bg-white rounded-2xl shadow-lg">
+          <div className="mb-8">
+            <div className="w-28 h-28 mx-auto mb-6">
+              <Lottie animationData={successAnimation} loop={false} />
+            </div>
+            <h3 className="text-2xl font-bold text-green-600 mb-4">
+              {t('projectSubmittedSuccessfully')}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {t('projectSubmittedDesc')}
+            </p>
           </div>
-          <h3 className="text-2xl font-bold text-green-600 mb-4">
-            {t('projectSubmittedSuccessfully')}
-          </h3>
-          <p className="text-gray-600 mb-6">
-            {t('projectSubmittedDesc')}
-          </p>
+          <button
+            onClick={() => {
+              setIsSubmitted(false); 
+              if (onClearData) onClearData();
+            }}
+            className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
+          >
+            {t('ok')}
+          </button>
         </div>
-
-        {/* ✅ OK button */}
-        <button
-          onClick={() => {
-            setIsSubmitted(false); // Reset view (you can redirect here instead)
-            if (onClearData) onClearData(); // Clear data if needed
-          }}
-          className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
-        >
-          {t('ok')}
-        </button>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 
   return (
@@ -129,28 +96,31 @@ const Step6: React.FC<Step6Props> = ({
       </p>
 
       <div className="bg-white rounded-2xl shadow-lg p-8 space-y-8">
-        {/* Strategic Goal */}
-        <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">{t('strategicGoal')}</p>
-          <p className="text-gray-800">{getLabelFromId(selectedGoal, goals)}</p>
-        </div>
+        {/* Edit Button */}
+        {onEditProjectDetails && (
+          <div className="flex justify-end mb-6">
+            <button
+              onClick={onEditProjectDetails}
+              className="flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors duration-200 font-medium"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              {t('editProjectDetails')}
+            </button>
+          </div>
+        )}
 
-        {/* Pillar */}
-        <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">{t('pillar')}</p>
-          <p className="text-gray-800">{getPillarTitle()}</p>
-        </div>
-
-        {/* Service */}
-        <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">{t('service')}</p>
-          <p className="text-gray-800">{getServiceTitle()}</p>
-        </div>
-
-        {/* Sub-Service */}
-        <div className="border-b pb-6">
-          <p className="text-xl font-semibold text-teal-700 mb-4">{t('subService')}</p>
-          <p className="text-gray-800">{getSubServiceTitle()}</p>
+        {/* Selected Cards */}
+        <div className="space-y-6">
+          <h4 className="text-xl font-semibold text-teal-700 mb-6">{t('yourSelections')}</h4>
+          {selectedCards.map((card, index) => (
+            <div key={`${card.type}-${card.id}`} className="border-b pb-6 last:border-b-0">
+              <p className="text-lg font-semibold text-teal-700 mb-2">{getCardTitle(card.type)}</p>
+              <p className="text-gray-800 font-medium">{card.title}</p>
+              <p className="text-gray-600 text-sm mt-1">{card.desc}</p>
+            </div>
+          ))}
         </div>
 
         {/* Project Details */}
@@ -289,13 +259,25 @@ const Step6: React.FC<Step6Props> = ({
           </div>
         )}
 
-        {/* Action Buttons */}
-        <button
-          onClick={handleSubmit}
-          className="px-8 py-3 bg-teal-600 justify-center text-center flex items-center mx-auto text-white rounded-xl hover:bg-teal-700 transition shadow-md font-medium"
-        >
-          {t('submitProject')}
-        </button>
+        {/* Navigation Buttons */}
+        <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+          <button
+            onClick={onPrevious}
+            className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {t('previous')}
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            className="px-8 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition shadow-md font-medium"
+          >
+            {t('submitProject')}
+          </button>
+        </div>
       </div>
     </div>
   );

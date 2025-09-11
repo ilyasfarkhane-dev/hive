@@ -1,24 +1,18 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { FaArrowUp } from "react-icons/fa";
+import Lottie from "lottie-react";
+import scrollUpAnimation from "@/public/go-top.json"; // place your Lottie JSON file in /public
 
 const ScrollToTop: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.pageYOffset > 300) {
-        setIsVisible(true);
-      } else {
-        setIsVisible(false);
-      }
+      setIsVisible(window.pageYOffset > 300);
     };
 
     window.addEventListener("scroll", handleScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const scrollToTop = () => {
@@ -32,11 +26,19 @@ const ScrollToTop: React.FC = () => {
     <button
       type="button"
       onClick={scrollToTop}
-      className={`  fixed right-12 w-12 h-12 flex items-center justify-center text-white bg-secondary rounded-lg z-50 transition-all duration-1000 ${
-        isVisible ? "bottom-1 animate-scroll_amini" : "bottom-[-10%] transition-all duration-300"
-      } hover:bg-primary`}
-      style={{ transitionProperty: "bottom" }}>
-      <FaArrowUp />
+      className={`fixed right-12 w-16 h-16 flex items-center justify-center rounded-full z-50 transition-all duration-1000 ${
+        isVisible
+          ? "bottom-8 animate-scroll_amini"
+          : "bottom-[-10%] transition-all duration-300"
+      }`}
+      style={{ transitionProperty: "bottom" }}
+    >
+      <Lottie
+        animationData={scrollUpAnimation}
+        loop
+        autoplay
+        className="w-22 h-22"
+      />
     </button>
   );
 };

@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import Lottie from "lottie-react";
-import loadingAnimation from "@/assets/loading.json"; // place your Lottie JSON in /public
+import loadingAnimation from "@/public/Loading.json"; // place your Lottie JSON in /public
 
 interface LottieLoaderProps {
   message?: string;

@@ -17,14 +17,14 @@ const demoCredentials = [
 ];
 
 const LoginPage = () => {
-const { t } = useTranslation('common');
+  const { t } = useTranslation('common');
   const [showPassword, setShowPassword] = useState(false);
   const [credentials, setCredentials] = useState({ login: "", password: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  
+
 
   useEffect(() => {
     const storedHash = localStorage.getItem("contactEeemailHash");
@@ -83,22 +83,22 @@ const { t } = useTranslation('common');
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex justify-center">
           <Image src={logo || "/placeholder.svg"} alt="ICESCO Logo" width={120} height={120} className="mb-6" />
         </motion.div>
- <motion.h4
-  initial={{ opacity: 0, y: -10 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.5, delay: 0.1 }}
-  className="mt-6 text-center text-3xl font-semibold text-secondary"
->
-  {t('siteTitle')}
-</motion.h4>
-<motion.p
-  initial={{ opacity: 0, y: -8 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.5, delay: 0.2 }}
-  className="text-center text-lg font-medium text-white mt-2"
->
-  {t('subtitle')}
-</motion.p>
+        <motion.h4
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="mt-6 text-center text-3xl font-semibold text-secondary"
+        >
+          {t('title')}
+        </motion.h4>
+        <motion.p
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="text-center text-lg font-medium text-white mt-2"
+        >
+          {t('subtitle')}
+        </motion.p>
       </div>
 
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.3 }} className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -154,7 +154,7 @@ const { t } = useTranslation('common');
                   <LogIn className="w-5 h-5 mr-2" /> {t('signIn')}
                 </>}
               </motion.button>
-             
+
             </div>
           </form>
         </div>

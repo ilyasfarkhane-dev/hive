@@ -7,6 +7,8 @@ interface LottieLoaderProps {
   message?: string;
 }
 
+//hi
+
 const LottieLoader: React.FC<LottieLoaderProps> = ({ message }) => {
   return (
     <div className="flex flex-col items-center justify-center py-12">

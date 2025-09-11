@@ -27,6 +27,8 @@ if (!i18n.isInitialized) {
     resources: {
       en: {
         common: {
+          siteTitle: "ICESCO",
+          subtitle: "Member States Portal",
           title: "ICESCO Member States Portal",
           description: "ICESCO Member States Portal",
           login: "Login",
@@ -210,6 +212,9 @@ if (!i18n.isInitialized) {
           keyPerformanceIndicators: "Key Performance Indicators (KPIs)",
           keyPerformanceIndicatorsPlaceholder: "Enter KPI...",
           keyPerformanceIndicatorsHelp: "Define measurable indicators to track project success",
+          pleaseFillAllRequiredFields: "Please fill all required fields",
+          uploadDropOrBrowse: "Drop files here or click to browse",
+          uploadTypesLimit: "PDF, DOCX, Images, PPTX up to 10MB each",
           vectorLine: "Vector line",
           logo: "Logo",
 
@@ -217,6 +222,8 @@ if (!i18n.isInitialized) {
       },
       fr: {
         common: {
+          siteTitle: "ICESCO",
+          subtitle: "Portail des États Membres",
           contactFullName: "Nom complet",
           keyPerformanceIndicatorsHelp: "Définissez des indicateurs mesurables pour suivre le succès du projet",
 
@@ -238,6 +245,9 @@ if (!i18n.isInitialized) {
           expectedOutputsDeliverablesPlaceholder: "Listez les résultats attendus...",
           keyPerformanceIndicators: "Indicateurs clés de performance (KPI)",
           keyPerformanceIndicatorsPlaceholder: "Entrez un KPI...",
+          pleaseFillAllRequiredFields: "Veuillez remplir tous les champs obligatoires",
+          uploadDropOrBrowse: "Déposez les fichiers ici ou cliquez pour parcourir",
+          uploadTypesLimit: "PDF, DOCX, Images, PPTX jusqu'à 10 Mo chacun",
 
           title: "Portail des États Membres de l'ICESCO",
           description: "Portail des États Membres de l'ICESCO",
@@ -409,6 +419,8 @@ if (!i18n.isInitialized) {
       },
       ar: {
         common: {
+          siteTitle: "الإيسيسكو",
+          subtitle: "بوابة الدول الأعضاء",
           keyPerformanceIndicatorsHelp: "حدد مؤشرات قابلة للقياس لتتبع نجاح المشروع",
 
           contactRolePlaceholder: "أدخل دور جهة الاتصال في المشروع",
@@ -433,6 +445,9 @@ if (!i18n.isInitialized) {
           expectedOutputsDeliverablesPlaceholder: "أدخل المخرجات المتوقعة...",
           keyPerformanceIndicators: "مؤشرات الأداء الرئيسية (KPIs)",
           keyPerformanceIndicatorsPlaceholder: "أدخل مؤشر أداء...",
+          pleaseFillAllRequiredFields: "يرجى تعبئة جميع الحقول المطلوبة",
+          uploadDropOrBrowse: "أسقط الملفات هنا أو انقر للاستعراض",
+          uploadTypesLimit: "PDF و DOCX و الصور و PPTX حتى 10MB لكل ملف",
 
           title: "بوابة الدول الأعضاء في الإيسيسكو",
           description: "بوابة الدول الأعضاء في الإيسيسكو",

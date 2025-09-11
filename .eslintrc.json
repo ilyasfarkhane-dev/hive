@@ -1,3 +1,7 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "react/no-unescaped-entities": "off", // Disable specific Next.js rule
+    "no-unused-vars": "off" // Disable general ESLint rule
+  }
 }

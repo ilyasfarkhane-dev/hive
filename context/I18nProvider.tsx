@@ -27,6 +27,7 @@ if (!i18n.isInitialized) {
     resources: {
       en: {
         common: {
+          projectTitle: "Project Title",
           siteTitle: "ICESCO",
           subtitle: "Member States Portal",
           title: "ICESCO Member States Portal",
@@ -222,6 +223,7 @@ if (!i18n.isInitialized) {
       },
       fr: {
         common: {
+          projectTitle: "Titre du Projet",
           siteTitle: "ICESCO",
           subtitle: "Portail des États Membres",
           contactFullName: "Nom complet",
@@ -419,6 +421,7 @@ if (!i18n.isInitialized) {
       },
       ar: {
         common: {
+          projectTitle: "عنوان المشروع",
           siteTitle: "الإيسيسكو",
           subtitle: "بوابة الدول الأعضاء",
           keyPerformanceIndicatorsHelp: "حدد مؤشرات قابلة للقياس لتتبع نجاح المشروع",

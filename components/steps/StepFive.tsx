@@ -230,7 +230,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="block font-medium text-gray-900">
-                  {t('title')} <span className="text-red-500">*</span>
+                  {t('projectTitle')} <span className="text-red-500">*</span>
                   <span className="block text-gray-500 text-sm">{t('titleHelp')}</span>
                 </label>
                 <input
@@ -1126,7 +1126,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         {!isFormValid() && (
           <div className="mt-4 text-center">
             <p className="text-sm text-gray-600">
-              {t('pleaseFillAllRequiredFields')}  {t('comments')}
+              {t('pleaseFillAllRequiredFields')}  
             </p>
           </div>
         )}

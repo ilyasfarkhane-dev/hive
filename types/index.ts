@@ -16,14 +16,12 @@ export interface Pillar {
 export interface Service {
     id: string;
     code: string;
-    title: string;
-    desc: string;
     description_service: string;
     description_service_fr_c: string;
     description_service_ar_c: string;
     name_service_fr_c: string;
     name_service_ar_c: string;
-    name_service: string;
+    description: string;
 }
 
 

@@ -32,27 +32,29 @@ const ServiceCard: React.FC<{
   language: string;
 }> = ({ service, colorIndex, isSelected, isHovered, onHover, onSelect, language }) => {
   // Get localized content based on language
-  const getLocalizedTitle = () => {
-    switch (language) {
-      case 'ar':
-        return service.name_service_ar_c || service.title;
-      case 'fr':
-        return service.name_service_fr_c || service.title;
-      default:
-        return service.title;
-    }
-  };
+const getLocalizedTitle = () => {
+  switch (language) {
+    case 'ar':
+      return service.name_service_ar_c || service.description;
+    case 'fr':
+      return service.name_service_fr_c || service.description;
+    default:
+      console.log("service description:", service.description);
+      console.log("service :", service);
+      return service.description;
+  }
+};
 
-  const getLocalizedDescription = () => {
-    switch (language) {
-      case 'ar':
-        return service.description_service_ar_c || service.desc;
-      case 'fr':
-        return service.description_service_fr_c || service.desc;
-      default:
-        return service.desc;
-    }
-  };
+const getLocalizedDescription = () => {
+  switch (language) {
+    case 'ar':
+      return service.description_service_ar_c || service.description_service || service.description;
+    case 'fr':
+      return service.description_service_fr_c || service.description_service || service.description;
+    default:
+      return service.description_service || service.description;
+  }
+};
   return (
     <motion.div
       layout
@@ -88,8 +90,8 @@ const ServiceCard: React.FC<{
 
         {/* Content */}
         <div className="p-6 pt-2 pb-24 relative">
-          <h4 className="text-2xl text-justify font-semibold text-white leading-tight">{getLocalizedTitle()}</h4>
-          <p className="text-white text-lg mt-4 text-justify">{getLocalizedDescription()}</p>
+          <h3 className="text-2xl  font-semibold text-white leading-tight">{getLocalizedTitle()}</h3>
+          <p className="text-white text-lg mt-4 ">{getLocalizedDescription()}</p>
 
           {/* Plus icon for hover */}
           {!isSelected && (

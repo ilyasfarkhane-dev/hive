@@ -76,61 +76,64 @@ const Rooms = () => {
   }, []);
 
   // Clear localStorage on page refresh/unload
-  useEffect(() => {
-    const handleBeforeUnload = () => {
+useEffect(() => {
+  const handleBeforeUnload = () => {
+    localStorage.removeItem('selectedCards');
+    localStorage.removeItem('projectDetails');
+  };
+
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') {
       localStorage.removeItem('selectedCards');
       localStorage.removeItem('projectDetails');
-    };
+    }
+  };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        localStorage.removeItem('selectedCards');
-        localStorage.removeItem('projectDetails');
-      }
-    };
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Clear on page refresh/reload
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+}, []);
 
-    // Cleanup function
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
 
   // Load selected cards from localStorage on component mount
-  useEffect(() => {
-    const loadSelectedCards = () => {
-      try {
-        const savedCards = localStorage.getItem('selectedCards');
-        if (savedCards) {
-          const parsedCards = JSON.parse(savedCards);
-          setSelectedCards(parsedCards);
+ useEffect(() => {
+  const loadSelectedCards = () => {
+    try {
+      const savedCards = localStorage.getItem("selectedCards");
+      if (savedCards) {
+        const parsedCards = JSON.parse(savedCards);
 
-          // If we have cards, show two columns and set the current step based on the last card
-          if (parsedCards.length > 0) {
-            setShowTwoColumns(true);
+        // ✅ Ensure every card keeps its type for the badge
+        const cardsWithType = parsedCards.map((card: any) => ({
+          ...card,
+          type: card.type || "unknown", // keep type or fallback
+        }));
 
-            // Determine current step based on the last selected card
-            const lastCard = parsedCards[parsedCards.length - 1];
-            switch (lastCard.type) {
-              case 'goal':
-                setCurrentStep(2);
-                setSelectedGoal(lastCard.id);
-                setSelectedColorIndex(lastCard.colorIndex);
-                // Load pillars for this goal
-                const goalPillars = pillarsData[lastCard.id] || [];
-                setPillars(goalPillars);
-                break;
-              case 'pillar':
-                setCurrentStep(3);
-                setSelectedPillar(lastCard.id);
-                setSelectedColorIndex(lastCard.colorIndex);
-                // Load services for this pillar
-                const pillarServicesRaw = pillarServicesData[lastCard.id] || [];
-                const pillarServices = pillarServicesRaw.map((s: any, index: number) => ({
+        setSelectedCards(cardsWithType);
+
+        if (cardsWithType.length > 0) {
+          setShowTwoColumns(true);
+
+          const lastCard = cardsWithType[cardsWithType.length - 1];
+          switch (lastCard.type) {
+            case "goal":
+              setCurrentStep(2);
+              setSelectedGoal(lastCard.id);
+              setSelectedColorIndex(lastCard.colorIndex);
+              setPillars(pillarsData[lastCard.id] || []);
+              break;
+
+            case "pillar":
+              setCurrentStep(3);
+              setSelectedPillar(lastCard.id);
+              setSelectedColorIndex(lastCard.colorIndex);
+              const pillarServicesRaw = pillarServicesData[lastCard.id] || [];
+              setServices(
+                pillarServicesRaw.map((s: any, index: number) => ({
                   id: s.id || s.code || `service-${index}`,
                   code: s.code,
                   title: s.description_service,
@@ -141,16 +144,19 @@ const Rooms = () => {
                   name_service_fr_c: s.name_service_fr_c,
                   name_service_ar_c: s.name_service_ar_c,
                   name_service: s.description_service,
-                }));
-                setServices(pillarServices);
-                break;
-              case 'service':
-                setCurrentStep(4);
-                setSelectedService(lastCard.id);
-                setSelectedColorIndex(lastCard.colorIndex);
-                // Load sub-services for this service
-                const serviceSubServicesRaw = (serviceSubservicesData as any)[lastCard.id] || [];
-                const serviceSubServices = serviceSubServicesRaw.map((s: any) => ({
+                  type: "service", // ✅ keep type
+                }))
+              );
+              break;
+
+            case "service":
+              setCurrentStep(4);
+              setSelectedService(lastCard.id);
+              setSelectedColorIndex(lastCard.colorIndex);
+              const serviceSubServicesRaw =
+                (serviceSubservicesData as any)[lastCard.id] || [];
+              setSubServices(
+                serviceSubServicesRaw.map((s: any) => ({
                   id: s.id,
                   name: s.name,
                   name_ar_c: s.name_ar_c,
@@ -164,24 +170,30 @@ const Rooms = () => {
                   description_subservice_ar_c: s.description_subservice_ar_c,
                   description_subservice_fr_c: s.description_subservice_fr_c,
                   description_subservice_en_c: s.description_subservice_en_c,
-                }));
-                setSubServices(serviceSubServices);
-                break;
-              case 'subService':
-                setCurrentStep(5);
-                setSelectedSubService(lastCard.id);
-                setSelectedColorIndex(lastCard.colorIndex);
-                break;
-            }
+                  type: "subService", // ✅ keep type
+                }))
+              );
+              break;
+
+            case "subService":
+              setCurrentStep(5);
+              setSelectedSubService(lastCard.id);
+              setSelectedColorIndex(lastCard.colorIndex);
+              break;
           }
         }
-      } catch (error) {
-        console.error('Error loading selected cards from localStorage:', error);
       }
-    };
+    } catch (error) {
+      console.error(
+        "Error loading selected cards from localStorage:",
+        error
+      );
+    }
+  };
 
-    loadSelectedCards();
-  }, []);
+  loadSelectedCards();
+}, []);
+
 
   // Handle goal selection
   const handleGoalSelect = (goalId: string, colorIndex: number) => {
@@ -230,7 +242,7 @@ const Rooms = () => {
         id: s.id || s.code || `service-${index}`, // ensure id exists
         code: s.code, // ✅ use the correct field
         title: s.description_service, // English title
-        desc: s.description_service, // English description
+        description: s.description, // English description
         description_service: s.description_service,
         description_service_fr_c: s.description_service_fr_c,
         description_service_ar_c: s.description_service_ar_c,
@@ -487,11 +499,12 @@ const Rooms = () => {
                         exit={{ opacity: 0, y: -50 }}
                         transition={{ duration: 0.4 }}
                       >
-                        <div className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${cardColors[card.colorIndex % cardColors.length].bg}`}>
+                        <div className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 relative  ${cardColors[card.colorIndex % cardColors.length].bg}`}>
 
                           {/* Type badge */}
                           <div className="absolute top-2 left-2 px-2 py-1 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-800 z-10">
                             {getCardTitle(card.type)}
+                            
                           </div>
 
                           {/* Code badge */}

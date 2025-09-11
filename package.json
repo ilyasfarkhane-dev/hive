@@ -17,6 +17,7 @@
     "framer-motion": "^11.18.2",
     "gsap": "^3.13.0",
     "i18next": "^25.5.2",
+    "i18next-http-backend": "^3.0.2",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.542.0",
     "md5": "^2.3.0",

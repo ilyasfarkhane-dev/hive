@@ -1,5 +1,6 @@
 {
-  "title": "ICESCO Member States Portal",
+  "siteTitle": "ICESCO",
+  "subtitle": "Member States Portal",
   "description": "ICESCO Member States Portal",
   "login": "Login",
   "password": "Password",
@@ -48,6 +49,7 @@
   "selectService": "Select Your Service",
   "selectServiceDesc": "Choose the service that best matches your project's focus",
   "serviceSelected": "Service selected successfully",
+  "ilyas": "farkhakjakja",
   "subServiceSelected": "Sub-service selected successfully",
   "pleaseFillAllRequiredFields": "Please fill all required fields to continue",
   "editProjectDetails": "Edit Project Details",

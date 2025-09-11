@@ -54,20 +54,19 @@ const Rooms = () => {
     id: string,
     title: string,
     desc: string,
-    colorIndex: number
+    colorIndex: number,
+    code?: string // <-- add code as optional param
   ) => {
-    const newCard = { type, id, title, desc, colorIndex };
-   setSelectedCards((prev) => {
-  // Only replace if type+id already exists (optional)
-  const exists = prev.some(c => c.id === newCard.id);
-  if (!exists) {
-    const updatedCards = [...prev, newCard];
-    localStorage.setItem('selectedCards', JSON.stringify(updatedCards));
-    return updatedCards;
-  }
-  return prev; // card already exists, do nothing
-});
-
+    const newCard = { type, id, title, desc, colorIndex, code }; // <-- include code
+    setSelectedCards((prev) => {
+      const exists = prev.some(c => c.id === newCard.id);
+      if (!exists) {
+        const updatedCards = [...prev, newCard];
+        localStorage.setItem('selectedCards', JSON.stringify(updatedCards));
+        return updatedCards;
+      }
+      return prev;
+    });
   };
 
 
@@ -193,7 +192,7 @@ const Rooms = () => {
     const goal = goals.find((g) => g.id === goalId);
     if (goal) {
       const lang = i18n.language || "en";
-      addSelectedCard("goal", goal.id, goal.title[lang], goal.desc[lang], colorIndex);
+      addSelectedCard("goal", goal.id, goal.title[lang], goal.desc[lang], colorIndex, goal.code);
     }
 
     // Load pillars for this goal
@@ -334,25 +333,25 @@ const Rooms = () => {
   };
 
   // Handle navigation
-const handlePrevious = () => {
-  if (currentStep > 1) {
-    const prevStep = currentStep - 1;
-    setCurrentStep(prevStep);
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      const prevStep = currentStep - 1;
+      setCurrentStep(prevStep);
 
-    // Remove cards of steps after prevStep
-    setSelectedCards((cards) =>
-      cards.filter((card) => {
-        switch (card.type) {
-          case 'goal': return prevStep >= 2;
-          case 'pillar': return prevStep >= 3;
-          case 'service': return prevStep >= 4;
-          case 'subService': return prevStep >= 5;
-          default: return true;
-        }
-      })
-    );
-  }
-};
+      // Remove cards of steps after prevStep
+      setSelectedCards((cards) =>
+        cards.filter((card) => {
+          switch (card.type) {
+            case 'goal': return prevStep >= 2;
+            case 'pillar': return prevStep >= 3;
+            case 'service': return prevStep >= 4;
+            case 'subService': return prevStep >= 5;
+            default: return true;
+          }
+        })
+      );
+    }
+  };
 
 
 
@@ -477,57 +476,57 @@ const handlePrevious = () => {
                 <div className="text-sm font-semibold text-gray-600 mb-2">
                   {t("yourSelections")}
                 </div>
-               <div className="relative min-h-[200px] flex flex-col gap-4">
-  <AnimatePresence>
-    {selectedCards.map((card, index) => (
-      <motion.div
-        key={`${card.type}-${card.id || index}`}
-        className={`w-full ${index === selectedCards.length - 1 ? "scale-105 shadow-2xl" : "scale-100"}`}
-        initial={{ opacity: 0, y: 50, scale: 0.9 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -50 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${cardColors[card.colorIndex % cardColors.length].bg}`}>
+                <div className="relative min-h-[200px] flex flex-col gap-4">
+                  <AnimatePresence>
+                    {selectedCards.map((card, index) => (
+                      <motion.div
+                        key={`${card.type}-${card.id || index}`}
+                        className={`w-full ${index === selectedCards.length - 1 ? "scale-105 shadow-2xl" : "scale-100"}`}
+                        initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -50 }}
+                        transition={{ duration: 0.4 }}
+                      >
+                        <div className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${cardColors[card.colorIndex % cardColors.length].bg}`}>
 
-          {/* Type badge */}
-          <div className="absolute top-2 left-2 px-2 py-1 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-800 z-10">
-            {getCardTitle(card.type)}
-          </div>
+                          {/* Type badge */}
+                          <div className="absolute top-2 left-2 px-2 py-1 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-800 z-10">
+                            {getCardTitle(card.type)}
+                          </div>
 
-          {/* Code badge */}
-          {card.code && (
-            <div className="absolute top-2 right-2 px-2 py-1 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-800 z-10">
-              {card.code}
-            </div>
-          )}
+                          {/* Code badge */}
+                          {card.code && (
+                            <div className="absolute top-2 right-2 px-2 py-1 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-800 z-10">
+                              {card.code}
+                            </div>
+                          )}
 
-          <div className="p-4 pb-3 flex items-start justify-between relative">
-            <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-sm font-bold shadow-md">
-              {card.name} 
-            </div>
-            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-lg">
-              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
+                          <div className="p-4 pb-3 flex items-start justify-between relative">
+                            <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-sm font-bold shadow-md">
+                              {card.name}
+                            </div>
+                            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-lg">
+                              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
 
-          <div className="p-4 pt-2">
-            <div className="mb-8">
-              <p className="text-white text-sm text-justify font-semibold opacity-90 mb-1">
-                {card.title}
-              </p>
-              <p className="text-white text-xs text-justify opacity-75 line-clamp-2">
-                {card.desc}
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    ))}
-  </AnimatePresence>
-</div>
+                          <div className="p-4 pt-2">
+                            <div className="mb-8">
+                              <p className="text-white text-sm text-justify font-semibold opacity-90 mb-1">
+                                {card.title}
+                              </p>
+                              <p className="text-white text-xs text-justify opacity-75 line-clamp-2">
+                                {card.desc}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
 
               </div>
             </div>

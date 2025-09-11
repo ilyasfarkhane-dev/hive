@@ -1126,7 +1126,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         {!isFormValid() && (
           <div className="mt-4 text-center">
             <p className="text-sm text-gray-600">
-              {t('pleaseFillAllRequiredFields')}
+              {t('pleaseFillAllRequiredFields')}  {t('comments')}
             </p>
           </div>
         )}

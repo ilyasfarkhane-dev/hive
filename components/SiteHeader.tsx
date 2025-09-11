@@ -50,18 +50,12 @@ const About = () => {
     return () => ctx.revert()
   }, [])
 
-  const handleScrollDown = () => {
-    const nextSection = document.querySelector("#next-section")
-    if (nextSection) {
-      const offsetTop = (nextSection as HTMLElement).offsetTop
-      gsap.to(window, {
-        duration: 0.8,
-        scrollTo: { y: offsetTop, offsetY: 0 },
-        ease: "power3.inOut",
-      })
-    }
+const handleScrollDown = () => {
+  const nextSection = document.querySelector("#next-section");
+  if (nextSection) {
+    nextSection.scrollIntoView({ behavior: "smooth" });
   }
-
+};
   return (
     <main
       ref={containerRef}

@@ -428,7 +428,7 @@ const handlePrevious = () => {
   }, [showTwoColumns, currentStep]);
 
   return (
-    <section className="bg-white-100 py-10 lg:py-14 w-full px-5 md:px-[1.9rem] largesceen:px-14 fourk:px-44 relative">
+    <section id="next-section" className="bg-white-100 py-10 lg:py-14 w-full px-5 md:px-[1.9rem] largesceen:px-14 fourk:px-44 relative">
       <div className="text-center mt-12 sm:mt-20 xl:mt-0">
         <h2 className="text-gradient uppercase text-3xl xs:text-[2rem] leading-none lg:text-[6.25rem] desktop:text-[7.813rem] largesceen:text-[2.375rem]">
           {t("takePartInStrategy")}

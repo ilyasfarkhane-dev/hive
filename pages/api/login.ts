@@ -14,8 +14,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const sessionId = await getSessionId(); // CRM session
 
     const contactInfo = await getContactByLogin(sessionId, email);
-    if (!contactInfo)
-      return res.status(404).json({ message: "Contact not found" });
+   
+
+    if (
+      !contactInfo ||
+      !contactInfo.password_c ||
+      contactInfo.portal_access_c !== "1" ||
+      contactInfo.password_c !== password
+    ) {
+      return res.status(404).json({ message: "Contact not found or access denied" });
+    }
+
+   
 
     const goals = await getGoals(sessionId, language);
 

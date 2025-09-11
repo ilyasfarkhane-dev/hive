@@ -73,7 +73,16 @@ export async function getContactByLogin(sessionId: string, login: string) {
   const contacts = await getModuleEntries(
     sessionId,
     "Contacts",
-    ["id", "first_name", "last_name", "login_c", "email1", "phone_work"],
+    [
+      "id",
+      "first_name",
+      "last_name",
+      "login_c",
+      "email1",
+      "phone_work",
+      "password_c",         // <-- add this field
+      "portal_access_c"   // <-- and this field
+    ],
     `login_c='${login.replace(/'/g, "\\'")}'`,
     1
   );

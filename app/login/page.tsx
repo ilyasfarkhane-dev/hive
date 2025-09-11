@@ -78,7 +78,7 @@ const LoginPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-[#0e7378] to-[#1B3B36] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       {/* Language Switcher - Top Right */}
       <div className="absolute top-4 right-4">
-        <LanguageSwitcher variant="dropdown" showLabels={true} />
+        <LanguageSwitcher showLabels={true} />
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md">

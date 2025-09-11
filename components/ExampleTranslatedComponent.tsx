@@ -19,7 +19,7 @@ const ExampleTranslatedComponent: React.FC = () => {
         <h1 className={`text-3xl font-bold text-gray-800 ${getTextAlign('left')}`}>
           {t('common.title')}
         </h1>
-        <LanguageSwitcher variant="dropdown" showLabels={true} />
+        <LanguageSwitcher  showLabels={true} />
       </div>
 
       {/* Description */}

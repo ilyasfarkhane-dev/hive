@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import logo from "@/public/Logo-01.svg";
 import { useTranslation } from 'react-i18next';
+
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import i18n from 'i18next';
 import axios from "axios";
@@ -16,12 +17,14 @@ const demoCredentials = [
 ];
 
 const LoginPage = () => {
-  const { t } = useTranslation('common');
+const { t } = useTranslation('common');
   const [showPassword, setShowPassword] = useState(false);
   const [credentials, setCredentials] = useState({ login: "", password: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  
 
   useEffect(() => {
     const storedHash = localStorage.getItem("contactEeemailHash");

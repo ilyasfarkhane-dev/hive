@@ -1,6 +1,18 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { useTranslation } from 'react-i18next'
 
+// Debug function to check for multilingual objects
+const debugRender = (value: any, context: string) => {
+  if (value && typeof value === 'object' && !Array.isArray(value) && !React.isValidElement(value)) {
+    if (value.hasOwnProperty('en') && value.hasOwnProperty('fr') && value.hasOwnProperty('ar')) {
+      console.error(`🚨 MULTILINGUAL OBJECT DETECTED in ${context}:`, value);
+      console.error('Stack trace:', new Error().stack);
+      return String(value.en || value.fr || value.ar || '');
+    }
+  }
+  return value;
+};
+
 type Step5Props = {
   onNext?: (details: any) => void;
   onPrevious?: () => void;
@@ -12,7 +24,17 @@ export type StepFiveRef = {
 };
 
 const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, initialValues }, ref) => {
-  const { t } = useTranslation('common');
+  const { t: originalT, i18n } = useTranslation('common');
+  const currentLanguage = i18n.language || 'en';
+  
+  // Safe translation function to ensure strings are returned
+  const t = (key: string): string => {
+    const translated = originalT(key);
+    if (typeof translated === 'object' && translated !== null) {
+      return (translated as any)[currentLanguage] || (translated as any).en || key;
+    }
+    return typeof translated === 'string' ? translated : key;
+  };
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [formValues, setFormValues] = useState({
     title: "",
@@ -167,7 +189,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     }));
     
     if (email && !validateEmail(email)) {
-      setEmailError(t('invalidEmailFormat'));
+      setEmailError(String(t('invalidEmailFormat')));
     } else {
       setEmailError("");
     }
@@ -277,10 +299,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
       {/* Section Header */}
       <div className="text-center mb-8">
         <h3 className="text-2xl font-bold text-[#0f7378] mb-2">
-          {t('enterProjectDetails')}
+          {debugRender(t('enterProjectDetails'), 'main title')}
         </h3>
         <p className="text-gray-600 text-sm">
-          {t('fillAllRequiredFields')}
+          {debugRender(t('fillAllRequiredFields'), 'subtitle')}
         </p>
       </div>
 
@@ -288,7 +310,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         {/* Project Identity */}
         <div className="space-y-6">
           <div className="border-b border-gray-200 pb-4">
-            <h4 className="text-lg font-semibold text-gray-800">{t('projectOverview')}</h4>
+            <h4 className="text-lg font-semibold text-gray-800">{debugRender(t('projectOverview'), 'section header')}</h4>
             <p className="text-sm text-gray-600 mt-1">{t('fillAllRequiredFields')}</p>
           </div>
 
@@ -359,12 +381,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3" id="beneficiaries">
                 {[
-                  { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: t('beneficiaryStudents') },
-                  { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: t('beneficiaryTeachers') },
-                  { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: t('beneficiaryYouth') },
-                  { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: t('beneficiaryPublic') },
-                  { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: t('beneficiaryPolicymakers') },
-                  { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: t('beneficiaryOther') },
+                  { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: String(t('beneficiaryStudents')) },
+                  { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: String(t('beneficiaryTeachers')) },
+                  { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: String(t('beneficiaryYouth')) },
+                  { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: String(t('beneficiaryPublic')) },
+                  { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: String(t('beneficiaryPolicymakers')) },
+                  { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: String(t('beneficiaryOther')) },
                 ].map((benef) => (
                   <label
                     key={benef.value}
@@ -574,7 +596,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder={formValues.partners.length >= 5 ? t('maxPartnersReached') : t('addPartnerPlaceholder')}
+                  placeholder={String(formValues.partners.length >= 5 ? t('maxPartnersReached') : t('addPartnerPlaceholder'))}
                   className={`enhanced-input flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 ${
                     formValues.partners.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
                   }`}
@@ -862,7 +884,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <input
                   type="text"
                   id="milestone-input"
-                  placeholder={formValues.milestones.length >= 5 ? t('maxMilestonesReached') : t('milestoneNamePlaceholder')}
+                  placeholder={String(formValues.milestones.length >= 5 ? t('maxMilestonesReached') : t('milestoneNamePlaceholder'))}
                   className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${
                     formValues.milestones.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
                   }`}
@@ -958,7 +980,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <input
                   type="text"
                   id="kpi-input"
-                  placeholder={formValues.kpis.length >= 5 ? t('maxKPIsReached') : t('keyPerformanceIndicatorsPlaceholder')}
+                  placeholder={String(formValues.kpis.length >= 5 ? t('maxKPIsReached') : t('keyPerformanceIndicatorsPlaceholder'))}
                   className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${
                     formValues.kpis.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
                   }`}
@@ -1105,11 +1127,37 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            {t('previous')}
+            {debugRender(t('previous'), 'previous button')}
           </button>
 
           <button
-            onClick={() => onNext && onNext(formValues)}
+            onClick={() => {
+              console.log('=== STEP 5 SUBMISSION DEBUG ===');
+              console.log('Form values being passed to next step:', formValues);
+              
+              // Check for multilingual objects in form values
+              const checkForMultilingualObjects = (obj: any, path = '') => {
+                for (const [key, value] of Object.entries(obj)) {
+                  const currentPath = path ? `${path}.${key}` : key;
+                  if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    if (value.hasOwnProperty('en') && value.hasOwnProperty('fr') && value.hasOwnProperty('ar')) {
+                      console.warn(`Found multilingual object at ${currentPath}:`, value);
+                    } else {
+                      checkForMultilingualObjects(value, currentPath);
+                    }
+                  } else if (Array.isArray(value)) {
+                    value.forEach((item, index) => {
+                      if (item && typeof item === 'object') {
+                        checkForMultilingualObjects(item, `${currentPath}[${index}]`);
+                      }
+                    });
+                  }
+                }
+              };
+              
+              checkForMultilingualObjects(formValues);
+              onNext && onNext(formValues);
+            }}
             disabled={!isFormValid()}
             className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${
               isFormValid()
@@ -1117,7 +1165,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
-            {t('next')}
+            {debugRender(t('next'), 'next button')}
             <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -1132,7 +1180,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               <p className="text-sm text-amber-700">
-                {t('pleaseFillAllRequiredFields')}  
+                {debugRender(t('pleaseFillAllRequiredFields'), 'validation message')}  
               </p>
             </div>
           </div>

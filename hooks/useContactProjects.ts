@@ -75,7 +75,11 @@ export const useContactProjects = () => {
       });
 
       const result = await response.json();
-      console.log('Contact projects result:', result);
+      console.log('=== CONTACT PROJECTS API RESULT ===');
+      console.log('Success:', result.success);
+      console.log('Projects count:', result.projects?.length || 0);
+      console.log('Error:', result.error);
+      console.log('Full result:', result);
 
       if (result.success) {
         console.log(`Found ${result.projects.length} projects from CRM`);

@@ -54,6 +54,7 @@ export interface ProjectSubmissionData {
   contact_email: string;
   contact_phone: string;
   contact_role: string;
+  contact_id?: string;
   
   // Additional info
   comments?: string;
@@ -76,7 +77,13 @@ export const useProjectSubmission = () => {
   const { logProjects, refreshData } = useSessionTracking();
 
   const submitProject = async (projectData: ProjectSubmissionData): Promise<SubmissionResult> => {
+    console.log('=== PROJECT SUBMISSION DEBUG ===');
+    console.log('Session ID:', sessionId);
+    console.log('Project Data:', projectData);
+    console.log('Current Language:', currentLanguage);
+    
     if (!sessionId) {
+      console.error('No session ID found - user not authenticated');
       return {
         success: false,
         error: 'No active session found. Please log in again.',
@@ -98,6 +105,8 @@ export const useProjectSubmission = () => {
       // Log the project submission
       logProjectSubmission(submissionData);
 
+      console.log('Sending request to /api/submit-project-simple...');
+      console.log('Current window location:', window.location.href);
       const response = await fetch('/api/submit-project-simple', {
         method: 'POST',
         headers: {
@@ -106,7 +115,15 @@ export const useProjectSubmission = () => {
         body: JSON.stringify(submissionData),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const result = await response.json();
+      console.log('API response:', result);
 
       if (result.success) {
         setSubmissionResult({
@@ -142,9 +159,15 @@ export const useProjectSubmission = () => {
       return result;
     } catch (error) {
       console.error('Project submission error:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        projectData: projectData,
+        sessionId: sessionId
+      });
       const errorResult = {
         success: false,
-        error: 'Failed to submit project. Please try again.',
+        error: `Failed to submit project. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
       setSubmissionResult(errorResult);
       return errorResult;

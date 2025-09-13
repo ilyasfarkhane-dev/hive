@@ -167,42 +167,58 @@ export const getServiceCodeFromSubserviceId = (subserviceCode: string): string |
 };
 
 // Helper function to get goal title from goal code
-export const getGoalTitleFromCode = (goalCode: string): string | null => {
+export const getGoalTitleFromCode = (goalCode: string, language: 'en' | 'fr' | 'ar' = 'en'): string | null => {
   const goal = goals.find(g => g.code === goalCode);
-  return goal ? goal.title.en : null;
+  return goal ? goal.title[language] : null;
 };
 
 // Helper function to get pillar title from pillar code
-export const getPillarTitleFromCode = (pillarCode: string): string | null => {
+export const getPillarTitleFromCode = (pillarCode: string, language: 'en' | 'fr' | 'ar' = 'en'): string | null => {
   for (const goalId in pillarsData) {
     const pillars = (pillarsData as any)[goalId];
     const pillar = pillars.find((p: any) => p.code === pillarCode);
     if (pillar) {
-      return pillar.title.en;
+      return pillar.title[language];
     }
   }
   return null;
 };
 
 // Helper function to get service title from service code
-export const getServiceTitleFromCode = (serviceCode: string): string | null => {
+export const getServiceTitleFromCode = (serviceCode: string, language: 'en' | 'fr' | 'ar' = 'en'): string | null => {
   for (const pillarId in pillarServicesData) {
     const services = (pillarServicesData as any)[pillarId];
     const service = services.find((s: any) => s.code === serviceCode);
     if (service) {
-      return service.description;
+      switch (language) {
+        case 'ar':
+          return service.name_service_ar_c || service.description;
+        case 'fr':
+          return service.name_service_fr_c || service.description;
+        case 'en':
+        default:
+          return service.description;
+      }
     }
   }
   return null;
 };
 
 // Helper function to get subservice title from subservice code
-export const getSubServiceTitleFromCode = (subserviceCode: string): string | null => {
+export const getSubServiceTitleFromCode = (subserviceCode: string, language: 'en' | 'fr' | 'ar' = 'en'): string | null => {
   for (const serviceId in serviceSubservicesData) {
     const subServices = (serviceSubservicesData as any)[serviceId];
     const subService = subServices.find((s: any) => s.name === subserviceCode);
     if (subService) {
-      return subService.description;
+      switch (language) {
+        case 'ar':
+          return subService.name_ar_c || subService.description;
+        case 'fr':
+          return subService.name_fr_c || subService.description;
+        case 'en':
+        default:
+          return subService.description;
+      }
     }
   }
   return null;

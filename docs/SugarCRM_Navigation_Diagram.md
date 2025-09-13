@@ -338,3 +338,4 @@ Login → ms_goal → List View → Click Goal → View Related Pillars → Clic
 This visual guide should help you navigate the SugarCRM interface effectively to view and manage ICESCO project data and strategic framework relationships.
 
 
+

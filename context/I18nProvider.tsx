@@ -28,6 +28,8 @@ if (!i18n.isInitialized) {
       en: {
         common: {
           "showing": "Showing",
+          "noCrmProjectsYet": "No project proposals are available at this time",
+          "noCrmProjectsDescription": "No projects yet",
           "of": "of",
           "home": "Home",
           "drafted": "Drafted",
@@ -269,6 +271,8 @@ if (!i18n.isInitialized) {
           "of": "de",
           "published": "Publié",
           "projects": "Projets",
+          "noCrmProjectsYet": "Aucun projet trouvé",
+          "noCrmProjectsDescription": "Aucun projet trouvé",
           "invalidEmailFormat": "Veuillez entrer une adresse email valide",
           "home": "Accueil",
           "maxPartnersReached": "Nombre maximum de partenaires atteint (5/5)",
@@ -501,6 +505,8 @@ if (!i18n.isInitialized) {
       ar: {
         common: {
           "drafted": "مسودة",
+          "noCrmProjectsYet": "لا يوجد مشاريع بعد",
+          "noCrmProjectsDescription": "لا يوجد مشاريع بعد",
           "showing": "عرض",
           "of": "من",
           "created": "منشور",

@@ -83,12 +83,28 @@ const ProjectsPage = () => {
 
   // Update CRM projects when data changes
   useEffect(() => {
+    console.log('=== PROJECTS PAGE CRM DATA UPDATE ===');
+    console.log('CRM Projects Data:', crmProjectsData);
+    console.log('CRM Loading:', crmLoading);
+    console.log('CRM Error:', crmError);
+    
     if (crmProjectsData) {
-      console.log('Setting CRM projects:', crmProjectsData);
+      console.log('Setting CRM projects:', crmProjectsData.length, 'projects');
+      console.log('=== ACTUAL CRM PROJECTS DATA ===');
+      console.log('First 3 projects:', crmProjectsData.slice(0, 3).map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        status: p.status,
+        created: p.created_at,
+        source: 'CRM' // This should confirm it's from CRM
+      })));
       setCrmProjects(crmProjectsData);
       setLoading(false);
+    } else {
+      console.log('No CRM projects data received');
     }
-  }, [crmProjectsData]);
+  }, [crmProjectsData, crmLoading, crmError]);
 
   // Set loading based on CRM loading state
   useEffect(() => {
@@ -99,11 +115,15 @@ const ProjectsPage = () => {
   useEffect(() => {
     let filtered = [...crmProjects];
 
-    console.log('Filtering CRM projects:', {
-      crmProjects: crmProjects.length,
-      statusFilter,
-      searchTerm
-    });
+    console.log('=== FILTERING CRM PROJECTS ===');
+    console.log('Input projects:', crmProjects.length);
+    console.log('Status filter:', statusFilter);
+    console.log('Search term:', searchTerm);
+    console.log('Sample input project:', crmProjects[0] ? {
+      id: crmProjects[0].id,
+      name: crmProjects[0].name,
+      status: crmProjects[0].status
+    } : 'No projects');
 
     // Search filter
     if (searchTerm) {
@@ -129,6 +149,15 @@ const ProjectsPage = () => {
       });
     }
 
+    console.log('=== FILTERING RESULTS ===');
+    console.log('Final filtered projects:', filtered.length);
+    console.log('Sample filtered project:', filtered[0] ? {
+      id: filtered[0].id,
+      name: filtered[0].name,
+      status: filtered[0].status,
+      description: filtered[0].description?.substring(0, 50) + '...'
+    } : 'No filtered projects');
+    
     setFilteredProjects(filtered);
     setCurrentPage(1); // Reset to first page when filters change
   }, [crmProjects, searchTerm, statusFilter]);
@@ -344,8 +373,8 @@ const ProjectsPage = () => {
           ))}
         </div>
       </div>
-    </div>
-  );
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-white-100" dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'}>
@@ -359,13 +388,13 @@ const ProjectsPage = () => {
       
       {/* Main Content */}
       <div className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Search and Filter Controls */}
           {loading ? (
             <LoadingFilters />
           ) : (
-            <div className="mb-8">
+        <div className="mb-8">
             <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
               {/* Search Bar */}
               <div className="relative flex-1 max-w-md">
@@ -428,19 +457,9 @@ const ProjectsPage = () => {
                 <span className="ml-2 text-teal-600">
                   ({crmProjects.length})
                 </span>
-              </div>
+        </div>
+
               
-              {/* Refresh Button */}
-              <button
-                onClick={() => refetchCrmProjects()}
-                disabled={crmLoading}
-                className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-teal-600 transition-colors duration-200 disabled:opacity-50"
-              >
-                <svg className={`w-4 h-4 mr-2 ${crmLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                {t('refresh')}
-              </button>
             </div>
             )}
             
@@ -457,8 +476,8 @@ const ProjectsPage = () => {
             <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
               <FileText className="w-12 h-12 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('noCrmProjectsYet')}</h3>
-            <p className="text-gray-500 mb-6">
+            
+            <p className="text-gray-500 text-lg mb-6">
               {t('noCrmProjectsDescription')}
             </p>
             <a
@@ -509,7 +528,7 @@ const ProjectsPage = () => {
                       {/* Project Title */}
                       <div className="mb-6">
                         <h4 className="text-xl font-bold text-gray-600 line-clamp-2 mb-4 group-hover:text-teal-700 transition-colors duration-300">
-                          {project.name}
+                    {project.name}
                         </h4>
                       </div>
 
@@ -575,13 +594,20 @@ const ProjectsPage = () => {
                         
                         {/* Show CRM relationship information with codes */}
                         {(() => {
+                              // Debug: Log project subservice data
+                              console.log(`=== PROJECT CARD DEBUG: ${project.id} ===`);
+                              console.log('Project subservice_id:', project.subservice_id);
+                              console.log('Project subservice_name:', project.subservice_name);
+                              console.log('Full project data:', project);
+                              
                               // Try to get subservice code using the comprehensive function
                               const subserviceCode = getSubServiceCodeFromProject(project);
+                              console.log('Subservice code from function:', subserviceCode);
                               
                               if (!subserviceCode) {
                                 // If no subservice code found, show a generic message
                                 return (
-                                  <Tooltip content="No subservice relationship found">
+                                  <Tooltip content={`No subservice relationship found. ID: ${project.subservice_id || 'none'}, Name: ${project.subservice_name || 'none'}`}>
                                     <span className="px-3 py-1.5 bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
                                       No Subservice
                                     </span>
@@ -594,11 +620,11 @@ const ProjectsPage = () => {
                               const pillarCode = getPillarCodeFromSubserviceId(subserviceCode);
                               const serviceCode = getServiceCodeFromSubserviceId(subserviceCode);
                               
-                              // Get the titles for tooltips
-                              const goalTitle = goalCode ? getGoalTitleFromCode(goalCode) : null;
-                              const pillarTitle = pillarCode ? getPillarTitleFromCode(pillarCode) : null;
-                              const serviceTitle = serviceCode ? getServiceTitleFromCode(serviceCode) : null;
-                              const subserviceTitle = getSubServiceTitleFromCode(subserviceCode);
+                              // Get the titles for tooltips with current language
+                              const goalTitle = goalCode ? getGoalTitleFromCode(goalCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
+                              const pillarTitle = pillarCode ? getPillarTitleFromCode(pillarCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
+                              const serviceTitle = serviceCode ? getServiceTitleFromCode(serviceCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
+                              const subserviceTitle = getSubServiceTitleFromCode(subserviceCode, currentLanguage as 'en' | 'fr' | 'ar');
                               
                               return (
                                 <>
@@ -720,8 +746,8 @@ const ProjectsPage = () => {
                     </svg>
                   </button>
                 </div>
-              </div>
-              
+                </div>
+                
               <div className="p-6 space-y-6">
                 {/* Project Overview */}
                 <div>
@@ -732,7 +758,7 @@ const ProjectsPage = () => {
                 </div>
 
                 {/* Contact Information */}
-                <div>
+                  <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('contactInformation')}</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="flex items-center">
@@ -752,10 +778,10 @@ const ProjectsPage = () => {
                       <span>{selectedProject.contact_role || ''}</span>
                     </div>
                   </div>
-                </div>
+                  </div>
 
                 {/* Budget */}
-                <div>
+                  <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('budget')}</h3>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="bg-blue-50 p-4 rounded-lg">
@@ -765,14 +791,14 @@ const ProjectsPage = () => {
                     <div className="bg-green-50 p-4 rounded-lg">
                       <div className="text-sm text-green-600 font-medium">{t('memberState')}</div>
                       <div className="text-xl font-bold text-green-900">{selectedProject.budget_member_state} USD</div>
-                    </div>
+                  </div>
                     <div className="bg-purple-50 p-4 rounded-lg">
                       <div className="text-sm text-purple-600 font-medium">{t('sponsorship')}</div>
                       <div className="text-xl font-bold text-purple-900">{selectedProject.budget_sponsorship} USD</div>
-                    </div>
                   </div>
+                    </div>
                 </div>
-
+                
                 {/* Timeline */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('timeline')}</h3>
@@ -784,8 +810,8 @@ const ProjectsPage = () => {
                     <div>
                       <div className="text-sm text-gray-600">{t('endDate')}</div>
                       <div className="font-medium">{selectedProject.end_date ? formatDate(selectedProject.end_date) : t('notSet')}</div>
-                    </div>
                   </div>
+                </div>
                 </div>
 
                 {/* Supporting Documents */}
@@ -797,8 +823,8 @@ const ProjectsPage = () => {
                         <div key={index} className="flex items-center p-3 bg-gray-50 rounded-lg">
                           <FileText className="w-4 h-4 mr-2 text-gray-400" />
                           <span className="text-sm text-gray-600">{doc}</span>
-                        </div>
-                      ))}
+              </div>
+            ))}
                     </div>
                   </div>
                 )}

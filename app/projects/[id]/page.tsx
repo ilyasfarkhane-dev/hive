@@ -5,7 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, MapPin, Users, DollarSign, FileText, Landmark, Settings, Pin, Clock, Tag, Target, BarChart3, User, MessageSquare } from 'lucide-react';
+import Image from 'next/image';
 import ProjectsHeader from '@/components/ProjectsHeader';
+import maquettesImage from '@/public/maquettes.png';
 
 import {
   getGoalCodeFromSubserviceId,
@@ -79,15 +81,20 @@ const ProjectDetailsPage = () => {
   useEffect(() => {
     const fetchProject = async () => {
       try {
+        console.log('=== PROJECT DETAILS PAGE DEBUG ===');
         setLoading(true);
         setError(null);
         const projectId = params?.id as string;
+        console.log('Project ID from params:', projectId);
 
         // First try to get from localStorage (local projects) - this is instant
         const localProjects = JSON.parse(localStorage.getItem('projects') || '[]');
+        console.log('Local projects found:', localProjects.length);
         const localProject = localProjects.find((p: AnyProject) => p.id === projectId);
+        console.log('Local project found:', !!localProject);
 
         if (localProject) {
+          console.log('Using local project:', localProject);
           setProject({ ...localProject, source: 'local' });
           setLoading(false);
           return;
@@ -97,14 +104,18 @@ const ProjectDetailsPage = () => {
         // Get contact ID from localStorage
         const contactInfo = JSON.parse(localStorage.getItem('contactInfo') || '{}');
         const contactId = contactInfo.id;
+        console.log('Contact info from localStorage:', contactInfo);
+        console.log('Contact ID:', contactId);
 
         if (!contactId) {
+          console.log('❌ No contact ID found');
           setError('No contact information found. Please log in again.');
           setLoading(false);
           return;
         }
 
         // Use Promise.race to add a timeout to the API call
+        console.log('🔄 Making API call to get contact projects...');
         const apiCall = fetch(`/api/get-contact-projects`, {
           method: 'POST',
           headers: {
@@ -118,68 +129,170 @@ const ProjectDetailsPage = () => {
         );
 
         const response = await Promise.race([apiCall, timeoutPromise]) as Response;
+        console.log('API response status:', response.status);
+        console.log('API response ok:', response.ok);
 
         if (response.ok) {
           const data = await response.json();
+          console.log('API response data:', data);
+          console.log('Number of projects returned:', data.projects?.length || 0);
+          
           const crmProject = data.projects?.find((p: AnyProject) => p.id === projectId);
+          console.log('CRM project found:', !!crmProject);
+          console.log('Looking for project ID:', projectId);
+          console.log('Available project IDs:', data.projects?.map((p: AnyProject) => p.id) || []);
 
           if (crmProject) {
+            // Debug: Log the raw CRM project data
+            console.log('=== RAW CRM PROJECT DATA ===');
+            console.log('Project ID:', projectId);
+            console.log('Raw CRM project:', crmProject);
+            console.log('Available fields:', Object.keys(crmProject));
+            
+            // Log specific fields that might be missing
+            console.log('Key fields check:');
+            console.log('- beneficiaries:', crmProject.beneficiaries);
+            console.log('- partners:', crmProject.partners);
+            console.log('- delivery_modality:', crmProject.delivery_modality);
+            console.log('- geographic_scope:', crmProject.geographic_scope);
+            console.log('- project_type:', crmProject.project_type);
+            console.log('- budget_icesco:', crmProject.budget_icesco);
+            console.log('- budget_member_state:', crmProject.budget_member_state);
+            console.log('- budget_sponsorship:', crmProject.budget_sponsorship);
+            console.log('- contact_name:', crmProject.contact_name);
+            console.log('- contact_email:', crmProject.contact_email);
+            console.log('- contact_phone:', crmProject.contact_phone);
+            console.log('- contact_role:', crmProject.contact_role);
+            
+            // Check for alternative field names that might exist in CRM
+            console.log('=== CHECKING ALTERNATIVE FIELD NAMES ===');
+            const alternativeFields = [
+              'beneficiaries_c', 'beneficiaries_list', 'target_beneficiaries',
+              'partners_c', 'partners_list', 'collaborating_partners',
+              'delivery_method', 'modality', 'implementation_method',
+              'geographic_coverage', 'scope', 'coverage_area',
+              'project_category', 'type', 'category',
+              'budget_icesco_c', 'icesco_budget', 'total_budget',
+              'budget_member_c', 'member_budget', 'member_state_budget',
+              'budget_sponsor_c', 'sponsor_budget', 'sponsorship_budget',
+              'contact_person', 'primary_contact', 'project_contact',
+              'email', 'contact_email_c', 'primary_email',
+              'phone', 'contact_phone_c', 'primary_phone',
+              'position', 'role_c', 'contact_position'
+            ];
+            
+            alternativeFields.forEach(field => {
+              if (crmProject[field] !== undefined) {
+                console.log(`Found alternative field ${field}:`, crmProject[field]);
+              }
+            });
+            
+            // Special debugging for partners field
+            console.log('=== PARTNERS FIELD DEBUG ===');
+            console.log('partners:', crmProject.partners);
+            console.log('partners_c:', crmProject.partners_c);
+            console.log('partners_list:', crmProject.partners_list);
+            console.log('collaborating_partners:', crmProject.collaborating_partners);
+            
+            // Check if partners data exists in any form
+            const partnersFields = ['partners', 'partners_c', 'partners_list', 'collaborating_partners'];
+            partnersFields.forEach(field => {
+              if (crmProject[field] !== undefined && crmProject[field] !== null && crmProject[field] !== '') {
+                console.log(`✅ Found partners data in field ${field}:`, crmProject[field]);
+              } else {
+                console.log(`❌ No partners data in field ${field}:`, crmProject[field]);
+              }
+            });
+            
+            // Helper function to get field value with fallbacks
+            const getFieldValue = (primaryField: string, ...fallbackFields: string[]) => {
+              const allFields = [primaryField, ...fallbackFields];
+              for (const field of allFields) {
+                if (crmProject[field] !== undefined && crmProject[field] !== null && crmProject[field] !== '') {
+                  return crmProject[field];
+                }
+              }
+              return '';
+            };
+
             // Transform CRM project data to match expected format
             const transformedProject = {
               ...crmProject,
               source: 'crm',
               // Transform string fields to arrays where needed
-              beneficiaries: typeof crmProject.beneficiaries === 'string'
-                ? crmProject.beneficiaries.split(',').map((b: string) => b.trim()).filter((b: string) => b)
-                : crmProject.beneficiaries || [],
-              partners: typeof crmProject.partners === 'string'
-                ? crmProject.partners.split(',').map((p: string) => p.trim()).filter((p: string) => p)
-                : crmProject.partners || [],
-              milestones: typeof crmProject.milestones === 'string'
-                ? crmProject.milestones.split(',').map((m: string) => m.trim()).filter((m: string) => m)
-                : crmProject.milestones || [],
-              kpis: typeof crmProject.kpis === 'string'
-                ? crmProject.kpis.split(',').map((k: string) => k.trim()).filter((k: string) => k)
-                : crmProject.kpis || [],
-              // Map budget fields
+              beneficiaries: (() => {
+                const beneficiariesValue = getFieldValue('beneficiaries', 'beneficiaries_c', 'beneficiaries_list', 'target_beneficiaries');
+                return typeof beneficiariesValue === 'string'
+                  ? beneficiariesValue.split(',').map((b: string) => b.trim()).filter((b: string) => b)
+                  : Array.isArray(beneficiariesValue) ? beneficiariesValue : [];
+              })(),
+              partners: (() => {
+                const partnersValue = getFieldValue('partners', 'partners_c', 'partners_list', 'collaborating_partners');
+                return typeof partnersValue === 'string'
+                  ? partnersValue.split(',').map((p: string) => p.trim()).filter((p: string) => p)
+                  : Array.isArray(partnersValue) ? partnersValue : [];
+              })(),
+              milestones: (() => {
+                const milestonesValue = getFieldValue('milestones', 'milestones_c', 'milestones_list');
+                return typeof milestonesValue === 'string'
+                  ? milestonesValue.split(',').map((m: string) => m.trim()).filter((m: string) => m)
+                  : Array.isArray(milestonesValue) ? milestonesValue : [];
+              })(),
+              kpis: (() => {
+                const kpisValue = getFieldValue('kpis', 'kpis_c', 'kpis_list', 'key_performance_indicators');
+                return typeof kpisValue === 'string'
+                  ? kpisValue.split(',').map((k: string) => k.trim()).filter((k: string) => k)
+                  : Array.isArray(kpisValue) ? kpisValue : [];
+              })(),
+              // Map budget fields with fallbacks
               budget: {
-                icesco: crmProject.budget_icesco || crmProject.budget?.icesco || '0',
-                member_state: crmProject.budget_member_state || crmProject.budget?.member_state || '0',
-                sponsorship: crmProject.budget_sponsorship || crmProject.budget?.sponsorship || '0'
+                icesco: getFieldValue('budget_icesco', 'budget_icesco_c', 'icesco_budget', 'total_budget') || '0',
+                member_state: getFieldValue('budget_member_state', 'budget_member_c', 'member_budget', 'member_state_budget') || '0',
+                sponsorship: getFieldValue('budget_sponsorship', 'budget_sponsor_c', 'sponsor_budget', 'sponsorship_budget') || '0'
               },
-              // Map other fields
-              brief: crmProject.description || crmProject.brief,
-              rationale: crmProject.problem_statement || crmProject.rationale,
-              start_date: crmProject.start_date,
-              end_date: crmProject.end_date,
-              project_frequency: crmProject.frequency || crmProject.project_frequency,
-              delivery_modality: crmProject.delivery_modality,
-              geographic_scope: crmProject.geographic_scope,
-              convening_method: crmProject.project_type || crmProject.convening_method,
-              expected_outputs: crmProject.expected_outputs,
-              comments: crmProject.comments,
-              // Map contact info
+              // Map other fields with fallbacks
+              brief: getFieldValue('description', 'brief', 'project_description', 'summary'),
+              rationale: getFieldValue('problem_statement', 'rationale', 'justification', 'background'),
+              start_date: getFieldValue('start_date', 'date_start', 'project_start', 'begin_date'),
+              end_date: getFieldValue('end_date', 'date_end', 'project_end', 'completion_date'),
+              project_frequency: getFieldValue('frequency', 'project_frequency', 'frequency_c', 'recurrence'),
+              delivery_modality: getFieldValue('delivery_modality', 'delivery_method', 'modality', 'implementation_method'),
+              geographic_scope: getFieldValue('geographic_scope', 'geographic_coverage', 'scope', 'coverage_area'),
+              convening_method: getFieldValue('project_type', 'convening_method', 'project_category', 'type', 'category'),
+              expected_outputs: getFieldValue('expected_outputs', 'outputs', 'deliverables', 'results'),
+              comments: getFieldValue('comments', 'notes', 'remarks', 'additional_info'),
+              // Map contact info with fallbacks
               contact: {
-                name: crmProject.contact_name || crmProject.contact?.name || '',
-                email: crmProject.contact_email || crmProject.contact?.email || '',
-                phone: crmProject.contact_phone || crmProject.contact?.phone || '',
-                role: crmProject.contact_role || crmProject.contact?.role || ''
+                name: getFieldValue('contact_name', 'contact_person', 'primary_contact', 'project_contact'),
+                email: getFieldValue('contact_email', 'email', 'contact_email_c', 'primary_email'),
+                phone: getFieldValue('contact_phone', 'phone', 'contact_phone_c', 'primary_phone'),
+                role: getFieldValue('contact_role', 'position', 'role_c', 'contact_position')
               }
             };
 
+            console.log('=== TRANSFORMED PROJECT DATA ===');
+            console.log('Transformed project:', transformedProject);
+            console.log('Transformed beneficiaries:', transformedProject.beneficiaries);
+            console.log('Transformed partners:', transformedProject.partners);
+            console.log('Transformed budget:', transformedProject.budget);
+
             setProject(transformedProject);
+            console.log('✅ Project loaded successfully');
           } else {
+            console.log('❌ Project not found in CRM');
             setError('Project not found in CRM');
           }
         } else {
+          console.log('❌ API call failed with status:', response.status);
           setError('Failed to fetch project details from CRM');
         }
       } catch (err) {
-        console.error('Error fetching project:', err);
+        console.error('❌ Error fetching project:', err);
         setError(err instanceof Error && err.message === 'Request timeout' 
           ? 'Request timed out. Please try again.' 
           : 'An error occurred while loading the project');
       } finally {
+        console.log('🔄 Setting loading to false');
         setLoading(false);
       }
     };
@@ -232,6 +345,74 @@ const ProjectDetailsPage = () => {
     }).format(num);
   };
 
+  // Helper function to translate beneficiary values
+  const translateBeneficiary = (beneficiary: string) => {
+    const beneficiaryMap: Record<string, string> = {
+      'Students': t('beneficiaryStudents'),
+      'Teachers': t('beneficiaryTeachers'),
+      'Youth': t('beneficiaryYouth'),
+      'General Public': t('beneficiaryPublic'),
+      'Policymakers': t('beneficiaryPolicymakers'),
+      'Other': t('beneficiaryOther'),
+      // Add more mappings as needed
+    };
+    
+    return beneficiaryMap[beneficiary] || beneficiary;
+  };
+
+  // Helper function to translate frequency values
+  const translateFrequency = (frequency: string) => {
+    const frequencyMap: Record<string, string> = {
+      'One-time': t('frequencyOneTime'),
+      'Continuous': t('frequencyContinuous'),
+      'Monthly': t('frequencyMonthly') || 'Monthly',
+      'Yearly': t('frequencyYearly') || 'Yearly',
+      'Weekly': t('frequencyWeekly') || 'Weekly',
+      'Daily': t('frequencyDaily') || 'Daily',
+      // Add more mappings as needed
+    };
+    
+    return frequencyMap[frequency] || frequency;
+  };
+
+  // Helper function to translate delivery modality values
+  const translateModality = (modality: string) => {
+    const modalityMap: Record<string, string> = {
+      'Physical': t('modalityPhysical'),
+      'Virtual': t('modalityVirtual'),
+      'Hybrid': t('modalityHybrid'),
+      // Add more mappings as needed
+    };
+    
+    return modalityMap[modality] || modality;
+  };
+
+  // Helper function to translate geographic scope values
+  const translateScope = (scope: string) => {
+    const scopeMap: Record<string, string> = {
+      'National': t('scopeNational'),
+      'Regional': t('scopeRegional'),
+      'International': t('scopeInternational'),
+      // Add more mappings as needed
+    };
+    
+    return scopeMap[scope] || scope;
+  };
+
+  // Helper function to translate convening method values
+  const translateConveningMethod = (method: string) => {
+    const methodMap: Record<string, string> = {
+      'Workshop': t('typeWorkshop'),
+      'Conference': t('typeConference'),
+      'Training': t('typeTraining'),
+      'Campaign': t('typeCampaign'),
+      'Research': t('typeResearch'),
+      // Add more mappings as needed
+    };
+    
+    return methodMap[method] || method;
+  };
+
   // Loading component for individual sections
   const LoadingSection = ({ title }: { title: string }) => (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -261,47 +442,73 @@ const ProjectDetailsPage = () => {
     </div>
   );
 
-  // Get hierarchy codes for CRM projects
-  let hierarchyData = null;
-  if (project && project.source === 'crm') {
-    const subserviceCode = getSubServiceCodeFromProject(project);
-    if (subserviceCode) {
-      const goalCode = getGoalCodeFromSubserviceId(subserviceCode);
-      const pillarCode = getPillarCodeFromSubserviceId(subserviceCode);
-      const serviceCode = getServiceCodeFromSubserviceId(subserviceCode);
+  // State for hierarchy data to make it reactive to language changes
+  const [hierarchyData, setHierarchyData] = useState<{
+    goal: { code: string | null; title: string | null };
+    pillar: { code: string | null; title: string | null };
+    service: { code: string | null; title: string | null };
+    subservice: { code: string | null; title: string | null };
+  } | null>(null);
 
-      const goalTitle = goalCode ? getGoalTitleFromCode(goalCode) : null;
-      const pillarTitle = pillarCode ? getPillarTitleFromCode(pillarCode) : null;
-      const serviceTitle = serviceCode ? getServiceTitleFromCode(serviceCode) : null;
-      const subserviceTitle = getSubServiceTitleFromCode(subserviceCode);
+  // Update hierarchy data when project or language changes
+  useEffect(() => {
+    if (project && project.source === 'crm') {
+      const subserviceCode = getSubServiceCodeFromProject(project);
+      if (subserviceCode) {
+        const goalCode = getGoalCodeFromSubserviceId(subserviceCode);
+        const pillarCode = getPillarCodeFromSubserviceId(subserviceCode);
+        const serviceCode = getServiceCodeFromSubserviceId(subserviceCode);
 
-      hierarchyData = {
-        goal: { code: goalCode, title: goalTitle },
-        pillar: { code: pillarCode, title: pillarTitle },
-        service: { code: serviceCode, title: serviceTitle },
-        subservice: { code: subserviceCode, title: subserviceTitle }
-      };
+        const goalTitle = goalCode ? getGoalTitleFromCode(goalCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
+        const pillarTitle = pillarCode ? getPillarTitleFromCode(pillarCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
+        const serviceTitle = serviceCode ? getServiceTitleFromCode(serviceCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
+        const subserviceTitle = getSubServiceTitleFromCode(subserviceCode, currentLanguage as 'en' | 'fr' | 'ar');
+
+        setHierarchyData({
+          goal: { code: goalCode, title: goalTitle },
+          pillar: { code: pillarCode, title: pillarTitle },
+          service: { code: serviceCode, title: serviceTitle },
+          subservice: { code: subserviceCode, title: subserviceTitle }
+        });
+      } else {
+        setHierarchyData(null);
+      }
+    } else {
+      setHierarchyData(null);
     }
-  }
+  }, [project, currentLanguage]);
+
+  // Debug: Log current state
+  console.log('=== PROJECT DETAILS RENDER STATE ===');
+  console.log('Loading:', loading);
+  console.log('Error:', error);
+  console.log('Project:', project);
+  console.log('Project ID from params:', params?.id);
 
   return (
-    <div className="min-h-screen bg-white-100" dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-white-100 relative" dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'}>
+     
+      
       {/* Header */}
-      <ProjectsHeader 
-        breadcrumbs={[
-          { label: t('projects'), href: '/projects' },
-          { label: project?.name || t('loading') }
-        ]}
-      />
+      <div className="relative z-10">
+        <ProjectsHeader 
+          breadcrumbs={[
+            { label: t('projects'), href: '/projects' },
+            { label: project?.name || t('loading') }
+          ]}
+        />
+      </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-0">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-8">
+           
+
             {/* Show loading or error states */}
             {loading && (
-              <>
+              <div className="relative z-0">
                 <LoadingSection title={t('projectOverview')} />
                 <LoadingSection title={t('rationaleImpact')} />
                 <LoadingSection title={t('implementationBudget')} />
@@ -310,11 +517,13 @@ const ProjectDetailsPage = () => {
                 <LoadingSection title={t('monitoringEvaluation')} />
                 <LoadingSection title={t('contactInformation')} />
                 <LoadingSection title={t('comments')} />
-              </>
+              </div>
             )}
 
             {error && (
-              <ErrorSection message={error} />
+              <div className="relative z-0">
+                <ErrorSection message={error} />
+              </div>
             )}
 
             {!loading && !error && project && (
@@ -382,7 +591,7 @@ const ProjectDetailsPage = () => {
                       {Array.isArray(project.beneficiaries) ? (
                         project.beneficiaries.map((beneficiary, index) => (
                           <span key={index} className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
-                            {beneficiary}
+                            {translateBeneficiary(beneficiary)}
                           </span>
                         ))
                       ) : (
@@ -448,7 +657,7 @@ const ProjectDetailsPage = () => {
                         <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
                           <span className="text-sm font-medium text-gray-600">{t('frequency')}</span>
                           <span className="text-sm font-semibold text-gray-900">
-                            {project.project_frequency || ('frequency' in project ? (project as any).frequency : '')} 
+                            {translateFrequency(project.project_frequency || ('frequency' in project ? (project as any).frequency : ''))} 
                             {project.frequency_duration && ` (${project.frequency_duration})`}
                           </span>
                         </div>
@@ -489,40 +698,6 @@ const ProjectDetailsPage = () => {
               </div>
             </motion.div>
 
-            {/* Partners & Collaboration */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-            >
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-8 py-6 border-b border-gray-100">
-                <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
-                  <div className={`w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
-                  {t('partnersCollaboration')}
-                </h2>
-              </div>
-              <div className="p-8">
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('partners')}</label>
-                    <div className="flex flex-wrap gap-3">
-                      {Array.isArray(project.partners) && project.partners.length > 0 ? (
-                        project.partners.map((partner, index) => (
-                          <span key={index} className="px-4 py-2 bg-indigo-100 text-indigo-800 rounded-xl text-sm font-medium border border-indigo-200">
-                            {partner}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
 
             {/* Project Scope & Modality */}
             <motion.div
@@ -545,13 +720,13 @@ const ProjectDetailsPage = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('deliveryModality')}</label>
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <p className="text-gray-900 font-medium">{project.delivery_modality || t('notSpecified')}</p>
+                        <p className="text-gray-900 font-medium">{project.delivery_modality ? translateModality(project.delivery_modality) : t('notSpecified')}</p>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('geographicScope')}</label>
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <p className="text-gray-900 font-medium">{project.geographic_scope || t('notSpecified')}</p>
+                        <p className="text-gray-900 font-medium">{project.geographic_scope ? translateScope(project.geographic_scope) : t('notSpecified')}</p>
                       </div>
                     </div>
                   </div>
@@ -560,7 +735,10 @@ const ProjectDetailsPage = () => {
                       <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('conveningMethod')}</label>
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <p className="text-gray-900 font-medium">
-                          {project.convening_method || ('project_type' in project ? (project as any).project_type : '') || t('notSpecified')} 
+                          {(() => {
+                            const method = project.convening_method || ('project_type' in project ? (project as any).project_type : '');
+                            return method ? translateConveningMethod(method) : t('notSpecified');
+                          })()} 
                           {project.convening_method_other && ` (${project.convening_method_other})`}
                         </p>
                       </div>
@@ -607,7 +785,7 @@ const ProjectDetailsPage = () => {
                       {project.beneficiaries && Array.isArray(project.beneficiaries) && project.beneficiaries.length > 0 ? (
                         project.beneficiaries.map((beneficiary, index) => (
                           <span key={index} className="px-4 py-2 bg-blue-100 text-blue-800 rounded-xl text-sm font-medium border border-blue-200">
-                            {beneficiary}
+                            {translateBeneficiary(beneficiary)}
                           </span>
                         ))
                       ) : (
@@ -732,10 +910,10 @@ const ProjectDetailsPage = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Show loading states for sidebar */}
             {loading && (
-              <>
+              <div className="relative z-0">
                 <LoadingSection title={t("projectHierarchy")} />
                 <LoadingSection title={t('projectInfo')} />
-              </>
+              </div>
             )}
 
             {/* Project Hierarchy (for CRM projects) */}
@@ -764,7 +942,7 @@ const ProjectDetailsPage = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-2">
-                            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Goal</span>
+                            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide mx-2">{t('goal')}</span>
                             <span className="text-xs font-mono font-bold text-blue-800 bg-blue-200 px-2 py-0.5 rounded">
                               {hierarchyData.goal.code}
                             </span>
@@ -786,7 +964,7 @@ const ProjectDetailsPage = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-2">
-                            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Pillar</span>
+                            <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mx-2">{t('pillar')}</span>
                             <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-200 px-2 py-0.5 rounded">
                               {hierarchyData.pillar.code}
                             </span>
@@ -808,7 +986,7 @@ const ProjectDetailsPage = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-2">
-                            <span className="text-xs font-semibold text-violet-600 uppercase tracking-wide">Service</span>
+                            <span className="text-xs font-semibold text-violet-600 uppercase tracking-wide mx-2">{t('service')}</span>
                             <span className="text-xs font-mono font-bold text-violet-800 bg-violet-200 px-2 py-0.5 rounded">
                               {hierarchyData.service.code}
                             </span>
@@ -830,7 +1008,7 @@ const ProjectDetailsPage = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-2">
-                            <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Subservice</span>
+                            <span className="text-xs font-semibold text-amber-600 mx-2 uppercase tracking-wide">{t('subService')}</span>
                             <span className="text-xs font-mono font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded">
                               {hierarchyData.subservice.code}
                             </span>
@@ -846,35 +1024,8 @@ const ProjectDetailsPage = () => {
               </motion.div>
             )}
 
-            {/* Project Info */}
-            {!loading && !error && project && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-            >
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-100">
-                <h2 className="text-lg font-sans font-bold text-gray-900 flex items-center">
-                  <div className={`w-8 h-8 bg-gray-500 rounded-lg flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-3' : 'mr-3'}`}>
-                    <FileText className="w-4 h-4 text-white" />
-                  </div>
-                  {t('projectInfo')}
-                </h2>
-              </div>
-              <div className="p-6 space-y-6">
-                <div className="space-y-3">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('createdAt')}</label>
-                  <p className="text-sm text-gray-700">{formatDate(project.created_at || project.date_entered)}</p>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('lastModified')}</label>
-                  <p className="text-sm text-gray-700">{formatDate(project.modified_at || project.date_modified)}</p>
-                </div>
-               
-              </div>
-            </motion.div>
-            )}
+          
+            
           </div>
 
         </div>

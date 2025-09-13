@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
           const sessionQuery = `session_id='${projectData.session_id}'`;
           const allSessionProjects = await getModuleEntries(
             sessionId,
-            "icesc_project_suggestions",
+            "icesc_suggestion",
             ["id", "name", "strategic_goal", "pillar", "service", "sub_service", "budget_icesco", "budget_member_state", "budget_sponsorship", "submission_date"],
             sessionQuery
           );
@@ -264,6 +264,8 @@ export async function POST(request: NextRequest) {
     console.log('Response status text:', response.statusText);
     console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     console.log('Response OK:', response.ok);
+    console.log('Response URL:', response.url);
+    console.log('Response type:', response.type);
     
     // Check for non-200 status codes
     if (!response.ok) {
@@ -309,10 +311,21 @@ export async function POST(request: NextRequest) {
     try {
       data = JSON.parse(responseText);
       console.log('=== DEBUG: Parsed JSON response ===');
-      console.log('Parsed data:', data);
+      console.log('Parsed data:', JSON.stringify(data, null, 2));
+      console.log('Data keys:', Object.keys(data || {}));
       console.log('Data ID:', data.id);
       console.log('Data error:', data.error);
       console.log('Data error description:', data.error?.description);
+      console.log('Data entry_list:', data.entry_list);
+      console.log('Data name_value_list:', data.name_value_list);
+      
+      // Check if this is a successful submission
+      if (data.id) {
+        console.log('✅ SUCCESS: Project created with ID:', data.id);
+      } else {
+        console.log('❌ NO PROJECT ID: Submission may have failed');
+        console.log('Full response for debugging:', data);
+      }
       console.log('Data error message:', data.error?.message);
     } catch (parseError) {
       console.error('=== DEBUG: JSON Parse Error ===');
@@ -337,10 +350,16 @@ export async function POST(request: NextRequest) {
       // Now set relationships to populate the _name fields
       console.log('=== DEBUG: Setting Relationships ===');
       try {
-        // Get contact info from localStorage (this is a server-side call, so we need to get it differently)
-        // For now, we'll use the contact info from the project data
-        const contactId = projectData.contact_id || '30b63613-1e46-c183-7e0c-68bdff000a8a'; // Default contact ID
+        // Use the contact ID from the project data (passed from the frontend)
+        const contactId = projectData.contact_id;
         const subserviceId = strategicInfo.subservice.id;
+        
+        if (!contactId) {
+          console.warn('⚠️ No contact ID provided - project will not be associated with a specific contact');
+          console.warn('This means the project may not appear in the user\'s projects list');
+        } else {
+          console.log('✅ Contact ID provided:', contactId);
+        }
         
         // Get a real account ID - use the same method as submit-suggestion
         const accountResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
@@ -387,7 +406,12 @@ export async function POST(request: NextRequest) {
             }),
           });
           const subserviceResult = await subserviceResponse.json();
-          console.log('Subservice relationship result:', subserviceResult);
+          console.log('Subservice relationship result:', JSON.stringify(subserviceResult, null, 2));
+          if (subserviceResult.id) {
+            console.log('✅ Subservice relationship set successfully');
+          } else {
+            console.log('❌ Subservice relationship may have failed:', subserviceResult);
+          }
         }
         
         // Set contact relationship
@@ -409,7 +433,12 @@ export async function POST(request: NextRequest) {
             }),
           });
           const contactResult = await contactResponse.json();
-          console.log('Contact relationship result:', contactResult);
+          console.log('Contact relationship result:', JSON.stringify(contactResult, null, 2));
+          if (contactResult.id) {
+            console.log('✅ Contact relationship set successfully');
+          } else {
+            console.log('❌ Contact relationship may have failed:', contactResult);
+          }
         }
         
         // Set account relationship - try different field names
@@ -420,10 +449,10 @@ export async function POST(request: NextRequest) {
           const possibleAccountLinkFields = [
             'accounts_icesc_project_suggestions_1',
             'account_icesc_project_suggestions_1',
-            'accounts_project_suggestions_1',
-            'account_project_suggestions_1',
             'accounts_icesc_suggestion_1',
-            'account_icesc_suggestion_1'
+            'account_icesc_project_suggestions_1',
+            'accounts_project_suggestions_1',
+            'account_project_suggestions_1'
           ];
           
           let accountRelationshipSuccess = false;
@@ -451,7 +480,12 @@ export async function POST(request: NextRequest) {
               });
               
               const accountResult = await accountResponse.json();
-              console.log(`Account relationship result for ${accountLinkField}:`, accountResult);
+              console.log(`Account relationship result for ${accountLinkField}:`, JSON.stringify(accountResult, null, 2));
+            if (accountResult.id) {
+              console.log(`✅ Account relationship set successfully with field: ${accountLinkField}`);
+            } else {
+              console.log(`❌ Account relationship failed with field: ${accountLinkField}`, accountResult);
+            }
               
               if (accountResult && !accountResult.error) {
                 console.log(`✅ Account relationship successful with field: ${accountLinkField}`);
@@ -474,6 +508,15 @@ export async function POST(request: NextRequest) {
         console.error('Error setting relationships:', relationshipError);
         // Don't fail the submission if relationships fail
       }
+      
+      console.log('=== 📋 SUBMISSION SUMMARY ===');
+      console.log('✅ Project created in CRM with ID:', data.id);
+      console.log('✅ Module used:', 'icesc_project_suggestions');
+      console.log('✅ Contact ID used:', projectData.contact_id);
+      console.log('✅ Subservice ID used:', strategicInfo.subservice.id);
+      console.log('📍 The project should now be visible in:');
+      console.log('   - CRM under "Member Project Suggestions"');
+      console.log('   - Frontend "My Projects" page (if relationships were set correctly)');
       
       return NextResponse.json({
         success: true,

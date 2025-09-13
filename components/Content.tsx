@@ -1,9 +1,61 @@
 "use client";
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, Component, ErrorInfo, ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
 import { useI18n } from "@/context/I18nProvider";
+
+// Error Boundary to catch multilingual object errors
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  stepName: string;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class StepErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error(`🚨 ERROR in ${this.props.stepName}:`, error);
+    console.error('Error details:', errorInfo);
+    console.error('Component stack:', errorInfo.componentStack);
+    
+    if (error.message.includes('Objects are not valid as a React child')) {
+      console.error('🚨 This is the multilingual object error!');
+      console.error('The error occurred in:', this.props.stepName);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 border border-red-300 bg-red-50 rounded-lg">
+          <h3 className="text-red-800 font-bold">Error in {this.props.stepName}</h3>
+          <p className="text-red-600 text-sm mt-2">{this.state.error?.message}</p>
+          <button 
+            onClick={() => this.setState({ hasError: false })}
+            className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-sm"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 import StepOne from "@/components/steps/StepOne";
 import StepTwo from "@/components/steps/StepTwo";
@@ -136,7 +188,7 @@ const Rooms = () => {
         return <span>{decodeHtmlEntities(result)}</span>;
       } else {
         const stringResult = Object.values(result).find(val => typeof val === 'string');
-        return <span>{stringResult ? decodeHtmlEntities(stringResult) : t("noDescription")}</span>;
+        return <span>{stringResult ? decodeHtmlEntities(stringResult) : String(t("noDescription"))}</span>;
       }
     }
     
@@ -147,7 +199,7 @@ const Rooms = () => {
         return <span>{decodeHtmlEntities(result)}</span>;
       } else {
         const stringResult = Object.values(result).find(val => typeof val === 'string');
-        return <span>{stringResult ? decodeHtmlEntities(stringResult) : t("noDescription")}</span>;
+        return <span>{stringResult ? decodeHtmlEntities(stringResult) : String(t("noDescription"))}</span>;
       }
     }
     
@@ -161,7 +213,7 @@ const Rooms = () => {
       return <span>{decodeHtmlEntities(card.desc)}</span>;
     }
     
-    return <span>{t("noDescription")}</span>;
+    return <span>{String(t("noDescription"))}</span>;
   });
   SelectedCardText.displayName = 'SelectedCardText';
 
@@ -177,7 +229,7 @@ const Rooms = () => {
       <div className="relative min-h-[120px] flex flex-col gap-4" style={{ direction: 'ltr' }}>
         {memoizedSelectedCards.length === 0 ? (
           <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
-            {t("noSelections")}
+            {String(t("noSelections"))}
           </div>
         ) : (
           <AnimatePresence>
@@ -262,7 +314,7 @@ const Rooms = () => {
                           ? "bg-white/25 scale-110" 
                           : "bg-white/20 hover:bg-white/25"
                       }`}>
-                        {card.code}
+                        {typeof card.code === 'string' ? card.code : card.id}
                       </div>
                       <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-lg transition-all duration-300 border border-white/30 ${
                         isLastSelected ? "scale-110" : "scale-100"
@@ -628,7 +680,7 @@ useEffect(() => {
         ar: subService.description_subservice_ar_c || subService.description_subservice
       };
 
-      addSelectedCard("subService", subService.id, subServiceTitle, subServiceDesc, selectedColorIndex, typeof subService.name === 'string' ? subService.name : subService.id);
+      addSelectedCard("subService", subService.id, subServiceTitle, subServiceDesc, selectedColorIndex, subService.name);
     }
 
     setCurrentStep(5);
@@ -639,8 +691,32 @@ useEffect(() => {
   const handleProjectDetails = () => {
     const details = stepFiveRef.current?.getFormValues();
     if (details) {
-      setProjectDetails(details);
-      console.log('Project details saved:', details);
+      console.log('=== CONTENT.TSX: Processing Step 5 details ===');
+      console.log('Raw details from StepFive:', details);
+      
+      // Sanitize the details to ensure no multilingual objects
+      const sanitizeValue = (value: any): any => {
+        if (value && typeof value === 'object' && !Array.isArray(value) && !React.isValidElement(value)) {
+          if (value.hasOwnProperty('en') && value.hasOwnProperty('fr') && value.hasOwnProperty('ar')) {
+            console.warn('🚨 Found multilingual object in project details:', value);
+            return String(value.en || value.fr || value.ar || '');
+          }
+          // Recursively sanitize object properties
+          const sanitized: any = {};
+          for (const [key, val] of Object.entries(value)) {
+            sanitized[key] = sanitizeValue(val);
+          }
+          return sanitized;
+        } else if (Array.isArray(value)) {
+          return value.map(item => sanitizeValue(item));
+        }
+        return value;
+      };
+      
+      const sanitizedDetails = sanitizeValue(details);
+      console.log('Sanitized details:', sanitizedDetails);
+      
+      setProjectDetails(sanitizedDetails);
       setCurrentStep(6);
     }
   };
@@ -651,10 +727,6 @@ useEffect(() => {
       console.error('No project details available for submission');
       return;
     }
-
-    console.log('Starting project submission...');
-    console.log('Form details:', projectDetails);
-    console.log('Contact data:', projectDetails.contact);
     
     try {
       // Handle file uploads first
@@ -739,6 +811,15 @@ useEffect(() => {
         contact_email: projectDetails.contact?.email || '',
         contact_phone: projectDetails.contact?.phone || '',
         contact_role: projectDetails.contact?.role || '',
+        contact_id: (() => {
+          // Get the contact ID from localStorage
+          try {
+            const contactInfo = JSON.parse(localStorage.getItem('contactInfo') || '{}');
+            return contactInfo.id || '';
+          } catch {
+            return '';
+          }
+        })(),
         
         // Additional info
         comments: projectDetails.comments || '',
@@ -759,7 +840,7 @@ useEffect(() => {
         setSubmissionResult({
           success: true,
           projectId: result.projectId || projectId,
-          message: result.message || t('projectSubmittedSuccessfully')
+          message: result.message || String(t('projectSubmittedSuccessfully'))
         });
       } else {
         // If CRM submission fails, still save locally as draft
@@ -785,13 +866,29 @@ useEffect(() => {
           project_brief: projectDetails.brief || '',
           problem_statement: projectDetails.rationale || '',
           rationale_impact: projectDetails.rationale || '',
-          strategic_goal: selectedCards.find(card => card.type === 'goal')?.code || '',
+          strategic_goal: (() => {
+            const goalCard = selectedCards.find(card => card.type === 'goal');
+            const code = goalCard?.code;
+            return typeof code === 'string' ? code : selectedGoal || '';
+          })(),
           strategic_goal_id: selectedGoal || '',
-          pillar: selectedCards.find(card => card.type === 'pillar')?.code || '',
+          pillar: (() => {
+            const pillarCard = selectedCards.find(card => card.type === 'pillar');
+            const code = pillarCard?.code;
+            return typeof code === 'string' ? code : selectedPillar || '';
+          })(),
           pillar_id: selectedPillar || '',
-          service: selectedCards.find(card => card.type === 'service')?.code || '',
+          service: (() => {
+            const serviceCard = selectedCards.find(card => card.type === 'service');
+            const code = serviceCard?.code;
+            return typeof code === 'string' ? code : selectedService || '';
+          })(),
           service_id: selectedService || '',
-          sub_service: selectedCards.find(card => card.type === 'subService')?.code || '',
+          sub_service: (() => {
+            const subServiceCard = selectedCards.find(card => card.type === 'subService');
+            const code = subServiceCard?.code;
+            return typeof code === 'string' ? code : selectedSubService || '';
+          })(),
           sub_service_id: selectedSubService || '',
           beneficiaries: projectDetails.beneficiaries || [],
           other_beneficiaries: projectDetails.otherBeneficiary || '',
@@ -1066,7 +1163,7 @@ useEffect(() => {
               // Animate title
               if (titleRef.current) {
                 console.log('Animating Content title...');
-                gsap.fromTo(
+      gsap.fromTo(
                   titleRef.current,
                   { opacity: 0, y: 30, scale: 0.95 },
                   { opacity: 1, y: 0, scale: 1, duration: 1, ease: "power3.out" }
@@ -1135,14 +1232,14 @@ useEffect(() => {
             className="text-gradient uppercase text-xl xs:text-2xl leading-none lg:text-3xl desktop:text-4xl"
             style={{ opacity: 0, transform: 'translateY(30px) scale(0.95)' }}
           >
-          {t("takePartInStrategy")}
+          {String(t("takePartInStrategy"))}
         </h2>
         <p 
           ref={descriptionRef}
           className="uppercase mt-4 text-gradient text-sm lg:text-base 2xl:text-lg max-lg:hidden"
           style={{ opacity: 0, transform: 'translateY(20px)' }}
         >
-          {t("submitAndTrackProposal")}
+          {String(t("submitAndTrackProposal"))}
         </p>
       </div>
 
@@ -1188,11 +1285,11 @@ useEffect(() => {
               <div className="h-[80px]"></div>
               <div className="sticky top-4 space-y-3" style={{ direction: 'ltr' }}>
                 <div className="text-sm font-semibold text-gray-600 mb-2">
-                  {t("yourSelections")}
+                  {String(t("yourSelections"))}
                 </div>
                 <SelectedCardsSection />
 
-              </div>
+                            </div>
             </div>
           )}
 
@@ -1207,11 +1304,11 @@ useEffect(() => {
                   ref={addContentRef}
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
-                  <StepOne
-                    goals={goals}
-                    selectedGoal={selectedGoal}
-                    onNext={handleGoalSelect}
-                  />
+                <StepOne
+                  goals={goals}
+                  selectedGoal={selectedGoal}
+                  onNext={handleGoalSelect}
+                />
                 </div>
               )}
               {currentStep === 2 && (
@@ -1219,14 +1316,14 @@ useEffect(() => {
                   ref={addContentRef}
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
-                  <StepTwo
-                    onNext={handlePillarSelect}
-                    onPrevious={handlePrevious}
-                    pillars={pillars}
-                    selectedPillar={selectedPillar}
-                    goalColorIndex={selectedColorIndex}
-                    selectedGoal={selectedGoal ?? ""}
-                  />
+                <StepTwo
+                  onNext={handlePillarSelect}
+                  onPrevious={handlePrevious}
+                  pillars={pillars}
+                  selectedPillar={selectedPillar}
+                  goalColorIndex={selectedColorIndex}
+                  selectedGoal={selectedGoal ?? ""}
+                />
                 </div>
               )}
               {currentStep === 3 && (
@@ -1234,13 +1331,13 @@ useEffect(() => {
                   ref={addContentRef}
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
-                  <StepThree
-                    services={services}
-                    onNext={handleServiceSelect}
-                    onPrevious={handlePrevious}
-                    selectedService={selectedService}
-                    goalColorIndex={selectedColorIndex}
-                  />
+                <StepThree
+                  services={services}
+                  onNext={handleServiceSelect}
+                  onPrevious={handlePrevious}
+                  selectedService={selectedService}
+                  goalColorIndex={selectedColorIndex}
+                />
                 </div>
               )}
               {currentStep === 4 && (
@@ -1248,13 +1345,13 @@ useEffect(() => {
                   ref={addContentRef}
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
-                  <StepFour
-                    subServices={subServices}
-                    onNext={handleSubServiceSelect}
-                    onPrevious={handlePrevious}  // <-- pass the handler
-                    selectedSubService={selectedSubService}
-                    goalColorIndex={selectedColorIndex}
-                  />
+                <StepFour
+                  subServices={subServices}
+                  onNext={handleSubServiceSelect}
+                  onPrevious={handlePrevious}  // <-- pass the handler
+                  selectedSubService={selectedSubService}
+                  goalColorIndex={selectedColorIndex}
+                />
                 </div>
               )}
 
@@ -1263,7 +1360,9 @@ useEffect(() => {
                   ref={addContentRef}
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
+                <StepErrorBoundary stepName="Step 5 (Project Details)">
                   <StepFive ref={stepFiveRef} onNext={handleProjectDetails} onPrevious={handlePrevious} />
+                </StepErrorBoundary>
                 </div>
               )}
               {currentStep === 6 && (
@@ -1271,6 +1370,7 @@ useEffect(() => {
                   ref={addContentRef}
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
+                <StepErrorBoundary stepName="Step 6 (Review & Submit)">
                   <StepSix
                     selectedCards={selectedCards}
                     projectDetails={projectDetails}
@@ -1278,9 +1378,10 @@ useEffect(() => {
                     onClearData={clearAllData}
                     onEditProjectDetails={handleEditProjectDetails}
                     onSubmit={handleProjectSubmission}
-                    submissionResult={localSubmissionResult || submissionResult}
-                    isSubmitting={isSubmitting}
-                  />
+                  submissionResult={localSubmissionResult || submissionResult}
+                  isSubmitting={isSubmitting}
+                />
+                </StepErrorBoundary>
                 </div>
               )}
             </AnimatePresence>

@@ -723,29 +723,7 @@ const ProjectDetailsPage = () => {
               </div>
             </motion.div>
 
-            {/* Comments */}
-            {project.comments && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
-                className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-              >
-                <div className="bg-gradient-to-r from-slate-50 to-gray-50 px-8 py-6 border-b border-gray-100">
-                  <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
-                    <div className={`w-10 h-10 bg-slate-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
-                      <MessageSquare className="w-6 h-6 text-white" />
-                    </div>
-                    {t('comments')}
-                  </h2>
-                </div>
-                <div className="p-8">
-                  <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                    <p className="text-gray-900 leading-relaxed text-lg">{project.comments}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+          
               </>
             )}
           </div>

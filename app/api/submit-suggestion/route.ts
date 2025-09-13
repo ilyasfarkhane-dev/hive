@@ -26,6 +26,20 @@ export async function POST(request: NextRequest) {
     console.log('Project Data:', JSON.stringify(projectData, null, 2));
     console.log('Contact Info:', JSON.stringify(contactInfo, null, 2));
     
+    // Check for multilingual objects in the received data
+    console.log('=== DEBUG: Checking for Multilingual Objects ===');
+    Object.keys(contactInfo).forEach(key => {
+      if (typeof contactInfo[key] === 'object' && contactInfo[key] !== null) {
+        console.log(`Multilingual object found in contactInfo.${key}:`, contactInfo[key]);
+      }
+    });
+    
+    Object.keys(projectData).forEach(key => {
+      if (typeof projectData[key] === 'object' && projectData[key] !== null) {
+        console.log(`Multilingual object found in projectData.${key}:`, projectData[key]);
+      }
+    });
+    
     // Validate contact information
     if (!contactInfo || !contactInfo.id) {
       console.error('No contact information provided in request');
@@ -478,13 +492,18 @@ ${projectData.additionalComments || projectData.comments || ''}`
       console.log('- accounts_icesc_project_suggestions_1:', accountId);
       console.log('==========================================');
       
-      return NextResponse.json({
+      const response = {
         success: true,
         suggestionId: data.id,
         contactId: contactInfo.id,
         subserviceId: subserviceId,
         message: 'Project suggestion submitted successfully with relationships established'
-      });
+      };
+      
+      console.log('=== DEBUG: Final Response ===');
+      console.log('Response:', JSON.stringify(response, null, 2));
+      
+      return NextResponse.json(response);
     } else {
       console.error('=== DEBUG: Failure ===');
       console.error('Project suggestion submission failed');

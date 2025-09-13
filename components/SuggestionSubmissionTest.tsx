@@ -47,6 +47,14 @@ const SuggestionSubmissionTest: React.FC = () => {
     console.log('Contact ID from localStorage:', contactInfo.id);
     console.log('Subservice ID:', subserviceId);
     console.log('Suggestion Data:', suggestionData);
+    console.log('Contact Info:', contactInfo);
+    
+    // Check for any multilingual objects in contact info
+    Object.keys(contactInfo).forEach(key => {
+      if (typeof contactInfo[key] === 'object' && contactInfo[key] !== null) {
+        console.log(`Multilingual object found in contactInfo.${key}:`, contactInfo[key]);
+      }
+    });
 
     const result = await submitSuggestion(subserviceId, suggestionData);
     
@@ -90,16 +98,16 @@ const SuggestionSubmissionTest: React.FC = () => {
         <h3 className="text-lg font-semibold text-blue-800 mb-2">Using Contact Information</h3>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="font-medium">Contact ID:</span> {contactInfo?.id}
+            <span className="font-medium">Contact ID:</span> {typeof contactInfo?.id === 'string' ? contactInfo.id : JSON.stringify(contactInfo?.id)}
           </div>
           <div>
-            <span className="font-medium">Name:</span> {contactInfo?.first_name} {contactInfo?.last_name}
+            <span className="font-medium">Name:</span> {typeof contactInfo?.first_name === 'string' ? contactInfo.first_name : JSON.stringify(contactInfo?.first_name)} {typeof contactInfo?.last_name === 'string' ? contactInfo.last_name : JSON.stringify(contactInfo?.last_name)}
           </div>
           <div>
-            <span className="font-medium">Email:</span> {contactInfo?.email1}
+            <span className="font-medium">Email:</span> {typeof contactInfo?.email1 === 'string' ? contactInfo.email1 : JSON.stringify(contactInfo?.email1)}
           </div>
           <div>
-            <span className="font-medium">Phone:</span> {contactInfo?.phone_work || contactInfo?.phone_mobile}
+            <span className="font-medium">Phone:</span> {typeof (contactInfo?.phone_work || contactInfo?.phone_mobile) === 'string' ? (contactInfo?.phone_work || contactInfo?.phone_mobile) : JSON.stringify(contactInfo?.phone_work || contactInfo?.phone_mobile)}
           </div>
         </div>
       </div>
@@ -256,14 +264,14 @@ const SuggestionSubmissionTest: React.FC = () => {
           </h3>
           {submissionResult.success ? (
             <div className="text-green-700">
-              <p><strong>Message:</strong> {submissionResult.message}</p>
-              <p><strong>Suggestion ID:</strong> {submissionResult.suggestionId}</p>
-              <p><strong>Contact ID:</strong> {submissionResult.contactId}</p>
-              <p><strong>Subservice ID:</strong> {submissionResult.subserviceId}</p>
+              <p><strong>Message:</strong> {typeof submissionResult.message === 'string' ? submissionResult.message : JSON.stringify(submissionResult.message)}</p>
+              <p><strong>Suggestion ID:</strong> {typeof submissionResult.suggestionId === 'string' ? submissionResult.suggestionId : JSON.stringify(submissionResult.suggestionId)}</p>
+              <p><strong>Contact ID:</strong> {typeof submissionResult.contactId === 'string' ? submissionResult.contactId : JSON.stringify(submissionResult.contactId)}</p>
+              <p><strong>Subservice ID:</strong> {typeof submissionResult.subserviceId === 'string' ? submissionResult.subserviceId : JSON.stringify(submissionResult.subserviceId)}</p>
             </div>
           ) : (
             <div className="text-red-700">
-              <p><strong>Error:</strong> {submissionResult.error}</p>
+              <p><strong>Error:</strong> {typeof submissionResult.error === 'string' ? submissionResult.error : JSON.stringify(submissionResult.error)}</p>
             </div>
           )}
         </div>

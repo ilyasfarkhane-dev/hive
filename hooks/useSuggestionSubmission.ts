@@ -57,6 +57,14 @@ export const useSuggestionSubmission = () => {
       // Get contact info from localStorage
       const contactInfo = JSON.parse(localStorage.getItem('contactInfo') || '{}');
       
+      // Check for multilingual objects in contact info
+      console.log('=== DEBUG: Checking Contact Info for Multilingual Objects ===');
+      Object.keys(contactInfo).forEach(key => {
+        if (typeof contactInfo[key] === 'object' && contactInfo[key] !== null) {
+          console.log(`Multilingual object found in contactInfo.${key}:`, contactInfo[key]);
+        }
+      });
+      
       const response = await fetch('/api/submit-suggestion', {
         method: 'POST',
         headers: {
@@ -71,6 +79,14 @@ export const useSuggestionSubmission = () => {
 
       const result = await response.json();
       console.log('Submission result:', result);
+      
+      // Check for multilingual objects in the result
+      console.log('=== DEBUG: Checking Result for Multilingual Objects ===');
+      Object.keys(result).forEach(key => {
+        if (typeof result[key] === 'object' && result[key] !== null) {
+          console.log(`Multilingual object found in result.${key}:`, result[key]);
+        }
+      });
 
       if (result.success) {
         setSubmissionResult({

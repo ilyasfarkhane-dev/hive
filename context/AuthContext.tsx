@@ -5,8 +5,32 @@ interface ContactInfo {
   id?: string;
   first_name?: string;
   last_name?: string;
+  login_c?: string;
   email1?: string;
   phone_work?: string;
+  phone_mobile?: string;
+  title?: string;
+  department?: string;
+  description?: string;
+  primary_address_street?: string;
+  primary_address_city?: string;
+  primary_address_state?: string;
+  primary_address_postalcode?: string;
+  primary_address_country?: string;
+  alt_address_street?: string;
+  alt_address_city?: string;
+  alt_address_state?: string;
+  alt_address_postalcode?: string;
+  alt_address_country?: string;
+  portal_access_c?: string;
+  date_entered?: string;
+  date_modified?: string;
+  created_by?: string;
+  modified_user_id?: string;
+  assigned_user_id?: string;
+  assigned_user_name?: string;
+  created_by_name?: string;
+  modified_by_name?: string;
   [key: string]: any;
 }
 
@@ -46,17 +70,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [sessionId, setSessionId] = useState<string | undefined>();
 
   useEffect(() => {
+    // Check for session_id in localStorage as primary authentication method
+    const storedSessionId = localStorage.getItem("session_id");
     const storedHash = localStorage.getItem("contactEeemailHash");
     const storedContact = localStorage.getItem("contactInfo");
     const storedGoals = localStorage.getItem("goals");
-    const storedSession = localStorage.getItem("sessionId");
 
-    if (storedHash) {
+    // If session_id exists, user is authenticated
+    if (storedSessionId) {
+      setIsAuthenticated(true);
+      setSessionId(storedSessionId);
+      
+      // Load additional data if available
+      if (storedContact) setContactInfo(JSON.parse(storedContact));
+      if (storedGoals) setGoals(JSON.parse(storedGoals));
+    } else if (storedHash) {
+      // Fallback to old authentication method for backward compatibility
       setIsAuthenticated(true);
       if (storedContact) setContactInfo(JSON.parse(storedContact));
       if (storedGoals) setGoals(JSON.parse(storedGoals));
-      if (storedSession) setSessionId(storedSession);
+    } else {
+      // No valid session found
+      setIsAuthenticated(false);
     }
+    
     setIsLoading(false);
   }, []);
 
@@ -72,10 +109,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const data = await res.json();
 
       if (res.ok && data.hashedEmail) {
+        console.log('=== DEBUG: Storing Contact Info in localStorage ===');
+        console.log('Contact Info:', data.contactInfo);
+        console.log('Session ID:', data.sessionId);
+        console.log('Goals Count:', data.goals?.length || 0);
+        console.log('================================================');
+
         localStorage.setItem("contactEeemailHash", data.hashedEmail);
         localStorage.setItem("contactInfo", JSON.stringify(data.contactInfo));
         localStorage.setItem("goals", JSON.stringify(data.goals));
-        if (data.sessionId) localStorage.setItem("sessionId", data.sessionId);
+        if (data.sessionId) {
+          localStorage.setItem("session_id", data.sessionId);
+          setSessionId(data.sessionId);
+        }
 
         setContactInfo(data.contactInfo);
         setGoals(data.goals);
@@ -100,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem("contactEeemailHash");
     localStorage.removeItem("contactInfo");
     localStorage.removeItem("goals");
-    localStorage.removeItem("sessionId");
+    localStorage.removeItem("session_id");
     setIsAuthenticated(false);
     setContactInfo(undefined);
     setGoals([]);

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -23,6 +23,18 @@ const StepOne: React.FC<StepOneProps> = ({ goals, onNext, selectedGoal = null })
   const [hovered, setHovered] = useState<string | null>(null);
 
   const currentLang = i18n.language || "en";
+
+  // Sync local selected state with prop changes (e.g., language changes)
+  useEffect(() => {
+    setSelected(selectedGoal);
+  }, [selectedGoal]);
+
+  // Function to decode HTML entities
+  const decodeHtmlEntities = (text: string) => {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+  };
 
   const cardColors = [
     { bg: "bg-[#3870ba]", hover: "hover:bg-[#2c5a95]" },
@@ -72,38 +84,51 @@ const StepOne: React.FC<StepOneProps> = ({ goals, onNext, selectedGoal = null })
                 onClick={() => handleSelect(goal.id)}
               >
                 <div
-                  className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${cardColors[index % cardColors.length].bg} ${isHovered && !isSelected ? cardColors[index % cardColors.length].hover : ""}`}
+                  className={`h-full rounded-3xl shadow-xl overflow-hidden transition-all duration-300 border border-white/10 ${cardColors[index % cardColors.length].bg} ${isHovered && !isSelected ? cardColors[index % cardColors.length].hover : ""}`}
                 >
-                  <div className="p-6 pb-4 flex items-start justify-between">
-                    <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-xl font-bold shadow-md">
+                  {/* Gradient overlay for depth */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
+
+                  <div className="p-6 pb-4 flex items-start justify-between relative">
+                    <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-25 text-white text-xl font-bold shadow-lg backdrop-blur-sm border border-white/20">
                       {goal.code}
                     </div>
 
                     <div className={`transition-all duration-300 ${isSelected ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}>
-                      <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white shadow-lg">
+                      <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg border border-white/30">
                         <Check className="w-6 h-6 text-green-600" />
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-6 pt-2">
+                  <div className="p-6 pt-2 relative">
                     <div className="mb-12">
-                      <p className="text-white text-xl text-justify font-semibold opacity-90 mt-2">
-                        {goal.desc?.[currentLang] || goal.title?.[currentLang] || goal.code}
+                      <p className="text-white text-lg text-justify font-medium leading-relaxed opacity-95 mt-2"
+                         style={{ 
+                           direction: currentLang === 'ar' ? 'rtl' : 'ltr',
+                           textAlign: currentLang === 'ar' ? 'right' : 'left'
+                         }}>
+                        {decodeHtmlEntities(
+                          (typeof goal.desc?.[currentLang] === 'string' ? goal.desc[currentLang] : 
+                           typeof goal.title?.[currentLang] === 'string' ? goal.title[currentLang] : 
+                           goal.code) || ''
+                        )}
                       </p>
-
                     </div>
 
                     <div className={`absolute bottom-6 right-6 transition-all duration-300 ${isSelected ? "opacity-0 scale-90" : "opacity-100 scale-100"}`}>
-                      <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
+                      <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-25 group-hover:bg-opacity-35 transition-all duration-300 backdrop-blur-sm border border-white/20">
                         <Plus className="w-6 h-6 text-white" />
                       </div>
                     </div>
                   </div>
+
+                  {/* Subtle border highlight */}
+                  <div className="absolute inset-0 rounded-3xl border border-white/20 pointer-events-none"></div>
                 </div>
 
                 {!isSelected && (
-                  <div className="absolute inset-0 rounded-2xl bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 pointer-events-none" />
+                  <div className="absolute inset-0 rounded-3xl bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300 pointer-events-none" />
                 )}
               </motion.div>
             );

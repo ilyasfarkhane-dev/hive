@@ -29,7 +29,6 @@ export default function RootLayout({
             </AuthWrapper>
           </AuthProvider>
         </I18nProvider>
-        <ScrollToTop />
       </body>
     </html>
   );

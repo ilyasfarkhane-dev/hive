@@ -1,8 +1,9 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { gsap } from "gsap";
 import { useTranslation } from "react-i18next";
+import { useI18n } from "@/context/I18nProvider";
 
 import StepOne from "@/components/steps/StepOne";
 import StepTwo from "@/components/steps/StepTwo";
@@ -16,12 +17,45 @@ import { goals as goalsData } from "@/Data/goals/data";
 import { pillarServicesData } from "@/Data/services/data";
 import type { Goal, Pillar, SubService, Service } from "@/types";
 import { serviceSubservicesData } from "@/Data/sub-service/data";
+import { useProjectSubmission, ProjectSubmissionData } from "@/hooks/useProjectSubmission";
+import { saveProjectToLocal, handleMultipleFileUploads, getProjectsFromLocal } from "@/utils/localStorage";
 
 
 const Rooms = () => {
   const { t, i18n } = useTranslation("common");
+  const { isRTL, currentLanguage } = useI18n();
   const [currentStep, setCurrentStep] = useState(1);
   const stepFiveRef = useRef<StepFiveRef>(null);
+  const { submitProject, isSubmitting, submissionResult, resetSubmission } = useProjectSubmission();
+  const [localSubmissionResult, setSubmissionResult] = useState<{success: boolean, projectId?: string, message?: string, error?: string} | null>(null);
+
+  // GSAP animation refs
+  const containerRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const stepperRef = useRef<HTMLDivElement>(null);
+  const contentRefs = useRef<HTMLDivElement[]>([]);
+  const [isLanguageLoaded, setIsLanguageLoaded] = useState(false);
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  // Function to add ref to contentRefs array
+  const addContentRef = (el: HTMLDivElement | null) => {
+    if (el && !contentRefs.current.includes(el)) {
+      contentRefs.current.push(el);
+    }
+  };
+
+  // Language loading effect
+  useEffect(() => {
+    setIsLanguageLoaded(true);
+    setHasAnimated(false); // Reset animation state when language changes
+  }, [currentLanguage]);
+
+  // Clear refs when language changes
+  useEffect(() => {
+    contentRefs.current = [];
+    setHasAnimated(false); // Reset animation state when language changes
+  }, [currentLanguage]);
 
   // User selections
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
@@ -34,6 +68,243 @@ const Rooms = () => {
   const [showTwoColumns, setShowTwoColumns] = useState(false);
   const rightColumnRef = useRef<HTMLDivElement>(null);
   const [selectedCards, setSelectedCards] = useState<any[]>([]);
+
+  // Memoize selected cards to force re-render when language changes
+  const memoizedSelectedCards = useMemo(() => {
+    const migratedCards = selectedCards.map(card => {
+      // Migrate string-based cards to multilingual objects
+      let migratedCard = { ...card };
+      
+      // If title is a string, convert it to multilingual object
+      if (typeof card.title === 'string') {
+        migratedCard.title = {
+          en: card.title,
+          fr: card.title,
+          ar: card.title
+        };
+      }
+      
+      // If desc is a string, convert it to multilingual object
+      if (typeof card.desc === 'string') {
+        migratedCard.desc = {
+          en: card.desc,
+          fr: card.desc,
+          ar: card.desc
+        };
+      }
+      
+      return {
+        ...migratedCard,
+        // Force re-evaluation of title text when language changes
+        _langKey: i18n.language
+      };
+    });
+    
+    // Save migrated cards back to localStorage if any were migrated
+    const hasStringCards = selectedCards.some(card => 
+      typeof card.title === 'string' || typeof card.desc === 'string'
+    );
+    
+    if (hasStringCards) {
+      const cardsToSave = migratedCards.map(card => {
+        const { _langKey, ...cardWithoutLangKey } = card;
+        return cardWithoutLangKey;
+      });
+      localStorage.setItem('selectedCards', JSON.stringify(cardsToSave));
+    }
+    
+    return migratedCards;
+  }, [selectedCards, i18n.language]);
+
+  // Force re-render when language changes
+  const [languageKey, setLanguageKey] = useState(0);
+  useEffect(() => {
+    setLanguageKey(prev => prev + 1);
+  }, [i18n.language]);
+
+  // Create a component that will re-render when language changes
+  const SelectedCardText = React.memo(({ card }: { card: any }) => {
+    const { i18n } = useTranslation("common");
+    const currentLang = i18n.language || "en";
+    
+    console.log('SelectedCardText rendering for card:', card.id, 'language:', currentLang);
+    
+    // Try to get translated title from the card data
+    if (card.title && typeof card.title === 'object') {
+      const result = card.title[currentLang] || card.title.en || card.title;
+      if (typeof result === 'string') {
+        return <span>{decodeHtmlEntities(result)}</span>;
+      } else {
+        const stringResult = Object.values(result).find(val => typeof val === 'string');
+        return <span>{stringResult ? decodeHtmlEntities(stringResult) : t("noDescription")}</span>;
+      }
+    }
+    
+    // Try desc field if title doesn't have translations
+    if (card.desc && typeof card.desc === 'object') {
+      const result = card.desc[currentLang] || card.desc.en || card.desc;
+      if (typeof result === 'string') {
+        return <span>{decodeHtmlEntities(result)}</span>;
+      } else {
+        const stringResult = Object.values(result).find(val => typeof val === 'string');
+        return <span>{stringResult ? decodeHtmlEntities(stringResult) : t("noDescription")}</span>;
+      }
+    }
+    
+    // If title is a string, return it as is
+    if (typeof card.title === 'string') {
+      return <span>{decodeHtmlEntities(card.title)}</span>;
+    }
+    
+    // If desc is a string, return it as is
+    if (typeof card.desc === 'string') {
+      return <span>{decodeHtmlEntities(card.desc)}</span>;
+    }
+    
+    return <span>{t("noDescription")}</span>;
+  });
+  SelectedCardText.displayName = 'SelectedCardText';
+
+  // Create a separate component for the entire selected cards section
+  const SelectedCardsSection = React.memo(() => {
+    const { t, i18n } = useTranslation("common");
+    const currentLang = i18n.language || "en";
+    
+    console.log('SelectedCardsSection rendering for language:', currentLang);
+    console.log('Selected cards:', memoizedSelectedCards);
+    
+    return (
+      <div className="relative min-h-[120px] flex flex-col gap-4" style={{ direction: 'ltr' }}>
+        {memoizedSelectedCards.length === 0 ? (
+          <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
+            {t("noSelections")}
+          </div>
+        ) : (
+          <AnimatePresence>
+            {memoizedSelectedCards.slice().reverse().map((card, index) => {
+              const isLastSelected = index === 0;
+              const originalIndex = memoizedSelectedCards.length - 1 - index;
+              
+              return (
+                <motion.div
+                  key={`${card.type}-${card.id || originalIndex}-${currentLang}-${languageKey}`}
+                  className={`w-full relative ${isLastSelected ? "z-20" : "z-10"}`}
+                  initial={{ 
+                    opacity: 0, 
+                    y: isLastSelected ? 60 : 30, 
+                    scale: isLastSelected ? 0.9 : 0.95,
+                    rotateX: isLastSelected ? 5 : 0
+                  }}
+                  animate={{ 
+                    opacity: 1, 
+                    y: 0, 
+                    scale: isLastSelected ? 1.02 : 0.98,
+                    rotateX: 0
+                  }}
+                  exit={{ 
+                    opacity: 0, 
+                    y: -20,
+                    scale: 0.95
+                  }}
+                  transition={{ 
+                    duration: 0.4,
+                    ease: "easeOut",
+                    delay: isLastSelected ? 0 : 0.05
+                  }}
+                  whileHover={{ 
+                    scale: isLastSelected ? 1.05 : 1.02,
+                    y: isLastSelected ? -2 : -1,
+                    transition: { duration: 0.2 }
+                  }}
+                >
+                  <div className={`h-full rounded-3xl shadow-xl overflow-hidden transition-all duration-500 relative border border-white/10 ${
+                    cardColors[card.colorIndex % cardColors.length].bg
+                  } ${
+                    isLastSelected 
+                      ? "shadow-2xl ring-2 ring-white ring-opacity-40 transform-gpu" 
+                      : "shadow-lg opacity-90 hover:opacity-95"
+                  }`}
+                  style={{
+                    transform: isLastSelected 
+                      ? "translateY(-6px) rotateX(-1deg)" 
+                      : "translateY(0px)",
+                    filter: isLastSelected 
+                      ? "brightness(1.05) contrast(1.02)" 
+                      : "brightness(0.98)"
+                  }}>
+
+                    {/* Gradient overlay for depth */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
+
+                    {/* Type badge */}
+                    <div className={`absolute top-3 left-4 px-3 py-1.5 rounded-full text-xs font-bold z-10 transition-all duration-300 whitespace-nowrap backdrop-blur-sm ${
+                      isLastSelected 
+                        ? "bg-white/95 text-gray-800 shadow-lg border border-white/20" 
+                        : "bg-white/85 text-gray-700 border border-white/30"
+                    }`}
+                    style={{
+                      width: 'auto',
+                      minWidth: 'fit-content',
+                      maxWidth: 'calc(100% - 2rem)',
+                      position: 'absolute',
+                      top: '0.25rem',
+                      left: '3rem',
+                      right: 'auto',
+                      direction: 'ltr'
+                    }}>
+                      {getCardTitle(card.type)}
+                    </div>
+
+                    {/* Header with code and checkmark */}
+                    <div className="p-4 pb-3 flex items-start justify-between relative">
+                      <div className={`w-12 h-12 flex items-center justify-center rounded-2xl text-white text-sm font-bold shadow-lg transition-all duration-300 backdrop-blur-sm border border-white/20 ${
+                        isLastSelected 
+                          ? "bg-white/25 scale-110" 
+                          : "bg-white/20 hover:bg-white/25"
+                      }`}>
+                        {card.code}
+                      </div>
+                      <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-white/90 shadow-lg transition-all duration-300 border border-white/30 ${
+                        isLastSelected ? "scale-110" : "scale-100"
+                      }`}>
+                        <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* Content area */}
+                    <div className="p-4 pt-2">
+                      <div className="mb-4">
+                        <p className={`text-white text-sm leading-relaxed font-medium transition-all duration-300 ${
+                          isLastSelected ? "opacity-100" : "opacity-90"
+                        }`}
+                        style={{ 
+                          direction: currentLang === 'ar' ? 'rtl' : 'ltr',
+                          textAlign: currentLang === 'ar' ? 'right' : 'left'
+                        }}>
+                          <SelectedCardText card={card} />
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Enhanced glow effect for last selected card */}
+                    {isLastSelected && (
+                      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-white/15 via-transparent to-white/10 opacity-60 pointer-events-none"></div>
+                    )}
+
+                    {/* Subtle border highlight */}
+                    <div className="absolute inset-0 rounded-3xl border border-white/20 pointer-events-none"></div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
+      </div>
+    );
+  });
+  SelectedCardsSection.displayName = 'SelectedCardsSection';
 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [pillars, setPillars] = useState<Pillar[]>([]);
@@ -52,12 +323,12 @@ const Rooms = () => {
   const addSelectedCard = (
     type: string,
     id: string,
-    title: string,
-    desc: string,
+    title: any, // Can be string or multilingual object
+    desc: any, // Can be string or multilingual object
     colorIndex: number,
-    code?: string // <-- add code as optional param
+    code?: string
   ) => {
-    const newCard = { type, id, title, desc, colorIndex, code }; // <-- include code
+    const newCard = { type, id, title, desc, colorIndex, code };
     setSelectedCards((prev) => {
       const exists = prev.some(c => c.id === newCard.id);
       if (!exists) {
@@ -107,13 +378,39 @@ useEffect(() => {
       if (savedCards) {
         const parsedCards = JSON.parse(savedCards);
 
-        // ✅ Ensure every card keeps its type for the badge
-        const cardsWithType = parsedCards.map((card: any) => ({
-          ...card,
-          type: card.type || "unknown", // keep type or fallback
-        }));
+        // ✅ Ensure every card keeps its type for the badge and extract correct language values
+        const currentLang = (i18n.language || "en") as "en" | "fr" | "ar";
+        const cardsWithType = parsedCards.map((card: any) => {
+          const migratedCard = {
+            ...card,
+            type: card.type || "unknown", // keep type or fallback
+          };
+
+          // Extract the correct language value from title
+          if (typeof card.title === 'object' && card.title !== null) {
+            migratedCard.title = card.title[currentLang] || card.title.en || card.title || '';
+          } else if (typeof card.title === 'string') {
+            migratedCard.title = card.title;
+          } else {
+            migratedCard.title = '';
+          }
+
+          // Extract the correct language value from desc
+          if (typeof card.desc === 'object' && card.desc !== null) {
+            migratedCard.desc = card.desc[currentLang] || card.desc.en || card.desc || migratedCard.title;
+          } else if (typeof card.desc === 'string') {
+            migratedCard.desc = card.desc;
+          } else {
+            migratedCard.desc = migratedCard.title;
+          }
+
+          return migratedCard;
+        });
 
         setSelectedCards(cardsWithType);
+        
+        // Save migrated cards back to localStorage
+        localStorage.setItem('selectedCards', JSON.stringify(cardsWithType));
 
         if (cardsWithType.length > 0) {
           setShowTwoColumns(true);
@@ -192,7 +489,7 @@ useEffect(() => {
   };
 
   loadSelectedCards();
-}, []);
+}, [i18n.language]);
 
 
   // Handle goal selection
@@ -203,8 +500,10 @@ useEffect(() => {
 
     const goal = goals.find((g) => g.id === goalId);
     if (goal) {
-      const lang = i18n.language || "en";
-      addSelectedCard("goal", goal.id, goal.title[lang], goal.desc[lang], colorIndex, goal.code);
+      // Extract the correct language value from the title and desc objects
+      const currentLang = (i18n.language || "en") as "en" | "fr" | "ar";
+      // Store the original multilingual objects instead of resolved strings
+      addSelectedCard("goal", goal.id, goal.title, goal.desc, colorIndex, goal.code);
     }
 
     // Load pillars for this goal
@@ -216,23 +515,16 @@ useEffect(() => {
 
 
   // Handle pillar selection
-  // Handle pillar selection
   const handlePillarSelect = (pillarId: string) => {
-
     console.log("🟢 Service card clicked ID:", pillarId);
     setSelectedPillar(pillarId);
 
     const pillar = pillars.find((p) => p.id === pillarId);
     if (pillar && selectedColorIndex !== null) {
-      const lang = i18n.language || "en";
-
-      const title =
-        typeof pillar.title === "object" ? (pillar.title as any)[lang] : pillar.title;
-      const desc = pillar.desc
-        ? (typeof pillar.desc === "object" ? (pillar.desc as any)[lang] : pillar.desc)
-        : title; // fallback to title if desc doesn't exist
-
-      addSelectedCard("pillar", pillar.id, title, desc, selectedColorIndex);
+      // Extract the correct language value from the title object
+      const currentLang = (i18n.language || "en") as "en" | "fr" | "ar";
+      // Store the original multilingual objects instead of resolved strings
+      addSelectedCard("pillar", pillar.id, pillar.title, pillar.desc || pillar.title, selectedColorIndex, pillar.code);
     }
 
     // Load services for this pillar
@@ -271,15 +563,21 @@ useEffect(() => {
     const service = services.find((s) => s.id === serviceId);
 
     if (service && selectedColorIndex !== null) {
-      const lang = i18n.language || "en";
+      // Extract the correct language value from the service data
+      const currentLang = i18n.language || "en";
+      // Create multilingual objects for service
+      const serviceTitle = {
+        en: service.title,
+        fr: service.name_service_fr_c || service.title,
+        ar: service.name_service_ar_c || service.title
+      };
+      const serviceDesc = {
+        en: service.desc,
+        fr: service.description_service_fr_c || service.desc,
+        ar: service.description_service_ar_c || service.desc
+      };
 
-      // Get localized title and description
-      const title = lang === "ar" ? service.name_service_ar_c :
-        lang === "fr" ? service.name_service_fr_c : service.title;
-      const desc = lang === "ar" ? service.description_service_ar_c :
-        lang === "fr" ? service.description_service_fr_c : service.desc;
-
-      addSelectedCard("service", service.id, title, desc, selectedColorIndex);
+      addSelectedCard("service", service.id, serviceTitle, serviceDesc, selectedColorIndex, service.code);
     }
 
     // 🔹 Get sub-services for this serviceId
@@ -316,31 +614,225 @@ useEffect(() => {
     const subService = subServices.find((s) => s.id === subServiceId);
 
     if (subService && selectedColorIndex !== null) {
-      const lang = i18n.language || "en";
+      // Extract the correct language value from the sub-service data
+      const currentLang = i18n.language || "en";
+      // Create multilingual objects for sub-service
+      const subServiceTitle = {
+        en: subService.description || subService.name,
+        fr: subService.name_fr_c || subService.description || subService.name,
+        ar: subService.name_ar_c || subService.description || subService.name
+      };
+      const subServiceDesc = {
+        en: subService.description_subservice_en_c || subService.description_subservice,
+        fr: subService.description_subservice_fr_c || subService.description_subservice,
+        ar: subService.description_subservice_ar_c || subService.description_subservice
+      };
 
-      // Pick correct localized title
-      const title = lang === "ar" ? subService.name_ar_c :
-        lang === "fr" ? subService.name_fr_c :
-          subService.description || subService.name;
-
-      // Pick correct localized description
-      const desc = lang === "ar" ? subService.description_subservice_ar_c :
-        lang === "fr" ? subService.description_subservice_fr_c :
-          subService.description_subservice_en_c || subService.description_subservice;
-
-      addSelectedCard("subService", subService.id, title, desc, selectedColorIndex);
+      addSelectedCard("subService", subService.id, subServiceTitle, subServiceDesc, selectedColorIndex, typeof subService.name === 'string' ? subService.name : subService.id);
     }
 
     setCurrentStep(5);
   };
 
 
-  // Handle project details (step 5)
+  // Handle project details (step 5) - just save and move to step 6
   const handleProjectDetails = () => {
     const details = stepFiveRef.current?.getFormValues();
     if (details) {
       setProjectDetails(details);
+      console.log('Project details saved:', details);
       setCurrentStep(6);
+    }
+  };
+
+  // Handle project submission (step 6)
+  const handleProjectSubmission = async () => {
+    if (!projectDetails) {
+      console.error('No project details available for submission');
+      return;
+    }
+
+    console.log('Starting project submission...');
+    console.log('Form details:', projectDetails);
+    console.log('Contact data:', projectDetails.contact);
+    
+    try {
+      // Handle file uploads first
+      let supportingDocuments: string[] = [];
+      if (projectDetails.files && projectDetails.files.length > 0) {
+        console.log('Uploading files:', projectDetails.files);
+        console.log('File details:', projectDetails.files.map((f: File) => ({
+          name: f.name,
+          size: f.size,
+          type: f.type,
+          isFile: f instanceof File,
+          constructor: f.constructor.name
+        })));
+        supportingDocuments = await handleMultipleFileUploads(projectDetails.files);
+        console.log('Files uploaded successfully:', supportingDocuments);
+      }
+      
+      // Prepare project data for CRM submission
+      const projectData = {
+        // Basic project info
+        name: projectDetails.title || '',
+        description: projectDetails.brief || '',
+        project_brief: projectDetails.brief || '',
+        problem_statement: projectDetails.rationale || '',
+        rationale_impact: projectDetails.rationale || '',
+        
+        // Strategic selections - get codes from selectedCards (ensure they are strings)
+        strategic_goal: (() => {
+          const goalCard = selectedCards.find(card => card.type === 'goal');
+          const code = goalCard?.code;
+          return typeof code === 'string' ? code : selectedGoal || '';
+        })(),
+        strategic_goal_id: selectedGoal || '',
+        pillar: (() => {
+          const pillarCard = selectedCards.find(card => card.type === 'pillar');
+          const code = pillarCard?.code;
+          return typeof code === 'string' ? code : selectedPillar || '';
+        })(),
+        pillar_id: selectedPillar || '',
+        service: (() => {
+          const serviceCard = selectedCards.find(card => card.type === 'service');
+          const code = serviceCard?.code;
+          return typeof code === 'string' ? code : selectedService || '';
+        })(),
+        service_id: selectedService || '',
+        sub_service: (() => {
+          const subServiceCard = selectedCards.find(card => card.type === 'subService');
+          const code = subServiceCard?.code;
+          return typeof code === 'string' ? code : selectedSubService || '';
+        })(),
+        sub_service_id: selectedSubService || '',
+        
+        // Beneficiaries - ensure all are strings
+        beneficiaries: (projectDetails.beneficiaries || []).map((b: any) => typeof b === 'string' ? b : String(b)),
+        other_beneficiaries: projectDetails.otherBeneficiary || '',
+        
+        // Budget and timeline
+        budget_icesco: parseFloat(projectDetails.budget?.icesco) || 0,
+        budget_member_state: parseFloat(projectDetails.budget?.member_state) || 0,
+        budget_sponsorship: parseFloat(projectDetails.budget?.sponsorship) || 0,
+        start_date: projectDetails.startDate || '',
+        end_date: projectDetails.endDate || '',
+        frequency: projectDetails.projectFrequency || '',
+        frequency_duration: projectDetails.frequencyDuration || '',
+        
+        // Partners and scope - ensure all are strings
+        partners: (projectDetails.partners || []).map((p: any) => typeof p === 'string' ? p : String(p)),
+        institutions: (projectDetails.partners || []).map((p: any) => typeof p === 'string' ? p : String(p)), // Using partners as institutions for now
+        delivery_modality: projectDetails.deliveryModality || '',
+        geographic_scope: projectDetails.geographicScope || '',
+        convening_method: projectDetails.conveningMethod || '',
+        project_type: projectDetails.conveningMethod || '', // Using convening method as project type for now
+        project_type_other: projectDetails.conveningMethodOther || '',
+        
+        // Monitoring and evaluation - ensure all are strings
+        milestones: (projectDetails.milestones || []).map((m: any) => typeof m === 'string' ? m : String(m)),
+        expected_outputs: projectDetails.expectedOutputs ? [String(projectDetails.expectedOutputs)] : [],
+        kpis: (projectDetails.kpis || []).map((k: any) => typeof k === 'string' ? k : String(k)),
+        
+        // Contact information
+        contact_name: projectDetails.contact?.name || '',
+        contact_email: projectDetails.contact?.email || '',
+        contact_phone: projectDetails.contact?.phone || '',
+        contact_role: projectDetails.contact?.role || '',
+        
+        // Additional info
+        comments: projectDetails.comments || '',
+        // Note: supporting_documents is expected to be File[] but we have URLs
+        // We'll store the URLs in comments instead
+        supporting_documents: [], // Empty array since we have URLs, not Files
+      };
+
+      // Submit to CRM using the hook
+      const result = await submitProject(projectData);
+      
+      if (result.success) {
+        // Also save to local storage for backup
+        const projectId = saveProjectToLocal(projectData);
+        console.log('Project submitted to CRM and saved locally with ID:', projectId);
+        
+        // Update submission result to show success
+        setSubmissionResult({
+          success: true,
+          projectId: result.projectId || projectId,
+          message: result.message || t('projectSubmittedSuccessfully')
+        });
+      } else {
+        // If CRM submission fails, still save locally as draft
+        const projectId = saveProjectToLocal(projectData);
+        console.log('CRM submission failed, saved locally as draft with ID:', projectId);
+        
+        setSubmissionResult({
+          success: false,
+          error: result.error || 'Failed to submit project to CRM. Saved locally as draft.',
+          projectId: projectId
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error during project submission:', error);
+      
+      // Try to save locally as backup
+      try {
+        // Create a minimal project data for local backup
+        const backupProjectData = {
+          name: projectDetails.title || 'Draft Project',
+          description: projectDetails.brief || '',
+          project_brief: projectDetails.brief || '',
+          problem_statement: projectDetails.rationale || '',
+          rationale_impact: projectDetails.rationale || '',
+          strategic_goal: selectedCards.find(card => card.type === 'goal')?.code || '',
+          strategic_goal_id: selectedGoal || '',
+          pillar: selectedCards.find(card => card.type === 'pillar')?.code || '',
+          pillar_id: selectedPillar || '',
+          service: selectedCards.find(card => card.type === 'service')?.code || '',
+          service_id: selectedService || '',
+          sub_service: selectedCards.find(card => card.type === 'subService')?.code || '',
+          sub_service_id: selectedSubService || '',
+          beneficiaries: projectDetails.beneficiaries || [],
+          other_beneficiaries: projectDetails.otherBeneficiary || '',
+          budget_icesco: parseFloat(projectDetails.budget?.icesco) || 0,
+          budget_member_state: parseFloat(projectDetails.budget?.member_state) || 0,
+          budget_sponsorship: parseFloat(projectDetails.budget?.sponsorship) || 0,
+          start_date: projectDetails.startDate || '',
+          end_date: projectDetails.endDate || '',
+          frequency: projectDetails.projectFrequency || '',
+          frequency_duration: projectDetails.frequencyDuration || '',
+          partners: projectDetails.partners || [],
+          institutions: projectDetails.partners || [],
+          delivery_modality: projectDetails.deliveryModality || '',
+          geographic_scope: projectDetails.geographicScope || '',
+          convening_method: projectDetails.conveningMethod || '',
+          project_type: projectDetails.conveningMethod || '',
+          project_type_other: projectDetails.conveningMethodOther || '',
+          milestones: projectDetails.milestones || [],
+          expected_outputs: projectDetails.expectedOutputs ? [projectDetails.expectedOutputs] : [],
+          kpis: projectDetails.kpis || [],
+          contact_name: projectDetails.contact?.name || '',
+          contact_email: projectDetails.contact?.email || '',
+          contact_phone: projectDetails.contact?.phone || '',
+          contact_role: projectDetails.contact?.role || '',
+          comments: projectDetails.comments || '',
+          supporting_documents: []
+        };
+        
+        const projectId = saveProjectToLocal(backupProjectData);
+        setSubmissionResult({
+          success: false,
+          error: 'Failed to submit project. Saved locally as draft.',
+          projectId: projectId
+        });
+      } catch (localError) {
+        console.error('Error saving locally:', localError);
+        setSubmissionResult({
+          success: false,
+          error: 'Failed to submit project and save locally. Please try again.'
+        });
+      }
     }
   };
 
@@ -351,17 +843,21 @@ useEffect(() => {
       setCurrentStep(prevStep);
 
       // Remove cards of steps after prevStep
-      setSelectedCards((cards) =>
-        cards.filter((card) => {
+      setSelectedCards((cards) => {
+        const filteredCards = cards.filter((card) => {
           switch (card.type) {
-            case 'goal': return prevStep >= 2;
-            case 'pillar': return prevStep >= 3;
-            case 'service': return prevStep >= 4;
-            case 'subService': return prevStep >= 5;
+            case 'goal': return prevStep >= 2; // Remove goal when going back to step 1
+            case 'pillar': return prevStep >= 3; // Remove pillar when going back to step 2 or earlier
+            case 'service': return prevStep >= 4; // Remove service when going back to step 3 or earlier
+            case 'subService': return prevStep >= 5; // Remove sub-service when going back to step 4 or earlier
             default: return true;
           }
-        })
-      );
+        });
+        
+        // Update localStorage with filtered cards
+        localStorage.setItem('selectedCards', JSON.stringify(filteredCards));
+        return filteredCards;
+      });
     }
   };
 
@@ -408,6 +904,98 @@ useEffect(() => {
     }
   };
 
+  const getCardDescription = (card: any) => {
+    const currentLang = i18n.language || "en";
+    
+    // Debug log
+    console.log('Card desc data:', card.desc, 'Current lang:', currentLang);
+    
+    // Try to get translated description from the card data
+    if (card.desc && typeof card.desc === 'object') {
+      const result = card.desc[currentLang] || card.desc.en || card.desc;
+      console.log('Translated desc:', result);
+      // Ensure we return a string, not an object
+      if (typeof result === 'string') {
+        return decodeHtmlEntities(result);
+      } else {
+        // If result is still an object, try to get a string value
+        const stringResult = Object.values(result).find(val => typeof val === 'string');
+        return stringResult ? decodeHtmlEntities(stringResult) : t("noDescription");
+      }
+    }
+    
+    // If desc is a string, return it as is
+    if (typeof card.desc === 'string') {
+      console.log('String desc:', card.desc);
+      return decodeHtmlEntities(card.desc);
+    }
+    
+    // Fallback to title if no description
+    if (card.title && typeof card.title === 'object') {
+      const result = card.title[currentLang] || card.title.en || card.title;
+      if (typeof result === 'string') {
+        return decodeHtmlEntities(result);
+      } else {
+        const stringResult = Object.values(result).find(val => typeof val === 'string');
+        return stringResult ? decodeHtmlEntities(stringResult) : t("noDescription");
+      }
+    }
+    
+    return card.title || t("noDescription");
+  };
+
+  // Function to decode HTML entities
+  const decodeHtmlEntities = (text: string) => {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+  };
+
+  const getCardTitleText = (card: any) => {
+    const currentLang = i18n.language || "en";
+    
+    // Debug: Log the card structure
+    console.log('Card data:', card, 'Current lang:', currentLang);
+    
+    // Try to get translated title from the card data
+    if (card.title && typeof card.title === 'object') {
+      const result = card.title[currentLang] || card.title.en || card.title;
+      console.log('Title result:', result);
+      // Ensure we return a string, not an object
+      if (typeof result === 'string') {
+        return decodeHtmlEntities(result);
+      } else {
+        // If result is still an object, try to get a string value
+        const stringResult = Object.values(result).find(val => typeof val === 'string');
+        return stringResult ? decodeHtmlEntities(stringResult) : t("noDescription");
+      }
+    }
+    
+    // Try desc field if title doesn't have translations
+    if (card.desc && typeof card.desc === 'object') {
+      const result = card.desc[currentLang] || card.desc.en || card.desc;
+      console.log('Desc result:', result);
+      if (typeof result === 'string') {
+        return decodeHtmlEntities(result);
+      } else {
+        const stringResult = Object.values(result).find(val => typeof val === 'string');
+        return stringResult ? decodeHtmlEntities(stringResult) : t("noDescription");
+      }
+    }
+    
+    // If title is a string, return it as is
+    if (typeof card.title === 'string') {
+      return decodeHtmlEntities(card.title);
+    }
+    
+    // If desc is a string, return it as is
+    if (typeof card.desc === 'string') {
+      return decodeHtmlEntities(card.desc);
+    }
+    
+    return t("noDescription");
+  };
+
   const getStepTitle = (stepId: number) => {
     switch (stepId) {
       case 1:
@@ -430,27 +1018,140 @@ useEffect(() => {
   // GSAP right column animation
   useEffect(() => {
     if (showTwoColumns && rightColumnRef.current) {
-      gsap.fromTo(
-        rightColumnRef.current,
-        { x: 100, opacity: 0 },
-        { x: 0, opacity: 1, duration: 0.6, ease: "power2.out" }
-      );
+      // Set initial state to prevent horizontal overflow
+      gsap.set(rightColumnRef.current, { x: 50, opacity: 0 });
+      
+      gsap.to(rightColumnRef.current, {
+        x: 0,
+        opacity: 1,
+        duration: 0.6,
+        ease: "power2.out"
+      });
     }
   }, [showTwoColumns, currentStep]);
 
+  // Prevent horizontal scrollbar when two-column layout is active
+  useEffect(() => {
+    if (showTwoColumns) {
+      document.body.style.overflowX = 'hidden';
+    } else {
+      document.body.style.overflowX = 'auto';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflowX = 'auto';
+    };
+  }, [showTwoColumns]);
+
+  // Intersection Observer for scroll-triggered animations
+  useEffect(() => {
+    if (!isLanguageLoaded || hasAnimated || !containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasAnimated) {
+            console.log('Content section came into view - starting GSAP animations...', {
+              titleRef: !!titleRef.current,
+              descriptionRef: !!descriptionRef.current,
+              stepperRef: !!stepperRef.current,
+              contentRefs: contentRefs.current.length,
+              containerRef: !!containerRef.current
+            });
+
+            setHasAnimated(true);
+
+            const ctx = gsap.context(() => {
+              // Animate title
+              if (titleRef.current) {
+                console.log('Animating Content title...');
+                gsap.fromTo(
+                  titleRef.current,
+                  { opacity: 0, y: 30, scale: 0.95 },
+                  { opacity: 1, y: 0, scale: 1, duration: 1, ease: "power3.out" }
+                );
+              }
+
+              // Animate description
+              if (descriptionRef.current) {
+                console.log('Animating Content description...');
+                gsap.fromTo(
+                  descriptionRef.current,
+                  { opacity: 0, y: 20 },
+                  { opacity: 1, y: 0, duration: 0.8, ease: "power3.out", delay: 0.2 }
+                );
+              }
+
+              // Animate stepper
+              if (stepperRef.current) {
+                console.log('Animating Content stepper...');
+                gsap.fromTo(
+                  stepperRef.current,
+                  { opacity: 0, y: 40 },
+                  { opacity: 1, y: 0, duration: 1.2, ease: "power3.out", delay: 0.4 }
+                );
+              }
+
+              // Animate content elements
+              if (contentRefs.current && contentRefs.current.length > 0) {
+                console.log('Animating Content elements...', contentRefs.current.length);
+                gsap.fromTo(
+                  contentRefs.current,
+                  { opacity: 0, y: 30 },
+                  { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", delay: 0.6 }
+                );
+              }
+            }, containerRef);
+
+            // Disconnect observer after animation
+            observer.disconnect();
+          }
+        });
+      },
+      {
+        threshold: 0.1, // Trigger when 10% of the section is visible
+        rootMargin: '0px 0px -50px 0px' // Start animation slightly before fully in view
+      }
+    );
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isLanguageLoaded, hasAnimated]);
+
+
   return (
-    <section id="next-section" className="bg-white-100 py-10 lg:py-14 w-full px-5 md:px-[1.9rem] largesceen:px-14 fourk:px-44 relative">
-      <div className="text-center mt-12 sm:mt-20 xl:mt-0">
-        <h2 className="text-gradient uppercase text-3xl xs:text-[2rem] leading-none lg:text-[6.25rem] desktop:text-[7.813rem] largesceen:text-[2.375rem]">
+    <section 
+      ref={containerRef}
+      id="next-section" 
+      className="bg-white-100 py-6 lg:py-8 w-full px-4 md:px-6 lg:px-8 relative overflow-x-hidden"
+    >
+      <div className="text-center mt-6 sm:mt-8 xl:mt-0">
+          <h2 
+            ref={titleRef}
+            className="text-gradient uppercase text-xl xs:text-2xl leading-none lg:text-3xl desktop:text-4xl"
+            style={{ opacity: 0, transform: 'translateY(30px) scale(0.95)' }}
+          >
           {t("takePartInStrategy")}
         </h2>
-        <p className="uppercase mt-12 text-gradient lg:text-base 2xl:text-lg largesceen:text-[1.625rem] max-lg:hidden">
+        <p 
+          ref={descriptionRef}
+          className="uppercase mt-4 text-gradient text-sm lg:text-base 2xl:text-lg max-lg:hidden"
+          style={{ opacity: 0, transform: 'translateY(20px)' }}
+        >
           {t("submitAndTrackProposal")}
         </p>
       </div>
 
       {/* Stepper */}
-      <section className="mt-16 md:mt-24 flex flex-col items-center">
+      <section 
+        ref={stepperRef}
+        className="mt-8 md:mt-12 flex flex-col items-center"
+        style={{ opacity: 0, transform: 'translateY(40px)' }}
+      >
         <div className="w-full max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             {steps.map((step) => (
@@ -477,69 +1178,19 @@ useEffect(() => {
 
         {/* Two-column layout */}
         <div
-          className={`relative w-full px-16 mt-12 ${showTwoColumns ? "flex flex-col md:flex-row gap-6" : ""
+          className={`relative w-full px-4 md:px-6 lg:px-8 mt-8 overflow-x-hidden ${showTwoColumns ? "flex flex-col md:flex-row gap-12" : ""
             }`}
+          style={{ direction: 'ltr' }}
         >
           {/* Left column */}
-          {showTwoColumns && selectedCards.length > 0 && (
-            <div className="hidden md:flex md:w-1/3 flex-col-reverse justify-between mt-18 mb-6 md:mb-0">
-              <div className="h-[150px]"></div>
-              <div className="sticky top-4 space-y-4">
+          {showTwoColumns && (
+            <div className="hidden md:flex md:w-1/3 flex-col-reverse justify-between mt-8 mb-4 md:mb-0" style={{ direction: 'ltr' }}>
+              <div className="h-[80px]"></div>
+              <div className="sticky top-4 space-y-3" style={{ direction: 'ltr' }}>
                 <div className="text-sm font-semibold text-gray-600 mb-2">
                   {t("yourSelections")}
                 </div>
-                <div className="relative min-h-[200px] flex flex-col gap-4">
-                  <AnimatePresence>
-                    {selectedCards.map((card, index) => (
-                      <motion.div
-                        key={`${card.type}-${card.id || index}`}
-                        className={`w-full ${index === selectedCards.length - 1 ? "scale-105 shadow-2xl" : "scale-100"}`}
-                        initial={{ opacity: 0, y: 50, scale: 0.9 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -50 }}
-                        transition={{ duration: 0.4 }}
-                      >
-                        <div className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 relative  ${cardColors[card.colorIndex % cardColors.length].bg}`}>
-
-                          {/* Type badge */}
-                          <div className="absolute top-2 left-2 px-2 py-1 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-800 z-10">
-                            {getCardTitle(card.type)}
-                            
-                          </div>
-
-                          {/* Code badge */}
-                          {card.code && (
-                            <div className="absolute top-2 right-2 px-2 py-1 bg-white bg-opacity-80 rounded-full text-xs font-bold text-gray-800 z-10">
-                              {card.code}
-                            </div>
-                          )}
-
-                          <div className="p-4 pb-3 flex items-start justify-between relative">
-                            <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-sm font-bold shadow-md">
-                              {card.name}
-                            </div>
-                            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-lg">
-                              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                          </div>
-
-                          <div className="p-4 pt-2">
-                            <div className="mb-8">
-                              <p className="text-white text-sm text-justify font-semibold opacity-90 mb-1">
-                                {card.title}
-                              </p>
-                              <p className="text-white text-xs text-justify opacity-75 line-clamp-2">
-                                {card.desc}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
+                <SelectedCardsSection />
 
               </div>
             </div>
@@ -547,57 +1198,90 @@ useEffect(() => {
 
           {/* Right column */}
           <div
-            className={`w-full ${showTwoColumns ? "md:w-2/3" : "w-full"}`}
+            className={`w-full overflow-x-hidden ${showTwoColumns ? "md:w-2/3" : "w-full"}`}
             ref={rightColumnRef}
           >
             <AnimatePresence mode="wait">
               {currentStep === 1 && (
-                <StepOne
-                  goals={goals}
-                  selectedGoal={selectedGoal}
-                  onNext={handleGoalSelect}
-                />
+                <div 
+                  ref={addContentRef}
+                  style={{ opacity: 0, transform: 'translateY(30px)' }}
+                >
+                  <StepOne
+                    goals={goals}
+                    selectedGoal={selectedGoal}
+                    onNext={handleGoalSelect}
+                  />
+                </div>
               )}
               {currentStep === 2 && (
-                <StepTwo
-                  onNext={handlePillarSelect}
-                  onPrevious={handlePrevious}
-                  pillars={pillars}
-                  selectedPillar={selectedPillar}
-                  goalColorIndex={selectedColorIndex}
-                  selectedGoal={selectedGoal ?? ""}
-                />
+                <div 
+                  ref={addContentRef}
+                  style={{ opacity: 0, transform: 'translateY(30px)' }}
+                >
+                  <StepTwo
+                    onNext={handlePillarSelect}
+                    onPrevious={handlePrevious}
+                    pillars={pillars}
+                    selectedPillar={selectedPillar}
+                    goalColorIndex={selectedColorIndex}
+                    selectedGoal={selectedGoal ?? ""}
+                  />
+                </div>
               )}
               {currentStep === 3 && (
-                <StepThree
-                  services={services}
-                  onNext={handleServiceSelect}
-                  onPrevious={handlePrevious}
-                  selectedService={selectedService}
-                  goalColorIndex={selectedColorIndex}
-                />
+                <div 
+                  ref={addContentRef}
+                  style={{ opacity: 0, transform: 'translateY(30px)' }}
+                >
+                  <StepThree
+                    services={services}
+                    onNext={handleServiceSelect}
+                    onPrevious={handlePrevious}
+                    selectedService={selectedService}
+                    goalColorIndex={selectedColorIndex}
+                  />
+                </div>
               )}
               {currentStep === 4 && (
-                <StepFour
-                  subServices={subServices}
-                  onNext={handleSubServiceSelect}
-                  onPrevious={handlePrevious}  // <-- pass the handler
-                  selectedSubService={selectedSubService}
-                  goalColorIndex={selectedColorIndex}
-                />
+                <div 
+                  ref={addContentRef}
+                  style={{ opacity: 0, transform: 'translateY(30px)' }}
+                >
+                  <StepFour
+                    subServices={subServices}
+                    onNext={handleSubServiceSelect}
+                    onPrevious={handlePrevious}  // <-- pass the handler
+                    selectedSubService={selectedSubService}
+                    goalColorIndex={selectedColorIndex}
+                  />
+                </div>
               )}
 
               {currentStep === 5 && (
-                <StepFive ref={stepFiveRef} onNext={handleProjectDetails} onPrevious={handlePrevious} />
+                <div 
+                  ref={addContentRef}
+                  style={{ opacity: 0, transform: 'translateY(30px)' }}
+                >
+                  <StepFive ref={stepFiveRef} onNext={handleProjectDetails} onPrevious={handlePrevious} />
+                </div>
               )}
               {currentStep === 6 && (
-                <StepSix
-                  selectedCards={selectedCards}
-                  projectDetails={projectDetails}
-                  onPrevious={handlePrevious}
-                  onClearData={clearAllData}
-                  onEditProjectDetails={handleEditProjectDetails}
-                />
+                <div 
+                  ref={addContentRef}
+                  style={{ opacity: 0, transform: 'translateY(30px)' }}
+                >
+                  <StepSix
+                    selectedCards={selectedCards}
+                    projectDetails={projectDetails}
+                    onPrevious={handlePrevious}
+                    onClearData={clearAllData}
+                    onEditProjectDetails={handleEditProjectDetails}
+                    onSubmit={handleProjectSubmission}
+                    submissionResult={localSubmissionResult || submissionResult}
+                    isSubmitting={isSubmitting}
+                  />
+                </div>
               )}
             </AnimatePresence>
           </div>
@@ -608,3 +1292,4 @@ useEffect(() => {
 };
 
 export default Rooms;
+  

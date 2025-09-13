@@ -15,7 +15,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const contactInfo = await getContactByLogin(sessionId, email);
    
-
     if (
       !contactInfo ||
       !contactInfo.password_c ||
@@ -25,12 +24,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: "Contact not found or access denied" });
     }
 
-   
+    console.log('=== DEBUG: Login Success - Contact Info ===');
+    console.log('Contact ID:', contactInfo.id);
+    console.log('Full Name:', contactInfo.first_name, contactInfo.last_name);
+    console.log('Email:', contactInfo.email1);
+    console.log('Phone Work:', contactInfo.phone_work);
+    console.log('Phone Mobile:', contactInfo.phone_mobile);
+    console.log('Title:', contactInfo.title);
+    console.log('Department:', contactInfo.department);
+    console.log('Primary Address:', {
+      street: contactInfo.primary_address_street,
+      city: contactInfo.primary_address_city,
+      state: contactInfo.primary_address_state,
+      postalcode: contactInfo.primary_address_postalcode,
+      country: contactInfo.primary_address_country
+    });
+    console.log('Portal Access:', contactInfo.portal_access_c);
+    console.log('Date Entered:', contactInfo.date_entered);
+    console.log('Date Modified:', contactInfo.date_modified);
+    console.log('==========================================');
 
     const goals = await getGoals(sessionId, language);
 
+    // Remove sensitive information before sending to client
+    // Never store passwords in localStorage for security reasons
+    const { password_c, ...safeContactInfo } = contactInfo;
+
     const hashedEmail = md5(email);
-    return res.status(200).json({ hashedEmail, sessionId, contactInfo, goals });
+    return res.status(200).json({ hashedEmail, sessionId, contactInfo: safeContactInfo, goals });
   } catch (error: any) {
     console.error("CRM error:", error.response?.data || error.message);
     return res

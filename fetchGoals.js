@@ -4,8 +4,8 @@ import axios from 'axios';
 import md5 from 'md5';
 
 const CRM_REST_URL = "http://3.145.21.11/service/v4_1/rest.php";
-const ADMIN_USERNAME = process.env.CRM_ADMIN_USER || "admin";
-const ADMIN_PASSWORD = process.env.CRM_ADMIN_PASS || "admin25";
+const ADMIN_USERNAME = process.env.CRM_ADMIN_USER || "portal";
+const ADMIN_PASSWORD = process.env.CRM_ADMIN_PASS || "Portal@2025";
 
 // Get session ID
 async function getSessionId() {

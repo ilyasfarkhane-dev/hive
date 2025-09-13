@@ -51,6 +51,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     comments: "",
   });
 
+  const [emailError, setEmailError] = useState("");
+
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Load saved data on component mount - only run once
@@ -70,7 +72,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
             ...prev,
             ...parsedData,
             // Note: Files from localStorage can't be restored as File objects
-            files: parsedData.files || []
+            // We'll only keep actual File objects that were added after page load
+            files: prev.files || []
           }));
         }
       } catch (error) {
@@ -84,7 +87,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     if (!isInitialized) {
       loadSavedData();
     }
-  }, []); // Remove isInitialized from dependency array
+  }, [isInitialized]); // Include isInitialized in dependency array
 
   // Handle initialValues from props (when coming back from next step)
   useEffect(() => {
@@ -120,15 +123,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     ref,
     () => ({
       getFormValues: () => {
-        const serializableFiles = formValues.files.map((file) => ({
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified,
-        }));
+        // Filter out any files that are not actual File objects (e.g., from localStorage)
+        const validFiles = formValues.files.filter(file => file instanceof File);
+        
         return {
           ...formValues,
-          files: serializableFiles,
+          files: validFiles, // Only return actual File objects
         };
       },
     }),
@@ -153,14 +153,74 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     }));
   };
 
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Handle email change with validation
+  const handleEmailChange = (email: string) => {
+    setFormValues(prev => ({
+      ...prev,
+      contact: { ...prev.contact, email }
+    }));
+    
+    if (email && !validateEmail(email)) {
+      setEmailError(t('invalidEmailFormat'));
+    } else {
+      setEmailError("");
+    }
+  };
+
   const handleAddPartner = () => {
     const trimmed = formValues.partnerInput.trim();
-    if (trimmed && !formValues.partners.includes(trimmed)) {
+    if (trimmed && !formValues.partners.includes(trimmed) && formValues.partners.length < 5) {
       setFormValues((prev) => ({
         ...prev,
         partners: [...prev.partners, trimmed],
         partnerInput: "",
       }));
+    }
+  };
+
+  const handleAddMilestone = () => {
+    const trimmed = formValues.milestoneInput.trim();
+    if (trimmed && !formValues.milestones.includes(trimmed) && formValues.milestones.length < 5) {
+      setFormValues((prev) => ({
+        ...prev,
+        milestones: [...prev.milestones, trimmed],
+        milestoneInput: "",
+      }));
+    }
+  };
+
+  const handleAddKPI = () => {
+    const trimmed = formValues.kpiInput.trim();
+    if (trimmed && !formValues.kpis.includes(trimmed) && formValues.kpis.length < 5) {
+      setFormValues((prev) => ({
+        ...prev,
+        kpis: [...prev.kpis, trimmed],
+        kpiInput: "",
+      }));
+    }
+  };
+
+  // Handle Enter key press for input fields
+  const handleKeyPress = (e: React.KeyboardEvent, type: 'partner' | 'milestone' | 'kpi') => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      switch (type) {
+        case 'partner':
+          handleAddPartner();
+          break;
+        case 'milestone':
+          handleAddMilestone();
+          break;
+        case 'kpi':
+          handleAddKPI();
+          break;
+      }
     }
   };
 
@@ -199,6 +259,11 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
       return false;
     }
 
+    // Check email validation
+    if (formValues.contact.email && !validateEmail(formValues.contact.email)) {
+      return false;
+    }
+
     return requiredFields.every(field => field);
   };
 
@@ -208,22 +273,23 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
   };
   return (
 
-    <div id="step5Content" className="space-y-16">
+    <div id="step5Content" className="max-w-6xl mx-auto">
       {/* Section Header */}
-      <div className="text-center">
-        <h3 className="text-4xl md:text-3xl font-extrabold text-[#0f7378]  mt-12">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-[#0f7378] mb-2">
           {t('enterProjectDetails')}
         </h3>
+        <p className="text-gray-600 text-sm">
+          {t('fillAllRequiredFields')}
+        </p>
       </div>
 
-      <div className="relative   py-4 space-y-8 ">
+      <div className="space-y-8">
         {/* Project Identity */}
-        <div className="my-12 space-y-6">
-          <div className="flex items-center gap-3 mb-6 text-teal-700">
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
-            <p className="text-xl font-semibold">{t('projectOverview')}</p>
+        <div className="space-y-6">
+          <div className="border-b border-gray-200 pb-4">
+            <h4 className="text-lg font-semibold text-gray-800">{t('projectOverview')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('fillAllRequiredFields')}</p>
           </div>
 
           <div>
@@ -240,7 +306,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   type="text"
                   required
                   placeholder={t('titlePlaceholder')}
-                  className={`w-full px-5 py-3 border rounded-2xl focus:ring-2 shadow-sm ${
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm ${
                     getFieldValidationClass(!!formValues.title)
                   }`}
                 />
@@ -257,7 +323,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   value={formValues.brief}
                   onChange={(e) => setFormValues({ ...formValues, brief: e.target.value })}
                   placeholder={t('projectBriefPlaceholder')}
-                  className={`w-full px-5 py-3 border rounded-2xl focus:ring-2 shadow-sm ${
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm resize-none ${
                     getFieldValidationClass(!!formValues.brief)
                   }`}
                 ></textarea>
@@ -265,20 +331,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
             </div>
 
             {/* Strategic Justification */}
-            <div className="mb-12">
-              <div className="flex items-center gap-3 mb-12 text-teal-700 ">
-                <svg
-                  className="w-6 h-6 text-teal-600"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <p className="text-xl font-semibold">{t('rationaleImpact')}</p>
+            <div className="mt-8">
+              <div className="border-b border-gray-200 pb-4 mb-6">
+                <h4 className="text-lg font-semibold text-gray-800">{t('rationaleImpact')}</h4>
+                <p className="text-sm text-gray-600 mt-1">{t('problemStatementPlaceholder')}</p>
               </div>
 
               <div className="mb-6">
@@ -301,7 +357,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               <label className="block mb-2 font-medium text-gray-900">
                 {t('beneficiaries')} <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="beneficiaries">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3" id="beneficiaries">
                 {[
                   { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: t('beneficiaryStudents') },
                   { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: t('beneficiaryTeachers') },
@@ -312,11 +368,15 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 ].map((benef) => (
                   <label
                     key={benef.value}
-                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-300 hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md"
+                    className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
+                      formValues.beneficiaries.includes(benef.value)
+                        ? 'border-teal-500 bg-teal-50 shadow-sm'
+                        : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                    }`}
                   >
                     <input
                       type="checkbox"
-                      className="accent-teal-500"
+                      className="mt-1 accent-teal-500 w-4 h-4"
                       value={benef.value}
                       checked={formValues.beneficiaries.includes(benef.value)}
                       onChange={(e) => {
@@ -336,9 +396,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                         }
                       }}
                     />
-                    <div className="flex gap-4 items-center">
-                      <span className="font-medium text-gray-900 ">{benef.label}</span>
-                      <span className="text-gray-500 text-sm">{benef.desc}</span>
+                    <div className="flex-1">
+                      <span className="font-medium text-gray-900 text-sm">{benef.label}</span>
+                      <p className="text-gray-500 text-xs mt-1 leading-relaxed">{benef.desc}</p>
                     </div>
                   </label>
                 ))}
@@ -346,10 +406,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
 
               {/* Show input only when "Other" is selected */}
               {showOtherInput && (
-                <div className="mt-2">
+                <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
+                  <label className="block text-sm font-medium text-teal-800 mb-2">
+                    {t('otherBeneficiaryPlaceholder')}
+                  </label>
                   <input
                     type="text"
-                    className="ml-2 px-3 py-2 border border-gray-300 rounded-xl"
+                    className="w-full px-4 py-3 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
                     placeholder={t('otherBeneficiaryPlaceholder')}
                     value={formValues.otherBeneficiary}
                     onChange={(e) =>
@@ -368,20 +431,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         </div>
 
         {/* Implementation & Budget */}
-        <div className="my-12 space-y-6">
-          <div className="flex items-center gap-3 mb-6 mt-4 text-teal-700">
-            <svg
-              className="w-6 h-6 text-teal-600"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-            </svg>
-            <p className="text-xl font-semibold">{t('implementationBudget')}</p>
+        <div className="space-y-6">
+          <div className="border-b border-gray-200 pb-4">
+            <h4 className="text-lg font-semibold text-gray-800">{t('implementationBudget')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('implementationBudgetDesc')}</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -415,35 +468,37 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               />
             </div>
 
-            {["ICESCO", "Member State", "Sponsorship"].map((item) => {
-              const key = item.replace(" ", "_").toLowerCase();
-              return (
-                <div className="flex items-center gap-4" key={item}>
-                  <label className="text-gray-700 text-sm min-w-[120px]">
-                    {t(`budgetLabel_${key}`)} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative w-full">
-                    <input
-                      type="text"
-                      placeholder={t('amountPlaceholder')}
-                      required
-                      className="w-full px-5 py-3 pr-16 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out"
-                      id={`budget_${key}`}
-                      value={formValues.budget[key as keyof typeof formValues.budget]}
-                      onChange={(e) =>
-                        setFormValues({
-                          ...formValues,
-                          budget: { ...formValues.budget, [key]: e.target.value },
-                        })
-                      }
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
-                      {t('currencyUSD')}
-                    </span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {["ICESCO", "Member State", "Sponsorship"].map((item) => {
+                const key = item.replace(" ", "_").toLowerCase();
+                return (
+                  <div className="space-y-2" key={item}>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {t(`budgetLabel_${key}`)} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={t('amountPlaceholder')}
+                        required
+                        className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition-all duration-200 shadow-sm"
+                        id={`budget_${key}`}
+                        value={formValues.budget[key as keyof typeof formValues.budget]}
+                        onChange={(e) =>
+                          setFormValues({
+                            ...formValues,
+                            budget: { ...formValues.budget, [key]: e.target.value },
+                          })
+                        }
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">
+                        {t('currencyUSD')}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
             <div className="md:col-span-2 space-y-2">
               <label className="block mb-1 font-medium text-gray-900">
@@ -451,7 +506,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               </label>
               <select
                 id="project_frequency"
-                className={`w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out ${formValues.freqError ? "border-red-500" : ""
+                className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:border-teal-500 focus:ring-2 focus:ring-teal-200 shadow-sm transition-all duration-200 ${formValues.freqError ? "border-red-500" : ""
                   }`}
                 value={formValues.projectFrequency}
                 onChange={(e) => setFormValues({ ...formValues, projectFrequency: e.target.value })}
@@ -479,15 +534,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         </div>
 
         {/* Partners & Collaboration */}
-        <div className="mb-12">
-          <div className="card-header flex items-center gap-3 mb-4 text-teal-700">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            <p className="text-xl font-semibold">{t('partnersCollaboration')}</p>
+        <div>
+          <div className="border-b border-gray-200 pb-4 mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">{t('partnersCollaboration')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('partnersCollaborationDesc')}</p>
           </div>
 
           <div className="form-group space-y-2">
@@ -495,7 +545,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               <span className="label-text font-medium text-gray-800">
                 {t('partners')} <span className="text-red-500">*</span>
               </span>
-              <span className="block text-gray-500 text-sm">{t('institutions')}</span>
+              <span className="block text-gray-500 text-sm">{t('institutions')} ({formValues.partners.length}/5)</span>
             </label>
             <div className="tag-input-container flex flex-col gap-2">
               <div id="partners-list" className="flex flex-wrap gap-2">
@@ -524,16 +574,25 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder={t('addPartnerPlaceholder')}
-                  className="enhanced-input flex-1 px-4 py-2 border border-gray-300 rounded-xl ..."
+                  placeholder={formValues.partners.length >= 5 ? t('maxPartnersReached') : t('addPartnerPlaceholder')}
+                  className={`enhanced-input flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 ${
+                    formValues.partners.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
                   value={formValues.partnerInput}
                   onChange={(e) => setFormValues({ ...formValues, partnerInput: e.target.value })}
+                  onKeyPress={(e) => handleKeyPress(e, 'partner')}
+                  disabled={formValues.partners.length >= 5}
                 />
                 <button
                   type="button"
                   id="add-partner-btn"
-                  className="px-3 py-2 bg-teal-600 text-white rounded-xl ..."
+                  className={`px-3 py-2 rounded-xl transition-all duration-200 ${
+                    formValues.partners.length >= 5
+                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                      : 'bg-teal-600 text-white hover:bg-teal-700'
+                  }`}
                   onClick={handleAddPartner}
+                  disabled={formValues.partners.length >= 5}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="12" y1="5" x2="12" y2="19" />
@@ -541,19 +600,20 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   </svg>
                 </button>
               </div>
+              {formValues.partners.length >= 5 && (
+                <p className="text-sm text-amber-600 mt-1">
+                  {t('maxPartnersLimitReached')}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Project Scope & Modality */}
-        <div className="my-12">
-          <div className="card-header flex items-center gap-3 mb-4 text-teal-700">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12h20" />
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-            <p className="text-xl font-semibold">{t('projectScopeModality')}</p>
+        <div>
+          <div className="border-b border-gray-200 pb-4 mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">{t('projectScopeModality')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('projectScopeModalityDesc')}</p>
           </div>
 
           <div className="form-group space-y-2 my-6">
@@ -605,51 +665,34 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 </span>
                 <span className="block text-gray-500 text-sm">{t('deliveryModalityHelp')}</span>
               </label>
-              <div className="radio-group flex flex-col gap-3">
-                <label className="radio-item flex items-center gap-3 p-3 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
-                  <input
-                    type="radio"
-                    name="modality"
-                    value="Physical"
-                    required
-                    className="accent-teal-500"
-                    checked={formValues.deliveryModality === "Physical"}
-                    onChange={(e) =>
-                      setFormValues({ ...formValues, deliveryModality: e.target.value })
-                    }
-                  />
-                  <span className="font-medium text-gray-900">{t('modalityPhysical')}</span>
-                </label>
-
-                <label className="radio-item flex items-center gap-3 p-3 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
-                  <input
-                    type="radio"
-                    name="modality"
-                    value="Virtual"
-                    required
-                    className="accent-teal-500"
-                    checked={formValues.deliveryModality === "Virtual"}
-                    onChange={(e) =>
-                      setFormValues({ ...formValues, deliveryModality: e.target.value })
-                    }
-                  />
-                  <span className="font-medium text-gray-900">{t('modalityVirtual')}</span>
-                </label>
-
-                <label className="radio-item flex items-center gap-3 p-3 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
-                  <input
-                    type="radio"
-                    name="modality"
-                    value="Hybrid"
-                    required
-                    className="accent-teal-500"
-                    checked={formValues.deliveryModality === "Hybrid"}
-                    onChange={(e) =>
-                      setFormValues({ ...formValues, deliveryModality: e.target.value })
-                    }
-                  />
-                  <span className="font-medium text-gray-900">{t('modalityHybrid')}</span>
-                </label>
+              <div className="space-y-2">
+                {[
+                  { value: "Physical", label: t('modalityPhysical') },
+                  { value: "Virtual", label: t('modalityVirtual') },
+                  { value: "Hybrid", label: t('modalityHybrid') }
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                      formValues.deliveryModality === option.value
+                        ? 'border-teal-500 bg-teal-50 shadow-sm'
+                        : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="modality"
+                      value={option.value}
+                      required
+                      className="accent-teal-500 w-4 h-4"
+                      checked={formValues.deliveryModality === option.value}
+                      onChange={(e) =>
+                        setFormValues({ ...formValues, deliveryModality: e.target.value })
+                      }
+                    />
+                    <span className="font-medium text-gray-900 text-sm">{option.label}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -660,79 +703,50 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 </span>
                 <span className="block text-gray-500 text-sm">{t('geographicScopeHelp')}</span>
               </label>
-              <div className="checkbox-grid-small grid grid-cols-1 gap-2">
-                <label className="checkbox-item-small flex items-center gap-2 p-2 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
-                  <input
-                    type="radio"
-                    name="geographicScope"
-                    value="National"
-                    required
-                    className="accent-teal-500"
-                    checked={formValues.geographicScope === "National"}
-                    onChange={(e) =>
-                      setFormValues({ ...formValues, geographicScope: e.target.value })
-                    }
-                  />
-                  <span className="text-gray-900 font-medium">{t('scopeNational')}</span>
-                </label>
-
-                <label className="checkbox-item-small flex items-center gap-2 p-2 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
-                  <input
-                    type="radio"
-                    name="geographicScope"
-                    value="Regional"
-                    required
-                    className="accent-teal-500"
-                    checked={formValues.geographicScope === "Regional"}
-                    onChange={(e) =>
-                      setFormValues({ ...formValues, geographicScope: e.target.value })
-                    }
-                  />
-                  <span className="text-gray-900 font-medium">{t('scopeRegional')}</span>
-                </label>
-
-                <label className="checkbox-item-small flex items-center gap-2 p-2 border border-gray-300 rounded-xl hover:border-teal-500 transition cursor-pointer bg-white/50 backdrop-blur-md">
-                  <input
-                    type="radio"
-                    name="geographicScope"
-                    value="International"
-                    required
-                    className="accent-teal-500"
-                    checked={formValues.geographicScope === "International"}
-                    onChange={(e) =>
-                      setFormValues({ ...formValues, geographicScope: e.target.value })
-                    }
-                  />
-                  <span className="text-gray-900 font-medium">{t('scopeInternational')}</span>
-                </label>
+              <div className="space-y-2">
+                {[
+                  { value: "National", label: t('scopeNational') },
+                  { value: "Regional", label: t('scopeRegional') },
+                  { value: "International", label: t('scopeInternational') }
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                      formValues.geographicScope === option.value
+                        ? 'border-teal-500 bg-teal-50 shadow-sm'
+                        : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="geographicScope"
+                      value={option.value}
+                      required
+                      className="accent-teal-500 w-4 h-4"
+                      checked={formValues.geographicScope === option.value}
+                      onChange={(e) =>
+                        setFormValues({ ...formValues, geographicScope: e.target.value })
+                      }
+                    />
+                    <span className="font-medium text-gray-900 text-sm">{option.label}</span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
         {/* Project Contact Information */}
-        <div className="my-12 ">
-          <div className="card-header flex items-center gap-3 mb-4 text-teal-700">
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            <p className="text-xl font-semibold">{t('contactInformation')}</p>
+        <div>
+          <div className="border-b border-gray-200 pb-4 mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">{t('contactInformation')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('contactInformationDesc')}</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="form-group space-y-2">
-              <label className="block">
-                <span className="label-text font-medium text-gray-800">
-                  {t('contactFullName')}<span className="text-red-500">*</span>
-                </span>
-                <span className="block text-gray-500 text-sm">{t('contactFullNameHelp')}</span>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {t('contactFullName')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -744,16 +758,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   ...formValues,
                   contact: { ...formValues.contact, name: e.target.value }
                 })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm"
               />
             </div>
 
-            <div className="form-group space-y-2">
-              <label className="block">
-                <span className="label-text font-medium text-gray-800">
-                  {t('contactEmail')} <span className="text-red-500">*</span>
-                </span>
-                <span className="block text-gray-500 text-sm">{t('contactEmailHelp')}</span>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {t('contactEmail')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -761,20 +772,19 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 placeholder={t('contactEmailPlaceholder')}
                 required
                 value={formValues.contact.email}
-                onChange={(e) => setFormValues({
-                  ...formValues,
-                  contact: { ...formValues.contact, email: e.target.value }
-                })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
+                onChange={(e) => handleEmailChange(e.target.value)}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-200 transition-all duration-200 shadow-sm ${
+                  emailError ? "border-red-500 focus:border-red-500 focus:ring-red-100" : "border-gray-300 focus:border-teal-500"
+                }`}
               />
+              {emailError && (
+                <p className="text-red-500 text-sm mt-1">{emailError}</p>
+              )}
             </div>
 
-            <div className="form-group space-y-2">
-              <label className="block">
-                <span className="label-text font-medium text-gray-800">
-                  {t('contactPhone')} <span className="text-red-500">*</span>
-                </span>
-                <span className="block text-gray-500 text-sm">{t('contactPhoneHelp')}</span>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {t('contactPhone')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
@@ -786,16 +796,13 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   ...formValues,
                   contact: { ...formValues.contact, phone: e.target.value }
                 })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm"
               />
             </div>
 
-            <div className="form-group space-y-2">
-              <label className="block">
-                <span className="label-text font-medium text-gray-800">
-                  {t('contactRole')} <span className="text-red-500">*</span>
-                </span>
-                <span className="block text-gray-500 text-sm">{t('contactRoleHelp')}</span>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {t('contactRole')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -807,21 +814,17 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   ...formValues,
                   contact: { ...formValues.contact, role: e.target.value }
                 })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm"
               />
             </div>
           </div>
         </div>
 
         {/* Monitoring & Evaluation */}
-        <div className="my-12">
-          <div className="card-header flex items-center gap-3 mb-4 text-teal-700">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-            <p className="text-xl font-semibold">{t('monitoringEvaluation')}</p>
+        <div>
+          <div className="border-b border-gray-200 pb-4 mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">{t('monitoringEvaluation')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('monitoringEvaluationDesc')}</p>
           </div>
 
           <div className="form-group space-y-3">
@@ -859,26 +862,26 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <input
                   type="text"
                   id="milestone-input"
-                  placeholder={t('milestoneNamePlaceholder')}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
+                  placeholder={formValues.milestones.length >= 5 ? t('maxMilestonesReached') : t('milestoneNamePlaceholder')}
+                  className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${
+                    formValues.milestones.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
                   value={formValues.milestoneInput}
                   onChange={(e) =>
                     setFormValues({ ...formValues, milestoneInput: e.target.value })
                   }
+                  onKeyPress={(e) => handleKeyPress(e, 'milestone')}
+                  disabled={formValues.milestones.length >= 5}
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    const trimmed = formValues.milestoneInput.trim();
-                    if (trimmed) {
-                      setFormValues((prev) => ({
-                        ...prev,
-                        milestones: [...prev.milestones, trimmed],
-                        milestoneInput: "",
-                      }));
-                    }
-                  }}
-                  className="px-3 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition shadow-md flex items-center justify-center"
+                  onClick={handleAddMilestone}
+                  disabled={formValues.milestones.length >= 5}
+                  className={`px-3 py-2 rounded-xl transition shadow-md flex items-center justify-center ${
+                    formValues.milestones.length >= 5
+                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                      : 'bg-teal-600 text-white hover:bg-teal-700'
+                  }`}
                 >
                   <svg
                     width="16"
@@ -893,6 +896,11 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   </svg>
                 </button>
               </div>
+              {formValues.milestones.length >= 5 && (
+                <p className="text-sm text-amber-600 mt-1 mb-8">
+                  {t('maxMilestonesLimitReached')}
+                </p>
+              )}
             </div>
           </div>
 
@@ -950,26 +958,26 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <input
                   type="text"
                   id="kpi-input"
-                  placeholder={t('keyPerformanceIndicatorsPlaceholder')}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm"
+                  placeholder={formValues.kpis.length >= 5 ? t('maxKPIsReached') : t('keyPerformanceIndicatorsPlaceholder')}
+                  className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${
+                    formValues.kpis.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
                   value={formValues.kpiInput}
                   onChange={(e) =>
                     setFormValues({ ...formValues, kpiInput: e.target.value })
                   }
+                  onKeyPress={(e) => handleKeyPress(e, 'kpi')}
+                  disabled={formValues.kpis.length >= 5}
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    const trimmed = formValues.kpiInput.trim();
-                    if (trimmed) {
-                      setFormValues((prev) => ({
-                        ...prev,
-                        kpis: [...prev.kpis, trimmed],
-                        kpiInput: "",
-                      }));
-                    }
-                  }}
-                  className="px-3 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition shadow-md flex items-center justify-center"
+                  onClick={handleAddKPI}
+                  disabled={formValues.kpis.length >= 5}
+                  className={`px-3 py-2 rounded-xl transition shadow-md flex items-center justify-center ${
+                    formValues.kpis.length >= 5
+                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                      : 'bg-teal-600 text-white hover:bg-teal-700'
+                  }`}
                 >
                   <svg
                     width="16"
@@ -984,31 +992,25 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   </svg>
                 </button>
               </div>
+              {formValues.kpis.length >= 5 && (
+                <p className="text-sm text-amber-600 mt-1">
+                  {t('maxKPIsLimitReached')}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Supporting Documents */}
-        <div className="my-12  p-8 space-y-6">
-          <div className="card-header flex items-center gap-3 mb-4 text-teal-700">
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14,2 14,8 20,8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-            <p className="text-xl font-semibold">{t('supportingDocuments')}</p>
+        <div>
+          <div className="border-b border-gray-200 pb-4 mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">{t('supportingDocuments')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('supportingDocumentsDesc')}</p>
           </div>
 
           <div
             id="upload-area"
-            className="relative border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-teal-500 transition cursor-pointer"
+            className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors duration-200 cursor-pointer"
           >
             <input
               type="file"
@@ -1018,37 +1020,47 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               onChange={handleFileChange}
             />
-            <div className="upload-content flex flex-col items-center justify-center gap-4 pointer-events-none">
+            <div className="upload-content flex flex-col items-center justify-center gap-3 pointer-events-none">
               <svg
-                className="w-12 h-12 text-teal-500"
+                className="w-10 h-10 text-gray-400"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="2"
               >
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-              <p className="text-lg font-medium text-gray-700">{t('uploadDropOrBrowse')}</p>
-              <p className="text-sm text-gray-500">{t('uploadTypesLimit')}</p>
+              <div>
+                <p className="text-sm font-medium text-gray-700">{t('uploadDropOrBrowse')}</p>
+                <p className="text-xs text-gray-500">{t('uploadTypesLimit')}</p>
+              </div>
             </div>
           </div>
 
           {formValues.files.length > 0 && (
             <div className="mt-4 space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</h4>
               {formValues.files.map((file, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between px-4 py-2 bg-gray-50 border rounded-lg shadow-sm"
+                  className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg"
                 >
-                  <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14,2 14,8 20,8" />
+                    </svg>
+                    <span className="text-sm text-gray-700">{file.name}</span>
+                    <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleRemoveFile(i)}
                     className="text-red-500 hover:text-red-700 text-sm"
                   >
-                    &times;
+                    ×
                   </button>
                 </div>
               ))}
@@ -1057,20 +1069,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         </div>
 
         {/* comments */}
-        <div className="my-12">
-          <div className="card-header flex items-center gap-3 mb-4 text-teal-700">
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-            <p className="text-xl font-semibold">{t('comments')}</p>
+        <div>
+          <div className="border-b border-gray-200 pb-4 mb-6">
+            <h4 className="text-lg font-semibold text-gray-800">{t('comments')}</h4>
+            <p className="text-sm text-gray-600 mt-1">{t('commentsDesc')}</p>
           </div>
 
           <div className="form-group space-y-3">
@@ -1094,11 +1096,11 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
       </div>
 
       {/* Navigation Buttons */}
-      <div className="mt-12 pt-8 border-t border-gray-200">
+      <div className="mt-8 pt-6 border-t border-gray-200">
         <div className="flex justify-between items-center">
           <button
             onClick={onPrevious}
-            className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium"
+            className="flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium shadow-sm"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1109,9 +1111,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
           <button
             onClick={() => onNext && onNext(formValues)}
             disabled={!isFormValid()}
-            className={`flex items-center px-6 py-3 rounded-lg transition-colors duration-200 font-medium ${
+            className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${
               isFormValid()
-                ? "bg-[#0e7378] text-white hover:bg-[#0a5d61] cursor-pointer"
+                ? "bg-[#0e7378] text-white hover:bg-[#0a5d61] hover:shadow-xl transform hover:-translate-y-0.5"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
@@ -1125,9 +1127,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         {/* Validation Message */}
         {!isFormValid() && (
           <div className="mt-4 text-center">
-            <p className="text-sm text-gray-600">
-              {t('pleaseFillAllRequiredFields')}  
-            </p>
+            <div className="inline-flex items-center px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <svg className="w-4 h-4 text-amber-600 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <p className="text-sm text-amber-700">
+                {t('pleaseFillAllRequiredFields')}  
+              </p>
+            </div>
           </div>
         )}
       </div>

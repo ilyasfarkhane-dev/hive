@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from 'react-i18next';
@@ -70,19 +70,22 @@ const getLocalizedDescription = () => {
       onClick={() => onSelect(service.id)}
     >
       <div
-        className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${
+        className={`h-full rounded-3xl shadow-xl overflow-hidden transition-all duration-300 border border-white/10 ${
           cardColors[colorIndex % cardColors.length].bg
         } ${!isSelected && isHovered ? cardColors[colorIndex % cardColors.length].hover : ""}`}
       >
+        {/* Gradient overlay for depth */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
+
         {/* Header */}
-        <div className="p-6 pb-4 flex items-start justify-between">
-          <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-xl font-bold shadow-md">
+        <div className="p-6 pb-4 flex items-start justify-between relative">
+          <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-25 text-white text-xl font-bold shadow-lg backdrop-blur-sm border border-white/20">
             {service.code}
           </div>
 
           {/* Selected check */}
           {isSelected && (
-            <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white shadow-lg transition-all duration-300">
+            <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg transition-all duration-300 border border-white/30">
               <Check className="w-6 h-6 text-green-600" />
             </div>
           )}
@@ -90,21 +93,36 @@ const getLocalizedDescription = () => {
 
         {/* Content */}
         <div className="p-6 pt-2 pb-24 relative">
-          <h3 className="text-2xl  font-semibold text-white leading-tight">{getLocalizedTitle()}</h3>
-          <p className="text-white text-lg mt-4 ">{getLocalizedDescription()}</p>
+          <h3 className="text-lg font-medium text-white leading-relaxed opacity-95"
+              style={{ 
+                direction: language === 'ar' ? 'rtl' : 'ltr',
+                textAlign: language === 'ar' ? 'right' : 'left'
+              }}>
+            {getLocalizedTitle()}
+          </h3>
+          <p className="text-white text-md mt-4 leading-relaxed opacity-90"
+             style={{ 
+               direction: language === 'ar' ? 'rtl' : 'ltr',
+               textAlign: language === 'ar' ? 'right' : 'left'
+             }}>
+            {getLocalizedDescription()}
+          </p>
 
           {/* Plus icon for hover */}
           {!isSelected && (
-            <div className="absolute bottom-6 right-6 w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
+            <div className="absolute bottom-6 right-6 w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-25 group-hover:bg-opacity-35 transition-all duration-300 backdrop-blur-sm border border-white/20">
               <Plus className="w-6 h-6 text-white" />
             </div>
           )}
         </div>
+
+        {/* Subtle border highlight */}
+        <div className="absolute inset-0 rounded-3xl border border-white/20 pointer-events-none"></div>
       </div>
 
       {/* Hover overlay */}
       {!isSelected && (
-        <div className="absolute inset-0 rounded-2xl bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 pointer-events-none" />
+        <div className="absolute inset-0 rounded-3xl bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300 pointer-events-none" />
       )}
     </motion.div>
   );
@@ -123,6 +141,11 @@ const StepThree: React.FC<StepThreeProps> = ({
   
   // Get current language
   const currentLanguage = i18n.language || 'en';
+
+  // Sync local selected state with prop changes (e.g., language changes)
+  useEffect(() => {
+    setSelected(selectedService);
+  }, [selectedService]);
 
   const handleSelect = (id: string) => {
     setSelected(id);

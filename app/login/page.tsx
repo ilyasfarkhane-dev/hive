@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import i18n from 'i18next';
 import axios from "axios";
+import { resetValidationFlag } from '@/utils/sessionValidation';
 
 const demoCredentials = [
   { username: "admin", password: "admin123", role: "Administrator" },
@@ -27,8 +28,13 @@ const LoginPage = () => {
 
 
   useEffect(() => {
+    const storedSessionId = localStorage.getItem("session_id");
     const storedHash = localStorage.getItem("contactEeemailHash");
-    if (storedHash) setIsLoggedIn(true);
+    if (storedSessionId || storedHash) {
+      setIsLoggedIn(true);
+      // Redirect to main page if already logged in
+      window.location.href = "/";
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,9 +49,20 @@ const LoginPage = () => {
         language: i18n.language || 'en'
       });
 
+      console.log("Login response:", response);
+
       if (response.status === 200 && response.data.hashedEmail) {
+        console.log('=== DEBUG: Storing Contact Info in localStorage ===');
+        console.log('Contact Info:', response.data.contactInfo);
+        console.log('Session ID:', response.data.sessionId);
+        console.log('Goals Count:', response.data.goals?.length || 0);
+        console.log('================================================');
+
         localStorage.setItem("contactEeemailHash", response.data.hashedEmail);
+        localStorage.setItem("contactInfo", JSON.stringify(response.data.contactInfo));
+        localStorage.setItem("goals", JSON.stringify(response.data.goals));
         localStorage.setItem("session_id", response.data.sessionId);
+        resetValidationFlag(); // Reset validation flag after successful login
         setIsLoggedIn(true);
         window.location.href = "/";
       } else {

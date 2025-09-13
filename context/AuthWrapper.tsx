@@ -1,8 +1,9 @@
 "use client";
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import LoginPage from '@/app/login/page';
-import LoadingSpinner from '@/components/LoadingSpinner'; // You might want to create a loading component
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { validateSessionOnLoad } from '@/utils/sessionValidation';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -10,6 +11,16 @@ interface AuthWrapperProps {
 
 const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    // Only validate session if we're not on the login page and not authenticated
+    if (!isLoading && !isAuthenticated && typeof window !== 'undefined') {
+      const isLoginPage = window.location.pathname.includes('/login');
+      if (!isLoginPage) {
+        validateSessionOnLoad();
+      }
+    }
+  }, [isLoading, isAuthenticated]);
 
   if (isLoading) {
     return (

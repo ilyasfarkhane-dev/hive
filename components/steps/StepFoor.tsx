@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -40,26 +40,41 @@ const StepFour: React.FC<StepFourProps> = ({
   const [selected, setSelected] = useState<string | null>(selectedSubService);
   const [hovered, setHovered] = useState<string | null>(null);
 
+  // Sync local selected state with prop changes (e.g., language changes)
+  useEffect(() => {
+    setSelected(selectedSubService);
+  }, [selectedSubService]);
+
   const handleSelect = (id: string) => {
     setSelected(id);
     setTimeout(() => onNext(id), 400);
   };
 
   const getLocalizedText = (subService: SubService, field: 'name' | 'description', lang: string) => {
+    const safeExtract = (value: any): string => {
+      if (typeof value === 'string') return value;
+      if (typeof value === 'object' && value !== null) {
+        // If it's an object, try to get a string value from it
+        const stringValue = Object.values(value).find(val => typeof val === 'string');
+        return stringValue || '';
+      }
+      return '';
+    };
+
     switch (field) {
       case 'name':
         switch (lang) {
-          case 'ar': return subService.name_ar_c || subService.description || subService.name;
-          case 'fr': return subService.name_fr_c || subService.description || subService.name;
-          case 'en': return subService.description || subService.name;
-          default: return subService.description || subService.name;
+          case 'ar': return safeExtract(subService.name_ar_c) || safeExtract(subService.description) || safeExtract(subService.name);
+          case 'fr': return safeExtract(subService.name_fr_c) || safeExtract(subService.description) || safeExtract(subService.name);
+          case 'en': return safeExtract(subService.description) || safeExtract(subService.name);
+          default: return safeExtract(subService.description) || safeExtract(subService.name);
         }
       case 'description':
         switch (lang) {
-          case 'ar': return subService.description_subservice_ar_c || subService.description_subservice || subService.description;
-          case 'fr': return subService.description_subservice_fr_c || subService.description_subservice || subService.description;
-          case 'en': return subService.description_subservice_en_c || subService.description_subservice || subService.description;
-          default: return subService.description_subservice || subService.description;
+          case 'ar': return safeExtract(subService.description_subservice_ar_c) || safeExtract(subService.description_subservice) || safeExtract(subService.description);
+          case 'fr': return safeExtract(subService.description_subservice_fr_c) || safeExtract(subService.description_subservice) || safeExtract(subService.description);
+          case 'en': return safeExtract(subService.description_subservice_en_c) || safeExtract(subService.description_subservice) || safeExtract(subService.description);
+          default: return safeExtract(subService.description_subservice) || safeExtract(subService.description);
         }
       default: return '';
     }
@@ -117,34 +132,52 @@ const StepFour: React.FC<StepFourProps> = ({
                 onMouseLeave={() => setHovered(null)}
                 onClick={() => handleSelect(subService.id)}
               >
-                <div className={`h-full rounded-2xl shadow-xl overflow-hidden transition-all duration-300 ${cardColors[colorIndex].bg} ${isHovered && !isSelected ? cardColors[colorIndex].hover : ""}`}>
-                  <div className="p-6 pb-4 flex items-start justify-between">
-                    <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-20 text-white text-md font-bold shadow-md">
+                <div className={`h-full rounded-3xl shadow-xl overflow-hidden transition-all duration-300 border border-white/10 ${cardColors[colorIndex].bg} ${isHovered && !isSelected ? cardColors[colorIndex].hover : ""}`}>
+                  {/* Gradient overlay for depth */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
+
+                  <div className="p-6 pb-4 flex items-start justify-between relative">
+                    <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white bg-opacity-25 text-white text-md font-bold shadow-lg backdrop-blur-sm border border-white/20">
                       {subService.name}
                     </div>
                     <div className={`transition-all duration-300 ${isSelected ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}>
-                      <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white shadow-lg">
+                      <div className="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 shadow-lg border border-white/30">
                         <Check className="w-6 h-6 text-green-600" />
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-6 pt-2">
+                  <div className="p-6 pt-2 relative">
                     <div className="mb-12">
-                      <h4 className="text-2xl text-justify font-semibold text-white leading-tight">{title}</h4>
-                      <p className="text-white mt-2 text-md font-semibold text-justify line-clamp-3">{desc}</p>
+                      <h4 className="text-lg text-justify font-medium text-white leading-relaxed opacity-95"
+                          style={{ 
+                            direction: i18n.language === 'ar' ? 'rtl' : 'ltr',
+                            textAlign: i18n.language === 'ar' ? 'right' : 'left'
+                          }}>
+                        {title}
+                      </h4>
+                      <p className="text-white mt-2 text-md font-medium text-justify line-clamp-3 leading-relaxed opacity-90"
+                         style={{ 
+                           direction: i18n.language === 'ar' ? 'rtl' : 'ltr',
+                           textAlign: i18n.language === 'ar' ? 'right' : 'left'
+                         }}>
+                        {desc}
+                      </p>
                     </div>
 
                     <div className={`absolute bottom-6 right-6 transition-all duration-300 ${isSelected ? "opacity-0 scale-90" : "opacity-100 scale-100"}`}>
-                      <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-300">
+                      <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white bg-opacity-25 group-hover:bg-opacity-35 transition-all duration-300 backdrop-blur-sm border border-white/20">
                         <Plus className="w-6 h-6 text-white" />
                       </div>
                     </div>
                   </div>
+
+                  {/* Subtle border highlight */}
+                  <div className="absolute inset-0 rounded-3xl border border-white/20 pointer-events-none"></div>
                 </div>
 
                 {!isSelected && (
-                  <div className="absolute inset-0 rounded-2xl bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 pointer-events-none" />
+                  <div className="absolute inset-0 rounded-3xl bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300 pointer-events-none" />
                 )}
               </motion.div>
             );

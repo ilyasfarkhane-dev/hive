@@ -829,7 +829,22 @@ useEffect(() => {
       };
 
       // Submit to CRM using the hook
+      console.log('=== DEBUG: About to submit project ===');
+      console.log('Project data keys:', Object.keys(projectData));
+      console.log('Project data sample:', {
+        name: projectData.name,
+        contact_id: projectData.contact_id,
+        strategic_goal_id: projectData.strategic_goal_id,
+        pillar_id: projectData.pillar_id,
+        service_id: projectData.service_id,
+        sub_service_id: projectData.sub_service_id
+      });
+      
       const result = await submitProject(projectData);
+      console.log('=== DEBUG: Submission result ===');
+      console.log('Result success:', result.success);
+      console.log('Result error:', result.error);
+      console.log('Result projectId:', result.projectId);
       
       if (result.success) {
         // Also save to local storage for backup

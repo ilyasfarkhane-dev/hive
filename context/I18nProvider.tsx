@@ -180,6 +180,7 @@ if (!i18n.isInitialized) {
           modalityVirtual: "Virtual",
           modalityHybrid: "Hybrid",
           scopeNational: "National",
+          "maxPartnersLimitReached": "Maximum of 5 partners allowed",
           scopeRegional: "Regional",
           scopeInternational: "International",
           monitoringEvaluation: "Monitoring & Evaluation",
@@ -265,6 +266,7 @@ if (!i18n.isInitialized) {
       },
       fr: {
         common: {
+          "maxPartnersLimitReached": "Maximum de 5 partenaires autorisés",
           "created": "Créé",
           "drafted": "Brouillon",
           "showing": "Affichage",
@@ -504,6 +506,7 @@ if (!i18n.isInitialized) {
       },
       ar: {
         common: {
+          "maxPartnersLimitReached": "الحد الأقصى للشركاء (5/5)",
           "drafted": "مسودة",
           "noCrmProjectsYet": "لا يوجد مشاريع بعد",
           "noCrmProjectsDescription": "لا يوجد مشاريع بعد",

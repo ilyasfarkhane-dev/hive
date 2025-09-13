@@ -78,7 +78,17 @@ const Step6: React.FC<Step6Props> = ({
     return value;
   };
   const router = useRouter();
-  const currentLanguage = i18n.language || 'en';
+  const [currentLanguage, setCurrentLanguage] = React.useState(i18n.language || 'en');
+  
+  // Update currentLanguage when i18n.language changes
+  React.useEffect(() => {
+    setCurrentLanguage(i18n.language || 'en');
+  }, [i18n.language]);
+  
+  // Debug: Log current language and translation
+  console.log('🔍 StepSix currentLanguage:', currentLanguage);
+  console.log('🔍 StepSix i18n.language:', i18n.language);
+  console.log('🔍 StepSix beneficiaryStudents translation:', t('beneficiaryStudents'));
 
   // Comprehensive debugging of projectDetails - MOVED TO TOP TO FIX HOOKS ERROR
   React.useEffect(() => {
@@ -193,11 +203,7 @@ const Step6: React.FC<Step6Props> = ({
             <p className="text-gray-600 mb-6">
               {safeRender(t('projectSubmittedDesc'))}
             </p>
-            {submissionResult.projectId && (
-              <p className="text-sm text-green-600 mt-2">
-                {safeRender(t('projectId'))} {safeRender(submissionResult.projectId)}
-              </p>
-            )}
+           
           </div>
           <button
             onClick={() => {
@@ -218,6 +224,131 @@ const Step6: React.FC<Step6Props> = ({
   }
 
 
+  // Helper function to translate beneficiary values
+  const translateBeneficiary = (beneficiary: any) => {
+    console.log('🔍 translateBeneficiary called with:', beneficiary, 'type:', typeof beneficiary, 'currentLanguage:', currentLanguage);
+    
+    // Handle multilingual objects
+    if (typeof beneficiary === 'object' && beneficiary !== null) {
+      if (beneficiary.hasOwnProperty(currentLanguage)) {
+        console.log('🔍 Found multilingual object with current language:', beneficiary[currentLanguage]);
+        return beneficiary[currentLanguage];
+      } else if (beneficiary.hasOwnProperty('en')) {
+        console.log('🔍 Found multilingual object with English fallback:', beneficiary.en);
+        return beneficiary.en;
+      }
+    }
+    
+    // Handle string values
+    const beneficiaryString = String(beneficiary);
+    const beneficiaryMap: Record<string, string> = {
+      'Students': t('beneficiaryStudents'),
+      'Teachers': t('beneficiaryTeachers'),
+      'Youth': t('beneficiaryYouth'),
+      'General Public': t('beneficiaryPublic'),
+      'Policymakers': t('beneficiaryPolicymakers'),
+      'Other': t('beneficiaryOther'),
+      // Add more mappings as needed
+    };
+    
+    const result = beneficiaryMap[beneficiaryString] || beneficiaryString;
+    console.log('🔍 translateBeneficiary result:', result);
+    return result;
+  };
+
+  // Helper function to translate frequency values
+  const translateFrequency = (frequency: any) => {
+    // Handle multilingual objects
+    if (typeof frequency === 'object' && frequency !== null) {
+      if (frequency.hasOwnProperty(currentLanguage)) {
+        return frequency[currentLanguage];
+      } else if (frequency.hasOwnProperty('en')) {
+        return frequency.en;
+      }
+    }
+    
+    const frequencyString = String(frequency);
+    const frequencyMap: Record<string, string> = {
+      'One-time': t('frequencyOneTime'),
+      'Continuous': t('frequencyContinuous'),
+      'Monthly': t('frequencyMonthly') || 'Monthly',
+      'Yearly': t('frequencyYearly') || 'Yearly',
+      'Weekly': t('frequencyWeekly') || 'Weekly',
+      'Daily': t('frequencyDaily') || 'Daily',
+      // Add more mappings as needed
+    };
+    
+    return frequencyMap[frequencyString] || frequencyString;
+  };
+
+  // Helper function to translate delivery modality values
+  const translateModality = (modality: any) => {
+    // Handle multilingual objects
+    if (typeof modality === 'object' && modality !== null) {
+      if (modality.hasOwnProperty(currentLanguage)) {
+        return modality[currentLanguage];
+      } else if (modality.hasOwnProperty('en')) {
+        return modality.en;
+      }
+    }
+    
+    const modalityString = String(modality);
+    const modalityMap: Record<string, string> = {
+      'Physical': t('modalityPhysical'),
+      'Virtual': t('modalityVirtual'),
+      'Hybrid': t('modalityHybrid'),
+      // Add more mappings as needed
+    };
+    
+    return modalityMap[modalityString] || modalityString;
+  };
+
+  // Helper function to translate geographic scope values
+  const translateScope = (scope: any) => {
+    // Handle multilingual objects
+    if (typeof scope === 'object' && scope !== null) {
+      if (scope.hasOwnProperty(currentLanguage)) {
+        return scope[currentLanguage];
+      } else if (scope.hasOwnProperty('en')) {
+        return scope.en;
+      }
+    }
+    
+    const scopeString = String(scope);
+    const scopeMap: Record<string, string> = {
+      'National': t('scopeNational'),
+      'Regional': t('scopeRegional'),
+      'International': t('scopeInternational'),
+      // Add more mappings as needed
+    };
+    
+    return scopeMap[scopeString] || scopeString;
+  };
+
+  // Helper function to translate convening method values
+  const translateConveningMethod = (method: any) => {
+    // Handle multilingual objects
+    if (typeof method === 'object' && method !== null) {
+      if (method.hasOwnProperty(currentLanguage)) {
+        return method[currentLanguage];
+      } else if (method.hasOwnProperty('en')) {
+        return method.en;
+      }
+    }
+    
+    const methodString = String(method);
+    const methodMap: Record<string, string> = {
+      'Workshop': t('typeWorkshop'),
+      'Conference': t('typeConference'),
+      'Training': t('typeTraining'),
+      'Campaign': t('typeCampaign'),
+      'Research': t('typeResearch'),
+      // Add more mappings as needed
+    };
+    
+    return methodMap[methodString] || methodString;
+  };
+
   // Helper function to get translated value for form values
   const getTranslatedFormValue = (value: string | undefined | null): string => {
     if (!value) return '';
@@ -233,7 +364,7 @@ const Step6: React.FC<Step6Props> = ({
         <h3 className="text-2xl font-bold text-[#0e7378] mb-2">
           {debugRender(safeRenderAny(t('reviewProjectProposal'), 'main title'), 'main title render')}
         </h3>
-        <p className="text-gray-600 text-sm">
+        <p className={`text-gray-600 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>
           {debugRender(safeRenderAny(t('reviewProjectProposalDesc'), 'desc'), 'desc render')}
         </p>
       </div>
@@ -262,10 +393,10 @@ const Step6: React.FC<Step6Props> = ({
                   <div className="w-6 h-6 bg-teal-100 rounded-lg flex items-center justify-center">
                     <span className="text-xs font-bold text-teal-600">{typeof card.code === 'string' ? card.code : card.id}</span>
                   </div>
-                  <p className="text-sm font-semibold text-teal-700">{getCardTitle(card.type)}</p>
+                  <p className={`font-semibold text-teal-700 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{getCardTitle(card.type)}</p>
                 </div>
-                <p className={`text-gray-800 font-medium text-sm mb-2 ${currentLanguage === 'ar' ? 'text-right' : 'text-left'}`}>{debugRender(getTranslatedValue(card.title), 'card title render')}</p>
-                <p className={`text-gray-600 text-xs leading-relaxed ${currentLanguage === 'ar' ? 'text-right' : 'text-left'}`}>{debugRender(getTranslatedValue(card.desc, card.title), 'card desc render')}</p>
+                <p className={`text-gray-800 font-medium mb-2 ${currentLanguage === 'ar' ? 'text-right text-base' : 'text-left text-sm'}`}>{debugRender(getTranslatedValue(card.title), 'card title render')}</p>
+                <p className={`text-gray-600 leading-relaxed ${currentLanguage === 'ar' ? 'text-right text-sm' : 'text-left text-xs'}`}>{debugRender(getTranslatedValue(card.desc, card.title), 'card desc render')}</p>
               </div>
             );
           })}
@@ -285,13 +416,13 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Overview */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 text-sm">{debugRender(safeRenderAny(t('projectOverview'), 'projectOverview header'), 'projectOverview section')}</p>
+              <p className={`font-semibold text-gray-800 mb-3 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{debugRender(safeRenderAny(t('projectOverview'), 'projectOverview header'), 'projectOverview section')}</p>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('title'), 'title label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.title)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('brief'), 'brief label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.brief)}</span>
                 </p>
@@ -300,23 +431,41 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Rationale */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 text-sm">{debugRender(safeRenderAny(t('rationaleImpact'), 'rationaleImpact header'), 'rationaleImpact section')}</p>
+              <p className={`font-semibold text-gray-800 mb-3 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{debugRender(safeRenderAny(t('rationaleImpact'), 'rationaleImpact header'), 'rationaleImpact section')}</p>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('problemStatementPlaceholder'), 'problemStatementPlaceholder label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.rationale)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('beneficiaries'), 'beneficiaries label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
-                    {Array.isArray(projectDetails.beneficiaries) 
-                      ? projectDetails.beneficiaries.map((b: any) => safeRenderAny(b, 'beneficiary')).join(", ")
-                      : safeRenderAny(projectDetails.beneficiaries, 'beneficiaries')
-                    }
+                    {(() => {
+                      console.log('🔍 Beneficiaries raw data:', projectDetails.beneficiaries);
+                      console.log('🔍 Beneficiaries type:', typeof projectDetails.beneficiaries);
+                      console.log('🔍 Beneficiaries isArray:', Array.isArray(projectDetails.beneficiaries));
+                      
+                      if (Array.isArray(projectDetails.beneficiaries)) {
+                        return projectDetails.beneficiaries.map((b: any) => {
+                          console.log('🔍 Individual beneficiary:', b, 'type:', typeof b);
+                          const rendered = safeRenderAny(b, 'beneficiary');
+                          console.log('🔍 Rendered beneficiary:', rendered);
+                          const translated = translateBeneficiary(rendered);
+                          console.log('🔍 Translated beneficiary:', translated);
+                          return translated;
+                        }).join(", ");
+                      } else {
+                        const rendered = safeRenderAny(projectDetails.beneficiaries, 'beneficiaries');
+                        console.log('🔍 Rendered beneficiaries (single):', rendered);
+                        const translated = translateBeneficiary(rendered);
+                        console.log('🔍 Translated beneficiaries (single):', translated);
+                        return translated;
+                      }
+                    })()}
                   </span>
                 </p>
                 {projectDetails.otherBeneficiary && (
-                  <p className="text-sm">
+                  <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                     <span className="font-medium text-gray-700">{safeRenderAny(t('otherBeneficiaries'), 'otherBeneficiaries label')}:</span> 
                     <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.otherBeneficiary)}</span>
                   </p>
@@ -326,26 +475,26 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Implementation */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 text-sm">{debugRender(safeRenderAny(t('implementationBudget'), 'implementationBudget header'), 'implementationBudget section')}</p>
+              <p className={`font-semibold text-gray-800 mb-3 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{debugRender(safeRenderAny(t('implementationBudget'), 'implementationBudget header'), 'implementationBudget section')}</p>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('startDate'), 'startDate label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.startDate)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('endDate'), 'endDate label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.endDate)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('budget'), 'budget label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
                     {safeRender(t('budgetLabel_icesco'))}: {safeRender(projectDetails.budget?.icesco)} USD, {safeRender(t('memberState'))}: {safeRender(projectDetails.budget?.member_state)} USD, {safeRender(t('sponsorship'))}: {safeRender(projectDetails.budget?.sponsorship)} USD
                   </span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('frequency'), 'frequency label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
-                    {debugRender(getTranslatedFormValue(projectDetails.projectFrequency), 'frequency value')} {safeRender(projectDetails.frequencyDuration) && `(${safeRender(projectDetails.frequencyDuration)})`}
+                    {debugRender(translateFrequency(projectDetails.projectFrequency || ''), 'frequency value')} {safeRender(projectDetails.frequencyDuration) && `(${safeRender(projectDetails.frequencyDuration)})`}
                   </span>
                 </p>
               </div>
@@ -353,9 +502,9 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Partners */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 text-sm">{debugRender(safeRenderAny(t('partnersCollaboration'), 'partnersCollaboration header'), 'partnersCollaboration section')}</p>
+              <p className={`font-semibold text-gray-800 mb-3 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{debugRender(safeRenderAny(t('partnersCollaboration'), 'partnersCollaboration header'), 'partnersCollaboration section')}</p>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('partners'), 'partners label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
                     {Array.isArray(projectDetails.partners) 
@@ -369,24 +518,24 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Scope */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 text-sm">{debugRender(safeRenderAny(t('projectScopeModality'), 'projectScopeModality header'), 'projectScopeModality section')}</p>
+              <p className={`font-semibold text-gray-800 mb-3 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{debugRender(safeRenderAny(t('projectScopeModality'), 'projectScopeModality header'), 'projectScopeModality section')}</p>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('deliveryModality'), 'deliveryModality label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
-                    {debugRender(getTranslatedFormValue(projectDetails.deliveryModality), 'delivery modality value')}
+                    {debugRender(translateModality(projectDetails.deliveryModality || ''), 'delivery modality value')}
                   </span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('geographicScope'), 'geographicScope label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
-                    {debugRender(getTranslatedFormValue(projectDetails.geographicScope), 'geographic scope value')}
+                    {debugRender(translateScope(projectDetails.geographicScope || ''), 'geographic scope value')}
                   </span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('conveningMethod'), 'conveningMethod label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
-                    {debugRender(getTranslatedFormValue(projectDetails.conveningMethod), 'convening method value')} {safeRender(projectDetails.conveningMethodOther) && `(${safeRender(projectDetails.conveningMethodOther)})`}
+                    {debugRender(translateConveningMethod(projectDetails.conveningMethod || ''), 'convening method value')} {safeRender(projectDetails.conveningMethodOther) && `(${safeRender(projectDetails.conveningMethodOther)})`}
                   </span>
                 </p>
               </div>
@@ -394,9 +543,9 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Monitoring */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 text-sm">{debugRender(safeRenderAny(t('monitoringEvaluation'), 'monitoringEvaluation header'), 'monitoringEvaluation section')}</p>
+              <p className={`font-semibold text-gray-800 mb-3 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{debugRender(safeRenderAny(t('monitoringEvaluation'), 'monitoringEvaluation header'), 'monitoringEvaluation section')}</p>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('milestones'), 'milestones label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
                     {Array.isArray(projectDetails.milestones) 
@@ -405,11 +554,11 @@ const Step6: React.FC<Step6Props> = ({
                     }
                   </span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('expectedOutputs'), 'expectedOutputs label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.expectedOutputs)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('kpis'), 'kpis label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>
                     {Array.isArray(projectDetails.kpis) 
@@ -423,21 +572,21 @@ const Step6: React.FC<Step6Props> = ({
 
             {/* Contact */}
             <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 text-sm">{debugRender(safeRenderAny(t('contactInformation'), 'contactInformation header'), 'contactInformation section')}</p>
+              <p className={`font-semibold text-gray-800 mb-3 ${currentLanguage === 'ar' ? 'text-base' : 'text-sm'}`}>{debugRender(safeRenderAny(t('contactInformation'), 'contactInformation header'), 'contactInformation section')}</p>
               <div className="space-y-2">
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('name'), 'name label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.contact?.name)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('email'), 'email label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.contact?.email)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('phone'), 'phone label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.contact?.phone)}</span>
                 </p>
-                <p className="text-sm">
+                <p className={currentLanguage === 'ar' ? 'text-base' : 'text-sm'}>
                   <span className="font-medium text-gray-700">{safeRenderAny(t('role'), 'role label')}:</span> 
                   <span className={`text-gray-600 ${currentLanguage === 'ar' ? 'mr-2' : 'ml-2'}`}>{safeRender(projectDetails.contact?.role)}</span>
                 </p>
@@ -501,11 +650,7 @@ const Step6: React.FC<Step6Props> = ({
                     <p className={`font-medium ${submissionResult.success ? 'text-green-800' : 'text-red-800'}`}>
                       {submissionResult.message || t('projectSubmittedSuccessfully')}
                     </p>
-                    {submissionResult.projectId && (
-                      <p className="text-sm text-green-600 mt-1">
-                        {t('projectId')} {submissionResult.projectId}
-                      </p>
-                    )}
+                    
                   </div>
                 </>
               ) : (

@@ -25,23 +25,12 @@ const About = () => {
   const descriptionRef = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {
-    console.log('GSAP useEffect running')
-    console.log('logoRef.current:', logoRef.current)
-    console.log('titleRef.current:', titleRef.current)
-    console.log('descriptionRef.current:', descriptionRef.current)
-    console.log('containerRef.current:', containerRef.current)
-    
-    // Test if GSAP is working at all
-    try {
-      console.log('GSAP version:', gsap.version)
-      
-      // Small delay to ensure DOM is fully ready
-      const timer = setTimeout(() => {
-        console.log('Starting GSAP animations after timeout')
-        
-        // Direct animation without context first
-        if (logoRef.current) {
-          console.log('Animating logo directly')
+    // Function to check if all refs are available and start animations
+    const checkRefsAndAnimate = () => {
+      // Wait until all refs are available
+      if (logoRef.current && titleRef.current && descriptionRef.current) {
+        try {
+          // Logo animation
           gsap.fromTo(logoRef.current, 
             { opacity: 0, y: 40, scale: 0.9 },
             { 
@@ -50,26 +39,20 @@ const About = () => {
               scale: 1, 
               duration: 1.4, 
               ease: "power3.out",
-              onStart: () => console.log('Logo animation started'),
-              onComplete: () => console.log('Logo animation completed'),
-              onUpdate: () => console.log('Logo animating...', gsap.getProperty(logoRef.current, "opacity"))
+              onComplete: () => {
+                // Start floating animation after main animation
+                gsap.to(logoRef.current, {
+                  y: "+=8",
+                  duration: 3,
+                  repeat: -1,
+                  yoyo: true,
+                  ease: "sine.inOut",
+                })
+              }
             }
           )
 
-          // Floating animation
-          gsap.to(logoRef.current, {
-            y: "+=8",
-            duration: 3,
-            repeat: -1,
-            yoyo: true,
-            ease: "sine.inOut",
-            delay: 1.6,
-          })
-        }
-
-        // Text animations
-        if (titleRef.current) {
-          console.log('Animating title')
+          // Title animation
           gsap.fromTo(titleRef.current,
             { opacity: 0, y: 30 },
             { 
@@ -77,14 +60,11 @@ const About = () => {
               y: 0, 
               duration: 1.2, 
               ease: "power3.out", 
-              delay: 0.4,
-              onComplete: () => console.log('Title animation completed')
+              delay: 0.4
             }
           )
-        }
 
-        if (descriptionRef.current) {
-          console.log('Animating description')
+          // Description animation
           gsap.fromTo(descriptionRef.current,
             { opacity: 0, y: 30 },
             { 
@@ -92,18 +72,24 @@ const About = () => {
               y: 0, 
               duration: 1.2, 
               ease: "power3.out", 
-              delay: 0.7,
-              onComplete: () => console.log('Description animation completed')
+              delay: 0.7
             }
           )
+          
+        } catch (error) {
+          console.error('GSAP Animation Error:', error)
         }
-      }, 100)
-
-      return () => {
-        clearTimeout(timer)
+      } else {
+        // Retry after a short delay if refs aren't ready
+        setTimeout(checkRefsAndAnimate, 50)
       }
-    } catch (error) {
-      console.error('GSAP Error:', error)
+    }
+    
+    // Start checking for refs after a small initial delay
+    const timer = setTimeout(checkRefsAndAnimate, 100)
+    
+    return () => {
+      clearTimeout(timer)
     }
   }, [])
 

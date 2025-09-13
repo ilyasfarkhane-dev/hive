@@ -25,68 +25,102 @@ const About = () => {
   const descriptionRef = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {
+    console.log('SiteHeader mounted, starting GSAP setup')
+    console.log('GSAP available:', typeof gsap !== 'undefined')
+    console.log('GSAP version:', gsap?.version)
+    
     // Function to check if all refs are available and start animations
-    const checkRefsAndAnimate = () => {
+    const checkRefsAndAnimate = (attempt = 1) => {
+      console.log(`Attempt ${attempt}: Checking refs...`)
+      console.log('logoRef.current:', logoRef.current)
+      console.log('titleRef.current:', titleRef.current)
+      console.log('descriptionRef.current:', descriptionRef.current)
+      
       // Wait until all refs are available
       if (logoRef.current && titleRef.current && descriptionRef.current) {
+        console.log('All refs found! Starting animations...')
+        
         try {
-          // Logo animation
-          gsap.fromTo(logoRef.current, 
-            { opacity: 0, y: 40, scale: 0.9 },
-            { 
-              opacity: 1, 
-              y: 0, 
-              scale: 1, 
-              duration: 1.4, 
-              ease: "power3.out",
-              onComplete: () => {
-                // Start floating animation after main animation
-                gsap.to(logoRef.current, {
-                  y: "+=8",
-                  duration: 3,
-                  repeat: -1,
-                  yoyo: true,
-                  ease: "sine.inOut",
-                })
-              }
-            }
-          )
+          // Test a simple animation first
+          console.log('Testing simple opacity animation on logo...')
+          gsap.to(logoRef.current, {
+            opacity: 0.5,
+            duration: 0.5,
+            onComplete: () => {
+              console.log('Simple test animation completed')
+              
+              // Now do the full animations
+              console.log('Starting full logo animation...')
+              gsap.fromTo(logoRef.current, 
+                { opacity: 0, y: 40, scale: 0.9 },
+                { 
+                  opacity: 1, 
+                  y: 0, 
+                  scale: 1, 
+                  duration: 1.4, 
+                  ease: "power3.out",
+                  onStart: () => console.log('Logo animation started'),
+                  onComplete: () => {
+                    console.log('Logo animation completed')
+                    // Start floating animation after main animation
+                    gsap.to(logoRef.current, {
+                      y: "+=8",
+                      duration: 3,
+                      repeat: -1,
+                      yoyo: true,
+                      ease: "sine.inOut",
+                    })
+                  }
+                }
+              )
 
-          // Title animation
-          gsap.fromTo(titleRef.current,
-            { opacity: 0, y: 30 },
-            { 
-              opacity: 1, 
-              y: 0, 
-              duration: 1.2, 
-              ease: "power3.out", 
-              delay: 0.4
-            }
-          )
+              // Title animation
+              console.log('Starting title animation...')
+              gsap.fromTo(titleRef.current,
+                { opacity: 0, y: 30 },
+                { 
+                  opacity: 1, 
+                  y: 0, 
+                  duration: 1.2, 
+                  ease: "power3.out", 
+                  delay: 0.4,
+                  onStart: () => console.log('Title animation started'),
+                  onComplete: () => console.log('Title animation completed')
+                }
+              )
 
-          // Description animation
-          gsap.fromTo(descriptionRef.current,
-            { opacity: 0, y: 30 },
-            { 
-              opacity: 1, 
-              y: 0, 
-              duration: 1.2, 
-              ease: "power3.out", 
-              delay: 0.7
+              // Description animation
+              console.log('Starting description animation...')
+              gsap.fromTo(descriptionRef.current,
+                { opacity: 0, y: 30 },
+                { 
+                  opacity: 1, 
+                  y: 0, 
+                  duration: 1.2, 
+                  ease: "power3.out", 
+                  delay: 0.7,
+                  onStart: () => console.log('Description animation started'),
+                  onComplete: () => console.log('Description animation completed')
+                }
+              )
             }
-          )
+          })
           
         } catch (error) {
           console.error('GSAP Animation Error:', error)
         }
       } else {
-        // Retry after a short delay if refs aren't ready
-        setTimeout(checkRefsAndAnimate, 50)
+        if (attempt < 20) { // Try for up to 1 second
+          console.log(`Refs not ready yet, retrying in 50ms... (attempt ${attempt})`)
+          setTimeout(() => checkRefsAndAnimate(attempt + 1), 50)
+        } else {
+          console.error('Failed to get refs after 20 attempts, giving up')
+        }
       }
     }
     
     // Start checking for refs after a small initial delay
-    const timer = setTimeout(checkRefsAndAnimate, 100)
+    const timer = setTimeout(() => checkRefsAndAnimate(1), 100)
     
     return () => {
       clearTimeout(timer)
@@ -123,8 +157,7 @@ const handleScrollDown = () => {
             alt={t("logo")}
             width={200}
             height={80}
-            className="w-35 sm:w-28 md:w-40 lg:w-96 h-auto opacity-0"
-            style={{ transform: 'translateY(40px) scale(0.9)' }}
+            className="w-35 sm:w-28 md:w-40 lg:w-96 h-auto"
           />
         </div>
 
@@ -146,8 +179,7 @@ const handleScrollDown = () => {
             <h4
               ref={titleRef}
               className={`uppercase text-white text-center lg:${isRTL ? 'text-start' : 'text-end'}
-                        text-5xl sm:text-2xl md:text-4xl lg:text-8xl xl:text-8xl opacity-0`}
-              style={{ transform: 'translateY(30px)' }}
+                        text-5xl sm:text-2xl md:text-4xl lg:text-8xl xl:text-8xl`}
             >
               ICESCO
             </h4>
@@ -161,8 +193,7 @@ const handleScrollDown = () => {
           <p
             ref={descriptionRef}
             className={`text-white text-opacity-70 text-xs sm:text-sm md:text-base lg:text-2xl mt-8 
-                        max-w-md text-center lg:${isRTL ? 'text-right' : 'text-left'} opacity-0`}
-            style={{ transform: 'translateY(30px)' }}
+                        max-w-md text-center lg:${isRTL ? 'text-right' : 'text-left'}`}
           >
             {t("takePartStrategy")}
           </p>

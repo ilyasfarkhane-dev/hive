@@ -25,37 +25,86 @@ const About = () => {
   const descriptionRef = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Logo animation
-      if (logoRef.current) {
-        gsap.fromTo(
-          logoRef.current,
-          { opacity: 0, y: 40, scale: 0.9 },
-          { opacity: 1, y: 0, scale: 1, duration: 1.4, ease: "power3.out" }
-        )
+    console.log('GSAP useEffect running')
+    console.log('logoRef.current:', logoRef.current)
+    console.log('titleRef.current:', titleRef.current)
+    console.log('descriptionRef.current:', descriptionRef.current)
+    console.log('containerRef.current:', containerRef.current)
+    
+    // Test if GSAP is working at all
+    try {
+      console.log('GSAP version:', gsap.version)
+      
+      // Small delay to ensure DOM is fully ready
+      const timer = setTimeout(() => {
+        console.log('Starting GSAP animations after timeout')
+        
+        // Direct animation without context first
+        if (logoRef.current) {
+          console.log('Animating logo directly')
+          gsap.fromTo(logoRef.current, 
+            { opacity: 0, y: 40, scale: 0.9 },
+            { 
+              opacity: 1, 
+              y: 0, 
+              scale: 1, 
+              duration: 1.4, 
+              ease: "power3.out",
+              onStart: () => console.log('Logo animation started'),
+              onComplete: () => console.log('Logo animation completed'),
+              onUpdate: () => console.log('Logo animating...', gsap.getProperty(logoRef.current, "opacity"))
+            }
+          )
 
-        gsap.to(logoRef.current, {
-          y: "+=8",
-          duration: 3,
-          repeat: -1,
-          yoyo: true,
-          ease: "sine.inOut",
-          delay: 1.6,
-        })
+          // Floating animation
+          gsap.to(logoRef.current, {
+            y: "+=8",
+            duration: 3,
+            repeat: -1,
+            yoyo: true,
+            ease: "sine.inOut",
+            delay: 1.6,
+          })
+        }
+
+        // Text animations
+        if (titleRef.current) {
+          console.log('Animating title')
+          gsap.fromTo(titleRef.current,
+            { opacity: 0, y: 30 },
+            { 
+              opacity: 1, 
+              y: 0, 
+              duration: 1.2, 
+              ease: "power3.out", 
+              delay: 0.4,
+              onComplete: () => console.log('Title animation completed')
+            }
+          )
+        }
+
+        if (descriptionRef.current) {
+          console.log('Animating description')
+          gsap.fromTo(descriptionRef.current,
+            { opacity: 0, y: 30 },
+            { 
+              opacity: 1, 
+              y: 0, 
+              duration: 1.2, 
+              ease: "power3.out", 
+              delay: 0.7,
+              onComplete: () => console.log('Description animation completed')
+            }
+          )
+        }
+      }, 100)
+
+      return () => {
+        clearTimeout(timer)
       }
-
-      // Text animations
-      const textElements = [titleRef.current, descriptionRef.current].filter(Boolean)
-      if (textElements.length > 0) {
-        gsap.fromTo(
-          textElements,
-          { opacity: 0, y: 30 },
-          { opacity: 1, y: 0, duration: 1.2, stagger: 0.3, ease: "power3.out", delay: 0.4 }
-        )
-      }
-    }, containerRef)
-
-    return () => ctx.revert()
+    } catch (error) {
+      console.error('GSAP Error:', error)
+    }
   }, [])
 
 const handleScrollDown = () => {
@@ -88,7 +137,8 @@ const handleScrollDown = () => {
             alt={t("logo")}
             width={200}
             height={80}
-            className="w-35 sm:w-28 md:w-40 lg:w-96 h-auto"
+            className="w-35 sm:w-28 md:w-40 lg:w-96 h-auto opacity-0"
+            style={{ transform: 'translateY(40px) scale(0.9)' }}
           />
         </div>
 
@@ -110,7 +160,8 @@ const handleScrollDown = () => {
             <h4
               ref={titleRef}
               className={`uppercase text-white text-center lg:${isRTL ? 'text-start' : 'text-end'}
-                        text-5xl sm:text-2xl md:text-4xl lg:text-8xl xl:text-8xl`}
+                        text-5xl sm:text-2xl md:text-4xl lg:text-8xl xl:text-8xl opacity-0`}
+              style={{ transform: 'translateY(30px)' }}
             >
               ICESCO
             </h4>
@@ -124,7 +175,8 @@ const handleScrollDown = () => {
           <p
             ref={descriptionRef}
             className={`text-white text-opacity-70 text-xs sm:text-sm md:text-base lg:text-2xl mt-8 
-                        max-w-md text-center lg:${isRTL ? 'text-right' : 'text-left'}`}
+                        max-w-md text-center lg:${isRTL ? 'text-right' : 'text-left'} opacity-0`}
+            style={{ transform: 'translateY(30px)' }}
           >
             {t("takePartStrategy")}
           </p>

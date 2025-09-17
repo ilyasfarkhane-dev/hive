@@ -233,7 +233,7 @@ const Rooms = () => {
           </div>
         ) : (
           <AnimatePresence>
-            {memoizedSelectedCards.slice().reverse().map((card, index) => {
+            {memoizedSelectedCards.slice().map((card, index) => {
               const isLastSelected = index === 0;
               const originalIndex = memoizedSelectedCards.length - 1 - index;
               

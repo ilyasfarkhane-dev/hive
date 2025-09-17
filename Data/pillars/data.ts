@@ -64,7 +64,7 @@ export const pillarsData: Record<string, Pillar[]> = {
       "code": "2.3",
       "title": {
         "en": "Promoting the advancement of efficient health systems and ensuring easy access to distinguished healthcare services",
-        "fr": "Soutenir le développement de systèmes de santé efficaces et garantir l&#039;accès au services sanitaires de qualité",
+        "fr": "Soutenir le développement de systèmes de santé efficaces et garantir l'accès au services sanitaires de qualité",
         "ar": "تعزيز تطوير أنظمة صحية فعّالة وضمان سهولة الوصول إلى خدمات رعاية صحية متميزة"
       }
     },
@@ -73,7 +73,7 @@ export const pillarsData: Record<string, Pillar[]> = {
       "code": "2.4",
       "title": {
         "en": "Driving future foresight and expediting the integration of artificial intelligence systems and emerging technologies.",
-        "fr": "Anticiper l&#039;avenir et accélérer l&#039;adoption des systèmes d&#039;intelligence artificielle et des technologies émergentes",
+        "fr": "Anticiper l'avenir et accélérer l'adoption des systèmes d'intelligence artificielle et des technologies émergentes",
         "ar": "دعم ثقافة استشراف المستقبل وتسريع تبني منظومات الذكاء الاصطناعي والتكنولوجيا الناشئة"
       }
     }
@@ -102,7 +102,7 @@ export const pillarsData: Record<string, Pillar[]> = {
       "code": "3.3",
       "title": {
         "en": "Promoting and fostering research and analysis in the field of social transformation",
-        "fr": "Encourager la recherche et l&#039;analyse dans le domaine des transformations sociales",
+        "fr": "Encourager la recherche et l'analyse dans le domaine des transformations sociales",
         "ar": "تشجيع البحث والتحليل في مجال التحولات الاجتماعية"
       }
     }
@@ -158,7 +158,7 @@ export const pillarsData: Record<string, Pillar[]> = {
       "code": "4.5",
       "title": {
         "en": "Promoting the teaching and dissemination of the Arabic language to non-native speakers",
-        "fr": "Promotion de l&#039;enseignement de la langue arabe pour les non arabophones",
+        "fr": "Promotion de l'enseignement de la langue arabe pour les non arabophones",
         "ar": "دعم تعليم اللغة العربية ونشرها بين غير الناطقين بها"
       }
     }

@@ -26,7 +26,7 @@ export type StepFiveRef = {
 const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, initialValues }, ref) => {
   const { t: originalT, i18n } = useTranslation('common');
   const currentLanguage = i18n.language || 'en';
-  
+
   // Safe translation function to ensure strings are returned
   const t = (key: string): string => {
     const translated = originalT(key);
@@ -77,6 +77,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
 
   const [isInitialized, setIsInitialized] = useState(false);
 
+
+  const otherBeneficiaryValue = t('beneficiaryOther');
   // Load saved data on component mount - only run once
   useEffect(() => {
     const loadSavedData = () => {
@@ -86,7 +88,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
           const parsedData = JSON.parse(savedData);
 
           // Check if "Other" beneficiary is selected to show the input
-          if (parsedData.beneficiaries && parsedData.beneficiaries.includes("Other")) {
+          if (parsedData.beneficiaries && parsedData.beneficiaries.includes(otherBeneficiaryValue)) {
             setShowOtherInput(true);
           }
 
@@ -147,7 +149,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
       getFormValues: () => {
         // Filter out any files that are not actual File objects (e.g., from localStorage)
         const validFiles = formValues.files.filter(file => file instanceof File);
-        
+
         return {
           ...formValues,
           files: validFiles, // Only return actual File objects
@@ -187,7 +189,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
       ...prev,
       contact: { ...prev.contact, email }
     }));
-    
+
     if (email && !validateEmail(email)) {
       setEmailError(String(t('invalidEmailFormat')));
     } else {
@@ -267,7 +269,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     ];
 
     // Check if "Other" beneficiary is selected but no input provided
-    if (formValues.beneficiaries.includes("Other") && !formValues.otherBeneficiary.trim()) {
+    if (formValues.beneficiaries.includes(otherBeneficiaryValue) && !formValues.otherBeneficiary.trim()) {
       return false;
     }
 
@@ -328,9 +330,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   type="text"
                   required
                   placeholder={t('titlePlaceholder')}
-                  className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm ${
-                    getFieldValidationClass(!!formValues.title)
-                  }`}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm ${getFieldValidationClass(!!formValues.title)
+                    }`}
                 />
               </div>
 
@@ -345,9 +346,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   value={formValues.brief}
                   onChange={(e) => setFormValues({ ...formValues, brief: e.target.value })}
                   placeholder={t('projectBriefPlaceholder')}
-                  className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm resize-none ${
-                    getFieldValidationClass(!!formValues.brief)
-                  }`}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 shadow-sm resize-none ${getFieldValidationClass(!!formValues.brief)
+                    }`}
                 ></textarea>
               </div>
             </div>
@@ -370,9 +370,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   value={formValues.rationale}
                   onChange={(e) => setFormValues({ ...formValues, rationale: e.target.value })}
                   placeholder={t('problemStatementPlaceholder')}
-                  className={`w-full px-5 py-3 border rounded-2xl focus:ring-2 shadow-sm transition ${
-                    getFieldValidationClass(!!formValues.rationale)
-                  }`}
+                  className={`w-full px-5 py-3 border rounded-2xl focus:ring-2 shadow-sm transition ${getFieldValidationClass(!!formValues.rationale)
+                    }`}
                 ></textarea>
               </div>
               {/* Target Beneficiaries */}
@@ -390,11 +389,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 ].map((benef) => (
                   <label
                     key={benef.value}
-                    className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
-                      formValues.beneficiaries.includes(benef.value)
+                    className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${formValues.beneficiaries.includes(benef.value)
                         ? 'border-teal-500 bg-teal-50 shadow-sm'
                         : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -407,14 +405,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                             ...prev,
                             beneficiaries: [...prev.beneficiaries, benef.value],
                           }));
-                          if (benef.value === "Other") setShowOtherInput(true);
+                          if (benef.value === otherBeneficiaryValue) setShowOtherInput(true);
                         } else {
                           setFormValues((prev) => ({
                             ...prev,
                             beneficiaries: prev.beneficiaries.filter((b) => b !== benef.value),
-                            otherBeneficiary: benef.value === "Other" ? "" : prev.otherBeneficiary,
+                            otherBeneficiary: benef.value === otherBeneficiaryValue ? "" : prev.otherBeneficiary,
                           }));
-                          if (benef.value === "Other") setShowOtherInput(false);
+                          if (benef.value === otherBeneficiaryValue) setShowOtherInput(false);
                         }
                       }}
                     />
@@ -597,9 +595,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <input
                   type="text"
                   placeholder={String(formValues.partners.length >= 5 ? t('maxPartnersReached') : t('addPartnerPlaceholder'))}
-                  className={`enhanced-input flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 ${
-                    formValues.partners.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
+                  className={`enhanced-input flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 ${formValues.partners.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   value={formValues.partnerInput}
                   onChange={(e) => setFormValues({ ...formValues, partnerInput: e.target.value })}
                   onKeyPress={(e) => handleKeyPress(e, 'partner')}
@@ -608,11 +605,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <button
                   type="button"
                   id="add-partner-btn"
-                  className={`px-3 py-2 rounded-xl transition-all duration-200 ${
-                    formValues.partners.length >= 5
+                  className={`px-3 py-2 rounded-xl transition-all duration-200 ${formValues.partners.length >= 5
                       ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                       : 'bg-teal-600 text-white hover:bg-teal-700'
-                  }`}
+                    }`}
                   onClick={handleAddPartner}
                   disabled={formValues.partners.length >= 5}
                 >
@@ -695,11 +691,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 ].map((option) => (
                   <label
                     key={option.value}
-                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
-                      formValues.deliveryModality === option.value
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${formValues.deliveryModality === option.value
                         ? 'border-teal-500 bg-teal-50 shadow-sm'
                         : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -733,11 +728,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 ].map((option) => (
                   <label
                     key={option.value}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
-                      formValues.geographicScope === option.value
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${formValues.geographicScope === option.value
                         ? 'border-teal-500 bg-teal-50 shadow-sm'
                         : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <input
                       type="radio"
@@ -795,9 +789,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 required
                 value={formValues.contact.email}
                 onChange={(e) => handleEmailChange(e.target.value)}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-200 transition-all duration-200 shadow-sm ${
-                  emailError ? "border-red-500 focus:border-red-500 focus:ring-red-100" : "border-gray-300 focus:border-teal-500"
-                }`}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-200 transition-all duration-200 shadow-sm ${emailError ? "border-red-500 focus:border-red-500 focus:ring-red-100" : "border-gray-300 focus:border-teal-500"
+                  }`}
               />
               {emailError && (
                 <p className="text-red-500 text-sm mt-1">{emailError}</p>
@@ -885,9 +878,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   type="text"
                   id="milestone-input"
                   placeholder={String(formValues.milestones.length >= 5 ? t('maxMilestonesReached') : t('milestoneNamePlaceholder'))}
-                  className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${
-                    formValues.milestones.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
+                  className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${formValues.milestones.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   value={formValues.milestoneInput}
                   onChange={(e) =>
                     setFormValues({ ...formValues, milestoneInput: e.target.value })
@@ -899,11 +891,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   type="button"
                   onClick={handleAddMilestone}
                   disabled={formValues.milestones.length >= 5}
-                  className={`px-3 py-2 rounded-xl transition shadow-md flex items-center justify-center ${
-                    formValues.milestones.length >= 5
+                  className={`px-3 py-2 rounded-xl transition shadow-md flex items-center justify-center ${formValues.milestones.length >= 5
                       ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                       : 'bg-teal-600 text-white hover:bg-teal-700'
-                  }`}
+                    }`}
                 >
                   <svg
                     width="16"
@@ -981,9 +972,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   type="text"
                   id="kpi-input"
                   placeholder={String(formValues.kpis.length >= 5 ? t('maxKPIsReached') : t('keyPerformanceIndicatorsPlaceholder'))}
-                  className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${
-                    formValues.kpis.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
-                  }`}
+                  className={`flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition shadow-sm ${formValues.kpis.length >= 5 ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                   value={formValues.kpiInput}
                   onChange={(e) =>
                     setFormValues({ ...formValues, kpiInput: e.target.value })
@@ -995,11 +985,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   type="button"
                   onClick={handleAddKPI}
                   disabled={formValues.kpis.length >= 5}
-                  className={`px-3 py-2 rounded-xl transition shadow-md flex items-center justify-center ${
-                    formValues.kpis.length >= 5
+                  className={`px-3 py-2 rounded-xl transition shadow-md flex items-center justify-center ${formValues.kpis.length >= 5
                       ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                       : 'bg-teal-600 text-white hover:bg-teal-700'
-                  }`}
+                    }`}
                 >
                   <svg
                     width="16"
@@ -1134,7 +1123,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
             onClick={() => {
               console.log('=== STEP 5 SUBMISSION DEBUG ===');
               console.log('Form values being passed to next step:', formValues);
-              
+
               // Check for multilingual objects in form values
               const checkForMultilingualObjects = (obj: any, path = '') => {
                 for (const [key, value] of Object.entries(obj)) {
@@ -1154,16 +1143,15 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                   }
                 }
               };
-              
+
               checkForMultilingualObjects(formValues);
               onNext && onNext(formValues);
             }}
             disabled={!isFormValid()}
-            className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${
-              isFormValid()
+            className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${isFormValid()
                 ? "bg-[#0e7378] text-white hover:bg-[#0a5d61] hover:shadow-xl transform hover:-translate-y-0.5"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
+              }`}
           >
             {debugRender(t('next'), 'next button')}
             <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1180,7 +1168,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               <p className="text-sm text-amber-700">
-                {debugRender(t('pleaseFillAllRequiredFields'), 'validation message')}  
+                {debugRender(t('pleaseFillAllRequiredFields'), 'validation message')}
               </p>
             </div>
           </div>

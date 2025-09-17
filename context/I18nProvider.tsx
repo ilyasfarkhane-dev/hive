@@ -45,6 +45,7 @@ if (!i18n.isInitialized) {
           subtitle: "Member States Portal",
           title: "ICESCO Member States Portal",
           description: "ICESCO Member States Portal",
+          titreprojet: "Project Title",
           login: "Login",
           password: "Password",
           signIn: "Sign in",
@@ -266,6 +267,7 @@ if (!i18n.isInitialized) {
       },
       fr: {
         common: {
+          "titreprojet": "Titre du Projet",
           "maxPartnersLimitReached": "Maximum de 5 partenaires autorisés",
           "created": "Créé",
           "drafted": "Brouillon",
@@ -506,6 +508,7 @@ if (!i18n.isInitialized) {
       },
       ar: {
         common: {
+          "titreprojet": "عنوان المشروع",
           "maxPartnersLimitReached": "الحد الأقصى للشركاء (5/5)",
           "drafted": "مسودة",
           "noCrmProjectsYet": "لا يوجد مشاريع بعد",

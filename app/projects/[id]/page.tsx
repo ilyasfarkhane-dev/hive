@@ -545,7 +545,7 @@ const ProjectDetailsPage = () => {
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('title')}</label>
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('titreprojet')}</label>
                     <p className="text-lg font-medium text-gray-900">{project.name}</p>
                   </div>
                 

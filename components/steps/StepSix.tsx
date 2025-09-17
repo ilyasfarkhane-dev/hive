@@ -197,10 +197,10 @@ const Step6: React.FC<Step6Props> = ({
             <div className="w-28 h-28 mx-auto mb-6">
               <Lottie animationData={successAnimation} loop={false} />
             </div>
-            <h3 className="text-2xl font-bold text-green-600 mb-4">
+            <h3 className="text-2xl font-bold text-[#0e7378] mb-4">
               {safeRender(t('projectSubmittedSuccessfully'))}
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-[#0e7378] mb-6">
               {safeRender(t('projectSubmittedDesc'))}
             </p>
            
@@ -214,7 +214,7 @@ const Step6: React.FC<Step6Props> = ({
                 if (onClearData) onClearData();
               }, 0);
             }}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
+            className="px-6 py-2 bg-[#0e7378] text-white rounded-lg shadow hover:bg-green-700 transition"
           >
             {safeRender(t('ok'))}
           </button>

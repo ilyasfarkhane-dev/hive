@@ -73,11 +73,36 @@ export const saveProjectToLocal = (projectData: Omit<ProjectData, 'id' | 'create
   return id;
 };
 
+// Helper function to clean beneficiary strings
+const cleanBeneficiaryString = (str: string) => {
+  return str
+    .replace(/[\^]/g, '') // Remove caret symbols
+    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+};
+
+// Helper function to clean project data
+const cleanProjectData = (project: ProjectData): ProjectData => {
+  return {
+    ...project,
+    beneficiaries: project.beneficiaries?.map(cleanBeneficiaryString) || [],
+    other_beneficiaries: project.other_beneficiaries ? cleanBeneficiaryString(project.other_beneficiaries) : '',
+    partners: project.partners?.map(cleanBeneficiaryString) || [],
+    institutions: project.institutions?.map(cleanBeneficiaryString) || [],
+    milestones: project.milestones?.map(cleanBeneficiaryString) || [],
+    expected_outputs: project.expected_outputs?.map(cleanBeneficiaryString) || [],
+    kpis: project.kpis?.map(cleanBeneficiaryString) || [],
+  };
+};
+
 // Get all projects from localStorage
 export const getProjectsFromLocal = (): ProjectData[] => {
   try {
     const projects = localStorage.getItem('project_suggestions');
-    return projects ? JSON.parse(projects) : [];
+    const parsedProjects = projects ? JSON.parse(projects) : [];
+    // Clean all project data to remove unwanted characters
+    return parsedProjects.map(cleanProjectData);
   } catch (error) {
     console.error('Error loading projects from localStorage:', error);
     return [];

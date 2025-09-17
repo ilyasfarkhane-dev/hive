@@ -87,6 +87,10 @@ const ProjectDetailsPage = () => {
         const projectId = params?.id as string;
         console.log('Project ID from params:', projectId);
 
+        // Clean existing data first
+        const { cleanExistingProjectData } = await import('@/utils/dataCleanup');
+        cleanExistingProjectData();
+
         // First try to get from localStorage (local projects) - this is instant
         const localProjects = JSON.parse(localStorage.getItem('projects') || '[]');
         console.log('Local projects found:', localProjects.length);
@@ -345,19 +349,47 @@ const ProjectDetailsPage = () => {
     }).format(num);
   };
 
+  // Helper function to clean beneficiary strings
+  const cleanBeneficiaryString = (str: string) => {
+    return str
+      .replace(/[\^]/g, '') // Remove caret symbols
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  };
+
   // Helper function to translate beneficiary values
   const translateBeneficiary = (beneficiary: string) => {
+    // Clean the beneficiary string from any unwanted characters
+    const cleanBeneficiary = cleanBeneficiaryString(beneficiary);
+    
     const beneficiaryMap: Record<string, string> = {
+      // English keys
       'Students': t('beneficiaryStudents'),
       'Teachers': t('beneficiaryTeachers'),
       'Youth': t('beneficiaryYouth'),
       'General Public': t('beneficiaryPublic'),
       'Policymakers': t('beneficiaryPolicymakers'),
       'Other': t('beneficiaryOther'),
-      // Add more mappings as needed
+      
+      // Arabic keys (in case data is stored in Arabic)
+      'الطلاب': t('beneficiaryStudents'),
+      'المعلمون': t('beneficiaryTeachers'),
+      'الشباب': t('beneficiaryYouth'),
+      'الجمهور العام': t('beneficiaryPublic'),
+      'صانعو السياسات': t('beneficiaryPolicymakers'),
+      'أخرى': t('beneficiaryOther'),
+      
+      // French keys (in case data is stored in French)
+      'Étudiants': t('beneficiaryStudents'),
+      'Enseignants': t('beneficiaryTeachers'),
+      'Jeunesse': t('beneficiaryYouth'),
+      'Grand Public': t('beneficiaryPublic'),
+      'Décideurs': t('beneficiaryPolicymakers'),
+      'Autre': t('beneficiaryOther'),
     };
     
-    return beneficiaryMap[beneficiary] || beneficiary;
+    return beneficiaryMap[cleanBeneficiary] || cleanBeneficiary;
   };
 
   // Helper function to translate frequency values

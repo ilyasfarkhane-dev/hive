@@ -424,16 +424,7 @@ const ProjectsPage = () => {
                 >
                   {t('allProjects')}
                 </button>
-                <button
-                  onClick={() => setStatusFilter('drafted')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                    statusFilter === 'drafted'
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {t('drafted')}
-                </button>
+               
                 <button
                   onClick={() => setStatusFilter('published')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${

@@ -20,8 +20,8 @@ const ChatBot: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Configuration - using environment variables
-  const API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY || "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";
-  const ASSISTANT_ID = process.env.NEXT_PUBLIC_OPENAI_ASSISTANT_ID || "asst_dCQiKh1IQwYBmTJhQl5htC4u";
+  const API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  const ASSISTANT_ID = process.env.NEXT_PUBLIC_OPENAI_ASSISTANT_ID;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -55,6 +55,12 @@ const ChatBot: React.FC = () => {
   };
 
   const initThread = useCallback(async () => {
+    if (!API_KEY || !ASSISTANT_ID) {
+      console.error("OpenAI API key or Assistant ID not configured");
+      alert("Chat service is not configured. Please contact support.");
+      return;
+    }
+
     try {
       const response = await fetch("https://api.openai.com/v1/threads", {
         method: "POST",
@@ -93,6 +99,12 @@ const ChatBot: React.FC = () => {
   }, [isOpen, isInitialized, initThread]);
 
   const sendMessage = async () => {
+    if (!API_KEY || !ASSISTANT_ID) {
+      console.error("OpenAI API key or Assistant ID not configured");
+      alert("Chat service is not configured. Please contact support.");
+      return;
+    }
+
     if (!threadId || !inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {

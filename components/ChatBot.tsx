@@ -23,6 +23,9 @@ const ChatBot: React.FC = () => {
   const API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
   const ASSISTANT_ID = process.env.NEXT_PUBLIC_OPENAI_ASSISTANT_ID;
 
+  console.log("API_KEY, ",ASSISTANT_ID);
+  console.log("ASSISTANT_ID",API_KEY);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -57,11 +60,17 @@ const ChatBot: React.FC = () => {
   const initThread = useCallback(async () => {
     if (!API_KEY || !ASSISTANT_ID) {
       console.error("OpenAI API key or Assistant ID not configured");
-      alert("Chat service is not configured. Please contact support.");
+      console.error("API_KEY:", API_KEY ? "Set" : "Missing");
+      console.error("ASSISTANT_ID:", ASSISTANT_ID ? "Set" : "Missing");
+      alert("Chat service is not configured. Please check your environment variables.");
+      setIsInitialized(true); // Enable input even if API keys are missing
       return;
     }
 
     try {
+      console.log("Initializing thread with API_KEY:", API_KEY.substring(0, 10) + "...");
+      console.log("Assistant ID:", ASSISTANT_ID);
+      
       const response = await fetch("https://api.openai.com/v1/threads", {
         method: "POST",
         headers: {
@@ -72,9 +81,20 @@ const ChatBot: React.FC = () => {
         body: JSON.stringify({})
       });
 
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(`API Error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+      }
+
       const data = await response.json();
+      console.log("Thread creation response:", data);
+      
       if (!data.id) {
-        throw new Error("Thread creation failed");
+        throw new Error("Thread creation failed - no ID returned");
       }
 
       setThreadId(data.id);
@@ -88,7 +108,10 @@ const ChatBot: React.FC = () => {
       }]);
     } catch (error) {
       console.error("Error initializing thread:", error);
-      alert("Failed to initialize chat. Please reload the page.");
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to initialize chat: ${errorMessage}. Please check the console for details.`);
+      // Still set initialized to true so user can try again
+      setIsInitialized(true);
     }
   }, [API_KEY]);
 
@@ -96,12 +119,16 @@ const ChatBot: React.FC = () => {
     if (isOpen && !isInitialized) {
       initThread();
     }
+    // If chat is open but not initialized, enable input anyway
+    if (isOpen) {
+      setIsInitialized(true);
+    }
   }, [isOpen, isInitialized, initThread]);
 
   const sendMessage = async () => {
     if (!API_KEY || !ASSISTANT_ID) {
       console.error("OpenAI API key or Assistant ID not configured");
-      alert("Chat service is not configured. Please contact support.");
+      alert("Chat service is not configured. Please check your environment variables.");
       return;
     }
 

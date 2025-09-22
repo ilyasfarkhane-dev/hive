@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Eye, EyeOff, LogIn, User } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import logo from "@/public/Logo-01.svg";
+// import logo from "@/public/Logo-01.svg"; // SVG import might not work in production
 // import maquettes from "@/public/maquettes.png"; // Removed during cleanup
 import { useTranslation } from 'react-i18next';
 
@@ -89,7 +89,7 @@ const LoginPage = () => {
 
       <div className="mx-auto w-full max-w-md relative z-10 px-4 sm:px-0">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex justify-center">
-          <Image src={logo || "/placeholder.svg"} alt="ICESCO Logo" width={80} height={80} className="mb-4 sm:mb-6 sm:w-[120px] sm:h-[120px]" />
+          <Image src="/Logo-01.svg" alt="ICESCO Logo" width={80} height={80} className="mb-4 sm:mb-6 sm:w-[120px] sm:h-[120px]" />
         </motion.div>
         <motion.h5
           initial={{ opacity: 0, y: -10 }}

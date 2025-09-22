@@ -87,61 +87,81 @@ export function useContactProjects(): UseContactProjectsReturn {
   // No caching - always fetch fresh data
 
   const fetchProjects = useCallback(async (forceRefresh = false) => {
-    try {
-      setLoading(true);
-      setError(null);
-      setErrorType(null);
-      
-      // Always fetch fresh data from API
-      
-      // Fetch projects from our API route (which handles CORS)
-      const response = await fetch('/api/crm/projects', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP error! status: ${response.status}`);
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`=== FRONTEND: FETCHING CRM PROJECTS (Attempt ${attempt}/${maxRetries}) ===`);
+        setLoading(true);
+        setError(null);
+        setErrorType(null);
+        
+        // Add a small delay on first attempt to allow serverless function to warm up
+        if (attempt === 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Fetch projects from our API route (which handles CORS)
+        const response = await fetch('/api/crm/projects', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Add timeout to prevent hanging
+          signal: AbortSignal.timeout(30000), // 30 second timeout
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch projects');
+        }
+        
+        console.log('=== FRONTEND: CRM PROJECTS RECEIVED ===');
+        console.log('Success:', data.success);
+        console.log('Count:', data.count);
+        console.log('Projects sample:', data.projects.slice(0, 2).map((p: CRMProject) => ({
+          id: p.id,
+          name: p.name,
+          status: p.status,
+          sub_service: p.sub_service,
+          sub_service_id: p.sub_service_id
+        })));
+        
+        setProjects(data.projects);
+        setLoading(false);
+        return; // Success, exit retry loop
+        
+      } catch (err) {
+        console.error(`Error fetching CRM projects (attempt ${attempt}):`, err);
+        
+        // If this is the last attempt, set error state
+        if (attempt === maxRetries) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
+          setError(errorMessage);
+          
+          // Determine error type based on the error message
+          if (errorMessage.includes('timeout') || errorMessage.includes('unavailable')) {
+            setErrorType('CONNECTION_ERROR');
+          } else if (errorMessage.includes('Authentication failed')) {
+            setErrorType('AUTH_ERROR');
+          } else {
+            setErrorType('UNKNOWN_ERROR');
+          }
+          
+          setProjects([]);
+          setLoading(false);
+        } else {
+          // Wait before retrying
+          console.log(`Waiting ${retryDelay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
       }
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch projects');
-      }
-      
-      console.log('=== FRONTEND: CRM PROJECTS RECEIVED ===');
-      console.log('Success:', data.success);
-      console.log('Count:', data.count);
-      console.log('Projects sample:', data.projects.slice(0, 2).map((p: CRMProject) => ({
-        id: p.id,
-        name: p.name,
-        status: p.status,
-        sub_service: p.sub_service,
-        sub_service_id: p.sub_service_id
-      })));
-      
-      setProjects(data.projects);
-      
-    } catch (err) {
-      console.error('Error fetching CRM projects:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
-      setError(errorMessage);
-      
-      // Determine error type based on the error message
-      if (errorMessage.includes('timeout') || errorMessage.includes('unavailable')) {
-        setErrorType('CONNECTION_ERROR');
-      } else if (errorMessage.includes('Authentication failed')) {
-        setErrorType('AUTH_ERROR');
-      } else {
-        setErrorType('UNKNOWN_ERROR');
-      }
-      
-      setProjects([]);
-    } finally {
-      setLoading(false);
     }
   }, []);
 

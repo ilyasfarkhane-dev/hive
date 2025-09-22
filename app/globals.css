@@ -90,6 +90,169 @@ body {
   font-family: "TWKEverett";
 }
 
+/* CRITICAL FIX: Override all text color issues in input fields */
+input, textarea, select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  position: relative !important;
+  z-index: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  position: relative !important;
+  z-index: 2 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Override any gradient or transparent text effects on inputs */
+input.text-gradient, 
+textarea.text-gradient, 
+select.text-gradient,
+input.link, 
+textarea.link, 
+select.link {
+  color: #000000 !important;
+  background: #ffffff !important;
+  background-clip: initial !important;
+  -webkit-background-clip: initial !important;
+}
+
+/* Ensure all input types are visible */
+input[type="text"], 
+input[type="email"], 
+input[type="tel"], 
+input[type="date"], 
+input[type="number"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+textarea {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  position: relative !important;
+  z-index: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+input[type="text"]:focus, 
+input[type="email"]:focus, 
+input[type="tel"]:focus, 
+input[type="date"]:focus, 
+input[type="number"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="url"]:focus,
+textarea:focus {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  position: relative !important;
+  z-index: 2 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Fix for enhanced-input and enhanced-select classes */
+.enhanced-input, .enhanced-select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  position: relative !important;
+  z-index: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.enhanced-input:focus, .enhanced-select:focus {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  position: relative !important;
+  z-index: 2 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Override any inherited transparent or gradient effects */
+input *, textarea *, select * {
+  color: #000000 !important;
+}
+
+/* Force visibility for all form elements */
+form input, form textarea, form select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* CRITICAL: Specific fix for StepFive component inputs */
+.step-five input,
+.step-five textarea,
+.step-five select,
+[data-step="5"] input,
+[data-step="5"] textarea,
+[data-step="5"] select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+.step-five input:focus,
+.step-five textarea:focus,
+.step-five select:focus,
+[data-step="5"] input:focus,
+[data-step="5"] textarea:focus,
+[data-step="5"] select:focus {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: relative !important;
+  z-index: 11 !important;
+}
+
+/* Override any parent container effects */
+.step-five * input,
+.step-five * textarea,
+.step-five * select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* NUCLEAR OPTION: Override ALL possible text hiding effects */
+input, textarea, select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: #000000 !important;
+  -webkit-text-stroke: none !important;
+  background-clip: initial !important;
+  -webkit-background-clip: initial !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+/* Ensure text is visible even with gradient backgrounds */
+input[style*="background"], 
+textarea[style*="background"], 
+select[style*="background"] {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  background-clip: initial !important;
+  -webkit-background-clip: initial !important;
+}
+
 /* RTL Support */
 [dir="rtl"] {
   direction: rtl;

@@ -296,10 +296,10 @@ const Rooms = () => {
       console.log('Has selected cards:', hasSelectedCards);
       console.log('Has project title:', hasProjectTitle);
       console.log('Submission successful:', submissionResult?.success);
-      console.log('Should show draft button:', hasSelectedCards && hasProjectTitle && !submissionResult?.success);
+      console.log('Should show draft button:', hasProjectTitle && !submissionResult?.success);
       console.log('========================');
       
-      setShowDraftButton(hasSelectedCards && hasProjectTitle && !submissionResult?.success);
+      setShowDraftButton(hasProjectTitle && !submissionResult?.success);
     };
 
     // Check immediately
@@ -334,9 +334,8 @@ const Rooms = () => {
   useEffect(() => {
     const handleProjectDetailsUpdate = (event: CustomEvent) => {
       // console.log('🔄 handleProjectDetailsUpdate called');
-      const hasSelectedCards = selectedCards.length > 0;
       
-      if (hasSelectedCards && event.detail?.formValues) {
+      if (event.detail?.formValues) {
         const hasProjectTitle = event.detail.formValues.title && event.detail.formValues.title.trim() !== '';
         console.log('🔄 Custom event - hasProjectTitle:', hasProjectTitle, 'title:', event.detail.formValues.title);
         

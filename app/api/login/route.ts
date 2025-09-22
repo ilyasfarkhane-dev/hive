@@ -15,150 +15,116 @@ export async function POST(request: NextRequest) {
     const { email, password, language = 'en' } = await request.json();
     console.log('Login attempt for email:', email);
 
-    // Try CRM authentication first, with fallback to bypass mode
-    try {
-      const crmService = new CRMService(CRM_CONFIG);
+    // CRM authentication only - no bypass mode
+    const crmService = new CRMService(CRM_CONFIG);
+    
+    // First authenticate with admin credentials from .env
+    console.log('Authenticating with CRM using portal credentials...');
+    await crmService.authenticate();
+    
+    // Search for the contact in CRM using provided credentials
+    console.log('Searching for contact in CRM...');
+    const contactResult = await crmService.searchContact(email, password);
+    
+    if (contactResult.success && contactResult.contact) {
+      console.log('Contact found in CRM:', contactResult.contact);
       
-      // First authenticate with admin credentials
-      console.log('Authenticating with CRM using admin credentials...');
-      await crmService.authenticate();
+      // Use the actual CRM session ID
+      const sessionId = crmService.currentSessionId;
       
-      // Search for the contact in CRM
-      console.log('Searching for contact in CRM...');
-      const contactResult = await crmService.searchContact(email, password);
-      
-      if (contactResult.success && contactResult.contact) {
-        console.log('Contact found in CRM:', contactResult.contact);
-        
-        // Use the actual CRM session ID
-        const sessionId = crmService.currentSessionId;
-        
-        // Create contact info from CRM data
-        const contactInfo = {
-          id: contactResult.contact.id,
-          name: `${contactResult.contact.first_name} ${contactResult.contact.last_name}`.trim(),
-          email: contactResult.contact.email,
-          phone: contactResult.contact.phone,
-          organization: contactResult.contact.account_name || 'ICESCO',
-          role: contactResult.contact.title || 'Member',
-          country: contactResult.contact.country
-        };
+      // Create contact info from CRM data
+      const contactInfo = {
+        id: contactResult.contact.id,
+        name: `${contactResult.contact.first_name} ${contactResult.contact.last_name}`.trim(),
+        email: contactResult.contact.email,
+        phone: contactResult.contact.phone,
+        organization: contactResult.contact.account_name || 'ICESCO',
+        role: contactResult.contact.title || 'Member',
+        country: contactResult.contact.country
+      };
 
-        // Create demo goals (you might want to fetch these from CRM too)
-        const goals = [
+      // Fetch goals dynamically from CRM
+      let goals = [];
+      try {
+        console.log('Fetching goals from CRM...');
+        goals = await crmService.getGoals();
+        console.log('Goals fetched from CRM:', goals.length);
+      } catch (goalError) {
+        console.warn('Failed to fetch goals from CRM, using defaults:', goalError);
+        // Fallback to default goals if CRM goals fetch fails
+        goals = [
           {
-            id: "goal_1",
+            id: "default_goal_1",
             name: "Strategic Goal 1",
-            description: "Strategic goal from CRM"
+            description: "Default strategic goal"
           },
           {
-            id: "goal_2",
+            id: "default_goal_2",
             name: "Strategic Goal 2", 
-            description: "Another strategic goal"
+            description: "Another default strategic goal"
           }
         ];
-
-        // Generate hashed email for backward compatibility
-        const hashedEmail = Buffer.from(email).toString('base64');
-
-        console.log('=== DEBUG: CRM Login Success ===');
-        console.log('Contact Info:', contactInfo);
-        console.log('Session ID:', sessionId);
-        console.log('Goals Count:', goals.length);
-        console.log('================================');
-
-        return NextResponse.json({
-          success: true,
-          hashedEmail,
-          sessionId,
-          contactInfo,
-          goals,
-          message: "Login successful"
-        });
-      } else {
-        console.log('Contact not found in CRM:', contactResult.error);
-        return NextResponse.json(
-          { 
-            success: false, 
-            message: "Invalid login or password" 
-          },
-          { status: 401 }
-        );
       }
 
-    } catch (crmError) {
-      console.error('CRM authentication/search failed:', crmError);
-      console.log('=== FALLING BACK TO BYPASS MODE ===');
-      
-      // Bypass mode for development when CRM is unavailable
-      const validCredentials = [
-        { email: 'demo@icesco.org', password: 'demo123', name: 'Demo User', organization: 'ICESCO' },
-        { email: 'admin@icesco.org', password: 'admin123', name: 'Admin User', organization: 'ICESCO' },
-        { email: 'test@icesco.org', password: 'test123', name: 'Test User', organization: 'ICESCO' }
-      ];
-      
-      const user = validCredentials.find(cred => cred.email === email && cred.password === password);
-      
-      if (user) {
-        console.log('Bypass authentication successful for:', user.email);
-        
-        // Create contact info for bypass mode
-        const contactInfo = {
-          id: `bypass_${Date.now()}`,
-          name: user.name,
-          email: user.email,
-          phone: '+1234567890',
-          organization: user.organization,
-          role: 'Member',
-          country: 'Morocco'
-        };
+      // Generate hashed email for backward compatibility
+      const hashedEmail = Buffer.from(email).toString('base64');
 
-        // Create demo goals
-        const goals = [
-          {
-            id: "goal_1",
-            name: "Strategic Goal 1",
-            description: "Strategic goal from bypass mode"
-          },
-          {
-            id: "goal_2",
-            name: "Strategic Goal 2", 
-            description: "Another strategic goal"
-          }
-        ];
+      console.log('=== DEBUG: CRM Login Success ===');
+      console.log('Contact Info:', contactInfo);
+      console.log('Session ID:', sessionId);
+      console.log('Goals Count:', goals.length);
+      console.log('================================');
 
-        // Generate hashed email for backward compatibility
-        const hashedEmail = Buffer.from(email).toString('base64');
-        const sessionId = `bypass_session_${Date.now()}`;
-
-        console.log('=== DEBUG: BYPASS Login Success ===');
-        console.log('Contact Info:', contactInfo);
-        console.log('Session ID:', sessionId);
-        console.log('Goals Count:', goals.length);
-        console.log('================================');
-
-        return NextResponse.json({
-          success: true,
-          hashedEmail,
-          sessionId,
-          contactInfo,
-          goals,
-          message: "Login successful (bypass mode - CRM unavailable)"
-        });
-      } else {
-        console.log('Invalid credentials in bypass mode');
-        return NextResponse.json(
-          { 
-            success: false, 
-            message: "Invalid login or password" 
-          },
-          { status: 401 }
-        );
-      }
+      return NextResponse.json({
+        success: true,
+        hashedEmail,
+        sessionId,
+        contactInfo,
+        goals,
+        message: "Login successful"
+      });
+    } else {
+      console.log('Contact not found in CRM:', contactResult.error);
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Invalid login credentials. Please check your email and password." 
+        },
+        { status: 401 }
+      );
     }
 
   } catch (error) {
     console.error('Login API error:', error);
+    
+    // Check if it's a CRM connection error
+    if (error instanceof Error && (
+      error.message.includes('ETIMEDOUT') || 
+      error.message.includes('timeout') ||
+      error.message.includes('ECONNREFUSED') ||
+      error.message.includes('ENOTFOUND') ||
+      error.message.includes('fetch failed')
+    )) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Unable to connect to authentication server. Please try again later." 
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+    
+    // Check if it's an authentication error
+    if (error instanceof Error && error.message.includes('Authentication failed')) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Authentication server error. Please contact support." 
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+    
     return NextResponse.json(
       { 
         success: false, 

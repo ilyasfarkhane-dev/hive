@@ -378,7 +378,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
   };
   return (
 
-    <div id="step5Content" className="max-w-6xl mx-auto">
+    <div id="step5Content" className="step-five max-w-6xl mx-auto" data-step="5">
       {/* Section Header */}
       <div className="text-center mb-8">
         <h3 className="text-2xl font-bold text-[#0f7378] mb-2">

@@ -1017,6 +1017,59 @@ class CRMService {
   }
 
   /**
+   * Get strategic goals from CRM
+   */
+  async getGoals(): Promise<any[]> {
+    try {
+      console.log('=== Fetching Goals from CRM ===');
+      
+      if (!this.sessionId) {
+        console.log('No session ID, authenticating...');
+        await this.authenticate();
+      }
+
+      const queryData = {
+        session: this.sessionId,
+        module_name: 'Goals',
+        query: '',
+        order_by: 'name',
+        offset: 0,
+        select_fields: ['id', 'name', 'description'],
+        max_results: 50
+      };
+
+      const response = await fetch(`${this.config.baseUrl}/service/v4_1/rest.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          method: 'get_entry_list',
+          input_type: 'JSON',
+          response_type: 'JSON',
+          rest_data: JSON.stringify(queryData),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error.description || 'Failed to fetch goals');
+      }
+
+      console.log('Goals fetched successfully:', data.entry_list?.length || 0);
+      return data.entry_list || [];
+    } catch (error) {
+      console.error('Get Goals Error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Logout from CRM session
    */
   async logout(): Promise<void> {

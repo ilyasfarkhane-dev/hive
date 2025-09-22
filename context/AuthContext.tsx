@@ -64,37 +64,78 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Start with loading true
+  const [isClient, setIsClient] = useState(false); // Track if we're on client side
   const [contactInfo, setContactInfo] = useState<ContactInfo>();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>();
 
-  useEffect(() => {
+  // Function to check authentication status
+  const checkAuthStatus = () => {
+    // Only check localStorage on client side
+    if (typeof window === 'undefined') return;
+    
+    console.log('=== AUTH CHECK DEBUG ===');
     // Check for session_id in localStorage as primary authentication method
     const storedSessionId = localStorage.getItem("session_id");
     const storedHash = localStorage.getItem("contactEeemailHash");
     const storedContact = localStorage.getItem("contactInfo");
     const storedGoals = localStorage.getItem("goals");
 
+    console.log('Stored session_id:', storedSessionId);
+    console.log('Stored hash:', storedHash);
+    console.log('Stored contact:', storedContact);
+    console.log('Stored goals:', storedGoals);
+
     // If session_id exists, user is authenticated
     if (storedSessionId) {
+      console.log('User is authenticated via session_id');
       setIsAuthenticated(true);
       setSessionId(storedSessionId);
       
       // Load additional data if available
-      if (storedContact) setContactInfo(JSON.parse(storedContact));
-      if (storedGoals) setGoals(JSON.parse(storedGoals));
+      if (storedContact && storedContact !== 'undefined') {
+        try {
+          setContactInfo(JSON.parse(storedContact));
+        } catch (error) {
+          console.error('Error parsing stored contact info:', error);
+        }
+      }
+      if (storedGoals && storedGoals !== 'undefined') {
+        try {
+          setGoals(JSON.parse(storedGoals));
+        } catch (error) {
+          console.error('Error parsing stored goals:', error);
+        }
+      }
     } else if (storedHash) {
       // Fallback to old authentication method for backward compatibility
       setIsAuthenticated(true);
-      if (storedContact) setContactInfo(JSON.parse(storedContact));
-      if (storedGoals) setGoals(JSON.parse(storedGoals));
+      if (storedContact && storedContact !== 'undefined') {
+        try {
+          setContactInfo(JSON.parse(storedContact));
+        } catch (error) {
+          console.error('Error parsing stored contact info:', error);
+        }
+      }
+      if (storedGoals && storedGoals !== 'undefined') {
+        try {
+          setGoals(JSON.parse(storedGoals));
+        } catch (error) {
+          console.error('Error parsing stored goals:', error);
+        }
+      }
     } else {
       // No valid session found
       setIsAuthenticated(false);
     }
-    
-    setIsLoading(false);
+  };
+
+  // Set client side flag and check authentication on mount
+  useEffect(() => {
+    setIsClient(true);
+    checkAuthStatus();
+    setIsLoading(false); // Set loading to false after checking auth
   }, []);
 
   const login = async (login: string, password: string): Promise<boolean> => {
@@ -127,6 +168,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setGoals(data.goals);
         setSessionId(data.sessionId);
         setIsAuthenticated(true);
+        
+        // Redirect to home page after successful login
+        if (typeof window !== 'undefined') {
+          window.location.href = "/";
+        }
+        
         return true;
       } else {
         console.error("Login failed:", data);

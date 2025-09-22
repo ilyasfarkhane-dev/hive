@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionId, getModuleEntries } from '@/utils/crm';
-import { mapProjectDataToCRM } from '@/utils/crmFieldMapping';
+import { mapProjectDataToCRM, validateProjectData } from '@/utils/crmFieldMapping';
 
 const CRM_BASE_URL = 'http://3.145.21.11';
 
@@ -28,6 +28,24 @@ export async function POST(request: NextRequest) {
     console.log('=== DEBUG: Received project data ===');
     console.log('Project data keys:', Object.keys(projectData));
     console.log('Project data:', JSON.stringify(projectData, null, 2));
+    
+    // Validate project data - use different validation for drafts
+    const isDraft = projectData.status === 'Draft';
+    const validation = validateProjectData(projectData, isDraft);
+    
+    if (!validation.valid) {
+      console.log('Validation failed:', validation.errors);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Validation failed: ${validation.errors.join(', ')}`,
+          errorType: 'VALIDATION_ERROR',
+          errors: validation.errors
+        },
+        { status: 400 }
+      );
+    }
+    console.log('Project data validation passed');
     
     // Get a fresh session ID for CRM authentication
     const sessionId = await getFreshSessionId();
@@ -142,8 +160,17 @@ export async function POST(request: NextRequest) {
           name: projectData.contact_name,
           email: projectData.contact_email,
           phone: projectData.contact_phone,
-          role: projectData.contact_role
+          role: projectData.contact_role,
+          id: projectData.contact_id
         });
+        
+        console.log('=== CONTACT FIELD VALIDATION ===');
+        console.log('Contact name present:', !!projectData.contact_name);
+        console.log('Contact email present:', !!projectData.contact_email);
+        console.log('Contact phone present:', !!projectData.contact_phone);
+        console.log('Contact role present:', !!projectData.contact_role);
+        console.log('Contact ID present:', !!projectData.contact_id);
+        console.log('================================');
         console.log('Budget:', {
           icesco: projectData.budget_icesco,
           memberState: projectData.budget_member_state,

@@ -22,11 +22,14 @@ import {
   AlertCircle
 } from 'lucide-react';
 // Removed local storage imports - only using CRM projects
-import ProjectsHeader from '@/components/ProjectsHeader';
+import ProjectsPageHeader from '@/components/ProjectsPageHeader';
 import { useRouter } from 'next/navigation';
 import { goals as goalsData } from '@/Data/goals/data';
 import { pillarsByGoal, servicesByPillar, subServicesByService } from '@/Data/index';
 import { useContactProjects, CRMProject } from '@/hooks/useContactProjects';
+import { useProjectHierarchy } from '@/hooks/useProjectHierarchy';
+import { ProjectHierarchyBadges } from '@/components/ProjectHierarchyBadges';
+import { ProjectCard } from '@/components/ProjectCard';
 import { 
   getGoalCodeFromSubserviceId, 
   getPillarCodeFromSubserviceId, 
@@ -79,30 +82,13 @@ const ProjectsPage = () => {
   const currentLanguage = i18n.language || 'en';
   
   // Fetch CRM projects
-  const { projects: crmProjectsData, loading: crmLoading, error: crmError, refetch: refetchCrmProjects } = useContactProjects();
+  const { projects: crmProjectsData, loading: crmLoading, error: crmError, errorType: crmErrorType, refetch: refetchCrmProjects } = useContactProjects();
 
   // Update CRM projects when data changes
   useEffect(() => {
-    console.log('=== PROJECTS PAGE CRM DATA UPDATE ===');
-    console.log('CRM Projects Data:', crmProjectsData);
-    console.log('CRM Loading:', crmLoading);
-    console.log('CRM Error:', crmError);
-    
     if (crmProjectsData) {
-      console.log('Setting CRM projects:', crmProjectsData.length, 'projects');
-      console.log('=== ACTUAL CRM PROJECTS DATA ===');
-      console.log('First 3 projects:', crmProjectsData.slice(0, 3).map(p => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        status: p.status,
-        created: p.created_at,
-        source: 'CRM' // This should confirm it's from CRM
-      })));
       setCrmProjects(crmProjectsData);
       setLoading(false);
-    } else {
-      console.log('No CRM projects data received');
     }
   }, [crmProjectsData, crmLoading, crmError]);
 
@@ -115,15 +101,6 @@ const ProjectsPage = () => {
   useEffect(() => {
     let filtered = [...crmProjects];
 
-    console.log('=== FILTERING CRM PROJECTS ===');
-    console.log('Input projects:', crmProjects.length);
-    console.log('Status filter:', statusFilter);
-    console.log('Search term:', searchTerm);
-    console.log('Sample input project:', crmProjects[0] ? {
-      id: crmProjects[0].id,
-      name: crmProjects[0].name,
-      status: crmProjects[0].status
-    } : 'No projects');
 
     // Search filter
     if (searchTerm) {
@@ -138,25 +115,17 @@ const ProjectsPage = () => {
     if (statusFilter !== 'all') {
       filtered = filtered.filter(project => {
         // Check if project has a status field, otherwise use a default logic
-        const projectStatus = project.status || 'published'; // Default to published if no status
+        const projectStatus = project.status || 'Draft'; // Default to Draft if no status
         
         if (statusFilter === 'drafted') {
-          return projectStatus === 'drafted' || projectStatus === 'draft';
+          return projectStatus === 'Draft';
         } else if (statusFilter === 'published') {
-          return projectStatus === 'published' || projectStatus === 'active' || projectStatus === 'live';
+          return projectStatus === 'Published';
         }
         return true;
       });
     }
 
-    console.log('=== FILTERING RESULTS ===');
-    console.log('Final filtered projects:', filtered.length);
-    console.log('Sample filtered project:', filtered[0] ? {
-      id: filtered[0].id,
-      name: filtered[0].name,
-      status: filtered[0].status,
-      description: filtered[0].description?.substring(0, 50) + '...'
-    } : 'No filtered projects');
     
     setFilteredProjects(filtered);
     setCurrentPage(1); // Reset to first page when filters change
@@ -174,8 +143,20 @@ const ProjectsPage = () => {
   };
 
   const handleCardClick = (project: AnyProject) => {
-    // Use replace for faster navigation
-    router.replace(`/projects/${project.id}`);
+    console.log('Card clicked:', project);
+    console.log('Project ID:', project.id);
+    console.log('Project ID type:', typeof project.id);
+    
+    if (!project.id) {
+      console.error('Project ID is missing!');
+      return;
+    }
+    
+    const projectUrl = `/projects/${project.id}`;
+    console.log('Navigating to:', projectUrl);
+    
+    // Use push for navigation
+    router.push(projectUrl);
   };
 
   const handleCardHover = (project: AnyProject) => {
@@ -194,15 +175,20 @@ const ProjectsPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Handle refresh
+  const handleRefresh = () => {
+    refetchCrmProjects(true);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString(currentLanguage === 'en-US' ? 'ar-SA' : currentLanguage === 'fr' ? 'fr-FR' : 'en-US');
   };
 
   const getStatusColor = (project: AnyProject) => {
     // Status logic based on project status field
-    const projectStatus = project.status || 'published';
+    const projectStatus = project.status || 'Draft';
     
-    if (projectStatus === 'drafted' || projectStatus === 'draft') {
+    if (projectStatus === 'Draft') {
       return 'bg-yellow-100 text-yellow-800';
     }
     return 'bg-green-100 text-green-800'; // Default to published
@@ -210,9 +196,9 @@ const ProjectsPage = () => {
 
   const getStatusText = (project: AnyProject) => {
     // Status text based on project status field
-    const projectStatus = project.status || 'published';
+    const projectStatus = project.status || 'Draft';
     
-    if (projectStatus === 'drafted' || projectStatus === 'draft') {
+    if (projectStatus === 'Draft') {
       return t('drafted');
     }
     return t('published'); // Default to published
@@ -377,17 +363,16 @@ const ProjectsPage = () => {
     );
 
   return (
-    <div className="min-h-screen bg-white-100" dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Header */}
-      <ProjectsHeader 
+    <div className="min-h-screen bg-white" dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Integrated Header with Content */}
+      <ProjectsPageHeader 
         breadcrumbs={[
           { label: t('projects') }
         ]}
-      
       />
       
       {/* Main Content */}
-      <div className="py-8">
+      <div className="py-8 bg-white relative z-20 projects-content">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Search and Filter Controls */}
@@ -412,29 +397,69 @@ const ProjectsPage = () => {
                 />
               </div>
 
-              {/* Filter Buttons - CRM Project Status */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStatusFilter('all')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                    statusFilter === 'all'
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {t('allProjects')}
-                </button>
-               
-                <button
-                  onClick={() => setStatusFilter('published')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                    statusFilter === 'published'
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {t('published')}
-                </button>
+              {/* Filter Buttons and Create Project Button */}
+              <div className="flex gap-2 items-center">
+                {/* Filter Buttons - CRM Project Status */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      statusFilter === 'all'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {t('allProjects')}
+                  </button>
+                 
+                  <button
+                    onClick={() => setStatusFilter('drafted')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      statusFilter === 'drafted'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {t('drafted')}
+                  </button>
+                 
+                  <button
+                    onClick={() => setStatusFilter('published')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      statusFilter === 'published'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {t('published')}
+                  </button>
+                </div>
+
+                {/* Debug and Action Buttons */}
+                <div className="flex gap-3">
+                  {/* Refresh Button */}
+                  <button
+                    onClick={handleRefresh}
+                    className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 text-sm font-medium"
+                    title="Refresh data"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </button>
+                  
+                  {/* Create New Project Button */}
+                  <button
+                    onClick={() => router.push('/#next-section')}
+                    className="inline-flex items-center px-6 py-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all duration-200 font-medium text-sm shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    {t('createNewProject') || 'Create New Project'}
+                  </button>
+                </div>
               </div>
             </div>
             </div>
@@ -444,15 +469,40 @@ const ProjectsPage = () => {
           {!loading && (
             <div className="mt-4 flex justify-between items-center">
               <div className="text-sm text-gray-600">
-                {t('showing')} {startIndex + 1}-{Math.min(endIndex, filteredProjects.length)} {t('of')} {filteredProjects.length} {t('projects')}
-                <span className="ml-2 text-teal-600">
-                  ({crmProjects.length})
-                </span>
-        </div>
-
+                {crmError && crmErrorType === 'CONNECTION_ERROR' ? (
+                  <div className="flex items-center">
+                    <span className="text-red-600">
+                      {t('crmConnectionError') || 'Unable to connect to CRM server'}
+                    </span>
+                    {crmProjects.length > 0 && (
+                      <span className="ml-2 text-amber-600 text-xs">
+                        ({t('usingCachedData') || 'Using cached data'})
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {t('showing')} {startIndex + 1}-{Math.min(endIndex, filteredProjects.length)} {t('of')} {filteredProjects.length} {t('projects')}
+                    <span className="ml-2 text-teal-600">
+                      ({crmProjects.length})
+                    </span>
+                  </>
+                )}
+              </div>
               
+              {crmError && crmErrorType === 'CONNECTION_ERROR' && (
+                <button
+                  onClick={handleRefresh}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {t('retry') || 'Retry'}
+                </button>
+              )}
             </div>
-            )}
+          )}
             
           
 
@@ -461,6 +511,31 @@ const ProjectsPage = () => {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <LoadingCard key={i} />
             ))}
+          </div>
+        ) : crmError && crmErrorType === 'CONNECTION_ERROR' ? (
+          <div className="text-center py-16">
+            <div className="w-24 h-24 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-12 h-12 text-red-500" />
+            </div>
+            
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {t('crmServerUnavailable') || 'CRM Server Unavailable'}
+            </h3>
+            <p className="text-gray-500 text-lg mb-6">
+              {t('crmServerUnavailableDescription') || 'The CRM server is currently unavailable. Please try again later or contact support if the issue persists.'}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+             
+              <button
+                onClick={() => router.push('/#next-section')}
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {t('createNewProject') || 'Create New Project'}
+              </button>
+            </div>
           </div>
         ) : crmProjects.length === 0 ? (
           <div className="text-center py-16">
@@ -471,12 +546,15 @@ const ProjectsPage = () => {
             <p className="text-gray-500 text-lg mb-6">
               {t('noCrmProjectsDescription')}
             </p>
-            <a
-              href="/"
-              className="inline-flex items-center px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors duration-200"
+            <button
+              onClick={() => router.push('/#next-section')}
+              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
-              {t('submitNewProject')}
-            </a>
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {t('createNewProject') || 'Create New Project'}
+            </button>
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="text-center py-16">
@@ -487,189 +565,29 @@ const ProjectsPage = () => {
             <p className="text-gray-500 mb-6">
               {t('tryAdjustingFilters')}
             </p>
+            <button
+              onClick={() => router.push('/#next-section')}
+              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {t('createNewProject') || 'Create New Project'}
+            </button>
           </div>
         ) : (
           <>
             <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
               <AnimatePresence>
                 {currentProjects.map((project, index) => (
-                <motion.div
-                  key={project.id}
-                  initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -30, scale: 0.95 }}
-                  transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
-                  className="group relative cursor-pointer"
-                  onClick={() => handleCardClick(project)}
-                  onMouseEnter={() => handleCardHover(project)}
-                >
-                  {/* Main Card */}
-                  <div className="relative bg-white rounded-3xl shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden border border-gray-100 group-hover:border-teal-200 group-hover:-translate-y-2">
-                    
-                    {/* Status Badge */}
-                    <div className={`absolute top-4 ${currentLanguage === 'ar' ? 'left-4' : 'right-4'}`}>
-                      <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${getStatusColor(project)}`}>
-                        <div className={`w-2 h-2 rounded-full ${currentLanguage === 'ar' ? 'ml-2' : 'mr-2'} ${getStatusColor(project).includes('green') ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                        {getStatusText(project)}
-                      </div>
-                    </div>
-
-                    {/* Card Content */}
-                    <div className="p-8">
-                      {/* Project Title */}
-                      <div className="mb-6">
-                        <h4 className="text-xl font-bold text-gray-600 line-clamp-2 mb-4 group-hover:text-teal-700 transition-colors duration-300">
-                    {project.name}
-                        </h4>
-                      </div>
-
-                      {/* Project Details */}
-                      <div className="space-y-3 mb-6">
-                        {project.frequency && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Clock className="w-4 h-4 text-gray-500 mr-3 " />
-                            <span className="font-medium text-gray-700 mx-2">{t('frequency') || 'Frequency'}:</span>
-                            <span className="ml-2 text-gray-600">{getTranslatedFrequency(project.frequency)}</span>
-                          </div>
-                        )}
-                        
-                        {project.delivery_modality && (
-                        <div className="flex items-center text-sm text-gray-600">
-                            <Globe className="w-4 h-4 text-gray-500 mr-3" />
-                            <span className="font-medium text-gray-700 mx-2">{t('deliveryModality') || 'Delivery Modality'}:</span>
-                            <span className="ml-2 text-gray-600">{getTranslatedDeliveryModality(project.delivery_modality)}</span>
-                          </div>
-                        )}
-                        
-                        {project.geographic_scope && (
-                        <div className="flex items-center text-sm text-gray-600">
-                            <MapPin className="w-4 h-4 text-gray-500 mr-3" />
-                            <span className="font-medium text-gray-700 mx-2">{t('geographicScope') || 'Geographic Scope'}:</span>
-                            <span className="ml-2 text-gray-600">{getTranslatedGeographicScope(project.geographic_scope)}</span>
-                          </div>
-                        )}
-                        
-                      
-                      </div>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-2 mb-6">
-                        {project.strategic_goal && (
-                          <Tooltip content={getGoalTitle(project.strategic_goal)}>
-                            <span className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                              {t('goal')}: {getCode(project.strategic_goal)}
-                          </span>
-                          </Tooltip>
-                        )}
-                        {project.pillar && (
-                          <Tooltip content={getPillarTitle(project.pillar)}>
-                            <span className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                              {t('pillar')}: {getCode(project.pillar)}
-                          </span>
-                          </Tooltip>
-                        )}
-                        {project.service && (
-                          <Tooltip content={getServiceTitle(project.service)}>
-                            <span className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                              {t('service')}: {getCode(project.service)}
-                            </span>
-                          </Tooltip>
-                        )}
-                        {project.sub_service && (
-                          <Tooltip content={getSubServiceTitle(project.sub_service)}>
-                            <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                              {t('subService')}: {getCode(project.sub_service)}
-                          </span>
-                          </Tooltip>
-                        )}
-                        
-                        {/* Show CRM relationship information with codes */}
-                        {(() => {
-                              // Debug: Log project subservice data
-                              console.log(`=== PROJECT CARD DEBUG: ${project.id} ===`);
-                              console.log('Project subservice_id:', project.subservice_id);
-                              console.log('Project subservice_name:', project.subservice_name);
-                              console.log('Full project data:', project);
-                              
-                              // Try to get subservice code using the comprehensive function
-                              const subserviceCode = getSubServiceCodeFromProject(project);
-                              console.log('Subservice code from function:', subserviceCode);
-                              
-                              if (!subserviceCode) {
-                                // If no subservice code found, show a generic message
-                                return (
-                                  <Tooltip content={`No subservice relationship found. ID: ${project.subservice_id || 'none'}, Name: ${project.subservice_name || 'none'}`}>
-                                    <span className="px-3 py-1.5 bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                                      No Subservice
-                                    </span>
-                                  </Tooltip>
-                                );
-                              }
-                              
-                              // Get the hierarchy codes from the subservice code
-                              const goalCode = getGoalCodeFromSubserviceId(subserviceCode);
-                              const pillarCode = getPillarCodeFromSubserviceId(subserviceCode);
-                              const serviceCode = getServiceCodeFromSubserviceId(subserviceCode);
-                              
-                              // Get the titles for tooltips with current language
-                              const goalTitle = goalCode ? getGoalTitleFromCode(goalCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
-                              const pillarTitle = pillarCode ? getPillarTitleFromCode(pillarCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
-                              const serviceTitle = serviceCode ? getServiceTitleFromCode(serviceCode, currentLanguage as 'en' | 'fr' | 'ar') : null;
-                              const subserviceTitle = getSubServiceTitleFromCode(subserviceCode, currentLanguage as 'en' | 'fr' | 'ar');
-                              
-                              return (
-                                <>
-                                  {/* Goal Code */}
-                                  {goalCode && (
-                                    <Tooltip content={goalTitle || `Goal ${goalCode}`}>
-                                      <span className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                                        {t('goal')} : {goalCode}
-                                      </span>
-                                    </Tooltip>
-                                  )}
-                                  
-                                  {/* Pillar Code */}
-                                  {pillarCode && (
-                                    <Tooltip content={pillarTitle || `Pillar ${pillarCode}`}>
-                                      <span className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                                        {t('pillar')} : {pillarCode}
-                                      </span>
-                                    </Tooltip>
-                                  )}
-                                  
-                                  {/* Service Code */}
-                                  {serviceCode && (
-                                    <Tooltip content={serviceTitle || `Service ${serviceCode}`}>
-                                      <span className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                                        {t('service')} : {serviceCode}
-                                      </span>
-                                    </Tooltip>
-                                  )}
-                                  
-                                  {/* Subservice Code */}
-                                  <Tooltip content={subserviceTitle || project.subservice_name || `Subservice ${subserviceCode}`}>
-                                    <span className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs rounded-full font-medium shadow-sm cursor-help">
-                                      {t('subService')} : {subserviceCode}
-                                    </span>
-                                  </Tooltip>
-                                </>
-                              );
-                        })()}
-                      </div>
-
-                      {/* Footer */}
-                      <div className="pt-4 border-t border-gray-100">
-                        <div className="flex items-center text-xs text-gray-500">
-                          <Clock className="w-3 h-3 mx-2" />
-                          {t('created')} : {formatDate(project.created_at)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Hover Effect Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                  </div>
-                </motion.div>
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    index={index}
+                    currentLanguage={currentLanguage}
+                    onCardClick={handleCardClick}
+                    onCardHover={handleCardHover}
+                  />
                 ))}
               </AnimatePresence>
             </div>

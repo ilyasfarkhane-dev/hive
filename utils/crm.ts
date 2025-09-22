@@ -3,11 +3,51 @@ import md5 from "md5";
 
 const CRM_REST_URL = "http://3.145.21.11/service/v4_1/rest.php";
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_BASE = 1000; // 1 second base delay
+
+// Utility function for retry logic with exponential backoff
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = MAX_RETRIES,
+  baseDelay: number = RETRY_DELAY_BASE
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry on authentication errors or client errors
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status && error.response.status >= 400 && error.response.status < 500) {
+          throw error; // Don't retry client errors
+        }
+      }
+      
+      // Don't retry on the last attempt
+      if (attempt === maxRetries) {
+        break;
+      }
+      
+      // Calculate delay with exponential backoff
+      const delay = baseDelay * Math.pow(2, attempt);
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError!;
+}
+
 // Admin credentials
 const ADMIN_USERNAME = process.env.CRM_ADMIN_USER || "portal";
 const ADMIN_PASSWORD = process.env.CRM_ADMIN_PASS || "Portal@2025";
 
-// 🔑 Get Session ID
+// 🔑 Get Session ID with timeout and retry logic
 export async function getSessionId(): Promise<string> {
   const hashedAdminPassword = md5(ADMIN_PASSWORD);
   const loginData = JSON.stringify({
@@ -15,28 +55,50 @@ export async function getSessionId(): Promise<string> {
     application_name: "MyApp",
   });
 
-  const loginResp = await axios.post(
-    CRM_REST_URL,
-    new URLSearchParams({
-      method: "login",
-      input_type: "JSON",
-      response_type: "JSON",
-      rest_data: loginData,
-    }).toString(),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
+  return withRetry(async () => {
+    const loginResp = await axios.post(
+      CRM_REST_URL,
+      new URLSearchParams({
+        method: "login",
+        input_type: "JSON",
+        response_type: "JSON",
+        rest_data: loginData,
+      }).toString(),
+      { 
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        timeout: 10000, // 10 second timeout
+        validateStatus: (status) => status < 500 // Don't throw for 4xx errors
+      }
+    );
 
-  if (!loginResp.data?.id) throw new Error("Failed to get session ID");
-  return loginResp.data.id;
+    if (!loginResp.data?.id) {
+      throw new Error(`Authentication failed: ${loginResp.data?.error?.description || 'No session ID returned'}`);
+    }
+    return loginResp.data.id;
+  }).catch(error => {
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Connection timeout: CRM server is not responding');
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        throw new Error('Connection refused: CRM server is unreachable');
+      } else if (error.response?.status === 401) {
+        throw new Error('Authentication failed: Invalid credentials');
+      } else {
+        throw new Error(`Network error: ${error.message}`);
+      }
+    }
+    throw error;
+  });
 }
 
-// 📦 Generic fetcher
+// 📦 Generic fetcher with timeout and error handling
 export async function getModuleEntries(
   sessionId: string,
   module: string,
   selectFields: string[] = [],
   query = "",
-  maxResults = 50
+  maxResults = 50,
+  linkNameToFieldsArray: any[] = []
 ) {
   const requestData = JSON.stringify({
     session: sessionId,
@@ -46,50 +108,106 @@ export async function getModuleEntries(
     offset: 0,
     select_fields: selectFields,
     max_results: maxResults,
+    link_name_to_fields_array: linkNameToFieldsArray.length > 0 ? linkNameToFieldsArray : []
   });
+  
+  console.log('=== CRM API REQUEST DEBUG ===');
+  console.log('Module:', module);
+  console.log('Select fields:', selectFields);
+  console.log('Link name to fields array:', linkNameToFieldsArray);
+  console.log('Request data:', requestData);
 
-  const resp = await axios.post(
-    CRM_REST_URL,
-    new URLSearchParams({
-      method: "get_entry_list",
-      input_type: "JSON",
-      response_type: "JSON",
-      rest_data: requestData,
-    }).toString(),
-    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-  );
+  return withRetry(async () => {
+    const resp = await axios.post(
+      CRM_REST_URL,
+      new URLSearchParams({
+        method: "get_entry_list",
+        input_type: "JSON",
+        response_type: "JSON",
+        rest_data: requestData,
+      }).toString(),
+      { 
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        timeout: 15000, // 15 second timeout
+        validateStatus: (status) => status < 500 // Don't throw for 4xx errors
+      }
+    );
 
-  console.log('=== DEBUG: CRM API Response ===');
-  console.log('Response status:', resp.status);
-  console.log('Response data:', JSON.stringify(resp.data, null, 2));
 
-  // Check if the response has the expected structure
-  if (!resp.data) {
-    console.error('No data in CRM response');
-    return [];
-  }
-
-  if (!resp.data.entry_list) {
-    console.error('No entry_list in CRM response');
-    console.error('Available keys:', Object.keys(resp.data));
-    return [];
-  }
-
-  if (!Array.isArray(resp.data.entry_list)) {
-    console.error('entry_list is not an array:', typeof resp.data.entry_list);
-    return [];
-  }
-
-  console.log(`Found ${resp.data.entry_list.length} entries`);
-
-  return resp.data.entry_list.map((entry: any) => {
-    const obj: Record<string, any> = {};
-    if (entry.name_value_list) {
-      Object.values(entry.name_value_list).forEach((field: any) => {
-        obj[field.name] = field.value;
-      });
+    // Check if the response has the expected structure
+    if (!resp.data) {
+      console.error('No data in CRM response');
+      return [];
     }
-    return obj;
+
+    if (!resp.data.entry_list) {
+      console.error('No entry_list in CRM response');
+      console.error('Available keys:', Object.keys(resp.data));
+      return [];
+    }
+
+    if (!Array.isArray(resp.data.entry_list)) {
+      console.error('entry_list is not an array:', typeof resp.data.entry_list);
+      return [];
+    }
+
+
+    return resp.data.entry_list.map((entry: any) => {
+      const obj: Record<string, any> = {};
+      
+      // Process name_value_list fields
+      if (entry.name_value_list) {
+        Object.values(entry.name_value_list).forEach((field: any) => {
+          obj[field.name] = field.value;
+        });
+      }
+      
+      // Process direct fields that might not be in name_value_list
+      Object.keys(entry).forEach((key: string) => {
+        if (key !== 'name_value_list' && key !== 'link_list') {
+          // Only add if not already processed from name_value_list
+          if (!(key in obj)) {
+            obj[key] = entry[key];
+          }
+        }
+      });
+      
+      // Process link_list relationships
+      if (entry.link_list) {
+        obj.link_list = {};
+        Object.keys(entry.link_list).forEach((linkName: string) => {
+          const linkData = entry.link_list[linkName];
+          if (Array.isArray(linkData)) {
+            obj.link_list[linkName] = linkData.map((relatedEntry: any) => {
+              const relatedObj: Record<string, any> = {};
+              if (relatedEntry.name_value_list) {
+                Object.values(relatedEntry.name_value_list).forEach((field: any) => {
+                  relatedObj[field.name] = field.value;
+                });
+              }
+              return relatedObj;
+            });
+          } else {
+            obj.link_list[linkName] = linkData;
+          }
+        });
+      }
+      
+      return obj;
+    });
+  }).catch(error => {
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Connection timeout: CRM server is not responding');
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        throw new Error('Connection refused: CRM server is unreachable');
+      } else if (error.response?.status === 401) {
+        throw new Error('Authentication failed: Session expired');
+      } else {
+        throw new Error(`Network error: ${error.message}`);
+      }
+    }
+    throw error;
   });
 }
 
@@ -134,17 +252,6 @@ export async function getContactByLogin(sessionId: string, login: string) {
     1
   );
   
-  console.log('=== DEBUG: Contact Retrieved ===');
-  console.log('Login:', login);
-  console.log('Contact found:', contacts.length > 0);
-  if (contacts[0]) {
-    console.log('Contact ID:', contacts[0].id);
-    console.log('Contact Name:', contacts[0].first_name, contacts[0].last_name);
-    console.log('Contact Email:', contacts[0].email1);
-    console.log('Contact Phone:', contacts[0].phone_work);
-    console.log('Portal Access:', contacts[0].portal_access_c);
-  }
-  console.log('===============================');
   
   return contacts[0] || null;
 }

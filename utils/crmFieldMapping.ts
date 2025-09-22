@@ -10,6 +10,7 @@ export interface CRMFieldMapping {
     enumValues?: { [key: string]: string };
     maxLength?: number;
     required?: boolean;
+    customMapping?: (value: any) => any;
   };
 }
 
@@ -27,7 +28,7 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
   description: {
     crmField: 'description',
     type: 'text',
-    required: true
+    required: false // Made optional for drafts
   },
   problem_statement: {
     crmField: 'problem_statement',
@@ -106,7 +107,15 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
   partners: {
     crmField: 'partners',
     type: 'array',
-    maxLength: 5 // Maximum 5 partners
+    maxLength: 5, // Maximum 5 partners
+    // Custom mapping function to split into individual partner fields
+    customMapping: (value: string[]) => {
+      const partnerFields: { [key: string]: string } = {};
+      for (let i = 0; i < 5; i++) {
+        partnerFields[`partner${i + 1}`] = value[i] || '';
+      }
+      return partnerFields;
+    }
   },
 
   // Delivery modality
@@ -160,7 +169,15 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
   milestones: {
     crmField: 'milestones',
     type: 'array',
-    maxLength: 5 // Maximum 5 milestones
+    maxLength: 5, // Maximum 5 milestones
+    // Custom mapping function to split into individual milestone fields
+    customMapping: (value: string[]) => {
+      const milestoneFields: { [key: string]: string } = {};
+      for (let i = 0; i < 5; i++) {
+        milestoneFields[`milestones${i + 1}`] = value[i] || '';
+      }
+      return milestoneFields;
+    }
   },
 
   // Expected outputs
@@ -173,7 +190,15 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
   kpis: {
     crmField: 'kpis',
     type: 'array',
-    maxLength: 5 // Maximum 5 KPIs
+    maxLength: 5, // Maximum 5 KPIs
+    // Custom mapping function to split into individual KPI fields
+    customMapping: (value: string[]) => {
+      const kpiFields: { [key: string]: string } = {};
+      for (let i = 0; i < 5; i++) {
+        kpiFields[`kpis${i + 1}`] = value[i] || '';
+      }
+      return kpiFields;
+    }
   },
 
   // Contact information
@@ -181,31 +206,48 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     crmField: 'contact_name',
     type: 'string',
     maxLength: 255,
-    required: true
+    required: false // Made optional for drafts
   },
   contact_email: {
     crmField: 'contact_email',
     type: 'string',
     maxLength: 255,
-    required: true
+    required: false // Made optional for drafts
   },
   contact_phone: {
     crmField: 'contact_phone',
     type: 'string',
     maxLength: 255,
-    required: true
+    required: false // Made optional for drafts
   },
   contact_role: {
     crmField: 'contact_role',
     type: 'string',
     maxLength: 255,
-    required: true
+    required: false // Made optional for drafts
+  },
+  contact_id: {
+    crmField: 'contact_id',
+    type: 'string',
+    maxLength: 36
   },
 
   // Additional information
   comments: {
     crmField: 'comments',
     type: 'text'
+  },
+
+  // Status field
+  status: {
+    crmField: 'status_c',
+    type: 'enum',
+    enumValues: {
+      'Published': 'Published',
+      'Draft': 'Draft'
+    },
+    maxLength: 100,
+    required: true
   },
 
   // Strategic relationship fields
@@ -292,9 +334,13 @@ export function mapProjectDataToCRM(projectData: any): any[] {
         if (Array.isArray(value)) {
           value.forEach((item, index) => {
             if (index < (mapping.maxLength || 5)) {
-              // Special handling for partners - map to partner1, partner2, etc.
+              // Special handling for different field types
               if (mapping.crmField === 'partners') {
                 addField(`partner${index + 1}`, item);
+              } else if (mapping.crmField === 'milestones') {
+                addField(`milestones${index + 1}`, item);
+              } else if (mapping.crmField === 'kpis') {
+                addField(`kpis${index + 1}`, item);
               } else {
                 addField(`${mapping.crmField}${index + 1}`, item);
               }
@@ -335,11 +381,17 @@ export function mapProjectDataToCRM(projectData: any): any[] {
 /**
  * Validate project data against CRM field requirements
  */
-export function validateProjectData(projectData: any): { valid: boolean; errors: string[] } {
+export function validateProjectData(projectData: any, isDraft: boolean = false): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   Object.entries(ICESC_FIELD_MAPPING).forEach(([projectField, mapping]) => {
-    if (mapping.required) {
+    // For drafts, only validate title field
+    if (isDraft && projectField !== 'name') {
+      return;
+    }
+
+    // For non-drafts, check if field is required
+    if (mapping.required && !isDraft) {
       const value = projectData[projectField];
       if (!value || (Array.isArray(value) && value.length === 0)) {
         errors.push(`Field '${projectField}' is required`);
@@ -359,6 +411,7 @@ export function validateProjectData(projectData: any): { valid: boolean; errors:
     errors
   };
 }
+
 
 /**
  * Get CRM field information for debugging

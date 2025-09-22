@@ -1,118 +1,161 @@
-"use client";
-import { useState, useEffect } from 'react';
-import { getStoredContactInfo } from '@/utils/contactStorage';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface CRMProject {
   id: string;
   name: string;
   description: string;
-  brief?: string;
+  project_brief: string;
+  brief?: string; // Alternative name for project_brief
   problem_statement: string;
+  rationale_impact: string;
+  
+  // Strategic information
+  strategic_goal: string;
+  strategic_goal_id: string;
+  pillar: string;
+  pillar_id: string;
+  service: string;
+  service_id: string;
+  sub_service: string;
+  sub_service_id: string;
+  subservice_code: string;
+  subservice_name: string;
+  
+  // Status and dates
+  status: string;
+  created_at: string;
+  date_entered: string;
+  date_modified: string;
+  
+  // Contact information
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  contact_role: string;
+  contact_id: string;
+  
+  // Budget
   budget_icesco: number;
   budget_member_state: number;
   budget_sponsorship: number;
+  
+  // Timeline
   start_date: string;
   end_date: string;
   frequency: string;
+  frequency_duration: string;
+  
+  // Additional fields
+  beneficiaries: string[];
+  other_beneficiaries: string;
+  partners: string[];
+  institutions: string[];
   delivery_modality: string;
   geographic_scope: string;
+  convening_method: string;
   project_type: string;
-  beneficiaries: string;
-  subservice_name: string;
-  subservice_id: string;
-  contact_name: string;
-  contact_id: string;
-  contact_email?: string;
-  contact_phone?: string;
-  contact_role?: string;
-  account_name: string;
-  account_id: string;
-  strategic_goal?: string;
-  pillar?: string;
-  service?: string;
-  sub_service?: string;
-  supporting_documents?: string[];
-  created_at: string;
-  modified_at: string;
-  status?: string;
-  source: 'crm';
+  project_type_other: string;
+  milestones: string[];
+  expected_outputs: string;
+  kpis: string[];
+  comments: string;
+  supporting_documents?: string[]; // Supporting documents array
+  
+  // CRM specific fields
+  assigned_user_id: string;
+  assigned_user_name: string;
+  created_by: string;
+  created_by_name: string;
+  modified_user_id: string;
+  modified_by_name: string;
 }
 
-export interface ContactProjectsResult {
-  success: boolean;
+export interface UseContactProjectsReturn {
   projects: CRMProject[];
-  total: number;
-  message?: string;
-  error?: string;
+  loading: boolean;
+  error: string | null;
+  errorType: string | null;
+  refetch: (forceRefresh?: boolean) => Promise<void>;
 }
 
-export const useContactProjects = () => {
+export function useContactProjects(): UseContactProjectsReturn {
   const [projects, setProjects] = useState<CRMProject[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<string | null>(null);
 
-  const fetchContactProjects = async (): Promise<ContactProjectsResult> => {
-    setLoading(true);
-    setError(null);
+  // No caching - always fetch fresh data
 
+  const fetchProjects = useCallback(async (forceRefresh = false) => {
     try {
-      // Get contact info from localStorage
-      const contactInfo = getStoredContactInfo();
-      if (!contactInfo || !contactInfo.id) {
-        throw new Error('No contact information found. Please log in again.');
-      }
-
-      console.log('Fetching projects for contact:', contactInfo.id);
-
-      const response = await fetch('/api/get-contact-projects', {
-        method: 'POST',
+      setLoading(true);
+      setError(null);
+      setErrorType(null);
+      
+      // Always fetch fresh data from API
+      
+      // Fetch projects from our API route (which handles CORS)
+      const response = await fetch('/api/crm/projects', {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          contactId: contactInfo.id
-        }),
       });
-
-      const result = await response.json();
-      console.log('=== CONTACT PROJECTS API RESULT ===');
-      console.log('Success:', result.success);
-      console.log('Projects count:', result.projects?.length || 0);
-      console.log('Error:', result.error);
-      console.log('Full result:', result);
-
-      if (result.success) {
-        console.log(`Found ${result.projects.length} projects from CRM`);
-        setProjects(result.projects);
-        return result;
-      } else {
-        throw new Error(result.error || 'Failed to fetch projects');
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP error! status: ${response.status}`);
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch projects');
+      }
+      
+      console.log('=== FRONTEND: CRM PROJECTS RECEIVED ===');
+      console.log('Success:', data.success);
+      console.log('Count:', data.count);
+      console.log('Projects sample:', data.projects.slice(0, 2).map((p: CRMProject) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        sub_service: p.sub_service,
+        sub_service_id: p.sub_service_id
+      })));
+      
+      setProjects(data.projects);
+      
+    } catch (err) {
+      console.error('Error fetching CRM projects:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
       setError(errorMessage);
-      console.error('Error fetching contact projects:', error);
-      return {
-        success: false,
-        projects: [],
-        total: 0,
-        error: errorMessage
-      };
+      
+      // Determine error type based on the error message
+      if (errorMessage.includes('timeout') || errorMessage.includes('unavailable')) {
+        setErrorType('CONNECTION_ERROR');
+      } else if (errorMessage.includes('Authentication failed')) {
+        setErrorType('AUTH_ERROR');
+      } else {
+        setErrorType('UNKNOWN_ERROR');
+      }
+      
+      setProjects([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Auto-fetch on mount
-  useEffect(() => {
-    fetchContactProjects();
   }, []);
+
+
+  // Fetch projects on mount
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   return {
     projects,
     loading,
     error,
-    fetchContactProjects,
-    refetch: fetchContactProjects
+    errorType,
+    refetch: (forceRefresh = false) => fetchProjects(forceRefresh),
   };
-};
+}

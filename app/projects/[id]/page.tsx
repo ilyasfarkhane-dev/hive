@@ -4,10 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, MapPin, Users, DollarSign, FileText, Landmark, Settings, Pin, Clock, Tag, Target, BarChart3, User, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, DollarSign, FileText, Landmark, Settings, Pin, Clock, Tag, Target, BarChart3, User, MessageSquare, AlertCircle, FileX } from 'lucide-react';
 import Image from 'next/image';
-import ProjectsHeader from '@/components/ProjectsHeader';
-import maquettesImage from '@/public/maquettes.png';
+import ProjectsPageHeader from '@/components/ProjectsPageHeader';
+// import maquettesImage from '@/public/maquettes.png'; // Removed during cleanup
 
 import {
   getGoalCodeFromSubserviceId,
@@ -66,6 +66,25 @@ type AnyProject = {
   account_name?: string;
   account_id?: string;
   source?: 'local' | 'crm';
+  // Additional CRM fields from the actual data
+  strategic_goal_id?: string;
+  pillar_id?: string;
+  service_id?: string;
+  sub_service_id?: string;
+  strategic_goal?: string;
+  pillar?: string;
+  service?: string;
+  sub_service?: string;
+  other_beneficiaries?: string;
+  budget_icesco?: string;
+  budget_member_state?: string;
+  budget_sponsorship?: string;
+  frequency?: string;
+  project_type?: string;
+  project_type_other?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  contact_role?: string;
 };
 
 const ProjectDetailsPage = () => {
@@ -78,14 +97,30 @@ const ProjectDetailsPage = () => {
   const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState<string | null>(null);
 
+  // Retry utility function with exponential backoff - retry indefinitely
+  const retryWithBackoff = async (fn: () => Promise<any>, baseDelay: number = 1000) => {
+    let attempt = 0;
+    
+    while (true) {
+      try {
+        return await fn();
+      } catch (error) {
+        attempt++;
+        
+        // Calculate delay with exponential backoff (capped at 30 seconds)
+        const delay = Math.min(baseDelay * Math.pow(2, Math.min(attempt - 1, 5)), 30000);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  };
+
   useEffect(() => {
     const fetchProject = async () => {
       try {
-        console.log('=== PROJECT DETAILS PAGE DEBUG ===');
         setLoading(true);
         setError(null);
         const projectId = params?.id as string;
-        console.log('Project ID from params:', projectId);
 
         // Clean existing data first
         const { cleanExistingProjectData } = await import('@/utils/dataCleanup');
@@ -93,120 +128,56 @@ const ProjectDetailsPage = () => {
 
         // First try to get from localStorage (local projects) - this is instant
         const localProjects = JSON.parse(localStorage.getItem('projects') || '[]');
-        console.log('Local projects found:', localProjects.length);
         const localProject = localProjects.find((p: AnyProject) => p.id === projectId);
-        console.log('Local project found:', !!localProject);
 
         if (localProject) {
-          console.log('Using local project:', localProject);
           setProject({ ...localProject, source: 'local' });
           setLoading(false);
           return;
         }
 
         // If not found locally, try to get from CRM
-        // Get contact ID from localStorage
-        const contactInfo = JSON.parse(localStorage.getItem('contactInfo') || '{}');
-        const contactId = contactInfo.id;
-        console.log('Contact info from localStorage:', contactInfo);
-        console.log('Contact ID:', contactId);
 
-        if (!contactId) {
-          console.log('❌ No contact ID found');
-          setError('No contact information found. Please log in again.');
-          setLoading(false);
-          return;
-        }
+        // Use retry logic for the API call
+        
+        const response = await retryWithBackoff(async () => {
+          const apiCall = fetch(`/api/crm/projects`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
 
-        // Use Promise.race to add a timeout to the API call
-        console.log('🔄 Making API call to get contact projects...');
-        const apiCall = fetch(`/api/get-contact-projects`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ contactId })
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), 30000) // 30 second timeout
+          );
+
+          const response = await Promise.race([apiCall, timeoutPromise]) as Response;
+          
+          if (!response.ok) {
+            throw new Error(`API call failed with status: ${response.status}`);
+          }
+          
+          return response;
         });
 
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 30000) // 30 second timeout
-        );
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch projects from CRM');
+        }
+        
+        const crmProject = data.projects?.find((p: AnyProject) => p.id === projectId);
 
-        const response = await Promise.race([apiCall, timeoutPromise]) as Response;
-        console.log('API response status:', response.status);
-        console.log('API response ok:', response.ok);
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log('API response data:', data);
-          console.log('Number of projects returned:', data.projects?.length || 0);
-          
-          const crmProject = data.projects?.find((p: AnyProject) => p.id === projectId);
-          console.log('CRM project found:', !!crmProject);
-          console.log('Looking for project ID:', projectId);
-          console.log('Available project IDs:', data.projects?.map((p: AnyProject) => p.id) || []);
-
-          if (crmProject) {
-            // Debug: Log the raw CRM project data
-            console.log('=== RAW CRM PROJECT DATA ===');
-            console.log('Project ID:', projectId);
-            console.log('Raw CRM project:', crmProject);
-            console.log('Available fields:', Object.keys(crmProject));
+        if (crmProject) {
             
-            // Log specific fields that might be missing
-            console.log('Key fields check:');
-            console.log('- beneficiaries:', crmProject.beneficiaries);
-            console.log('- partners:', crmProject.partners);
-            console.log('- delivery_modality:', crmProject.delivery_modality);
-            console.log('- geographic_scope:', crmProject.geographic_scope);
-            console.log('- project_type:', crmProject.project_type);
-            console.log('- budget_icesco:', crmProject.budget_icesco);
-            console.log('- budget_member_state:', crmProject.budget_member_state);
-            console.log('- budget_sponsorship:', crmProject.budget_sponsorship);
-            console.log('- contact_name:', crmProject.contact_name);
-            console.log('- contact_email:', crmProject.contact_email);
-            console.log('- contact_phone:', crmProject.contact_phone);
-            console.log('- contact_role:', crmProject.contact_role);
             
-            // Check for alternative field names that might exist in CRM
-            console.log('=== CHECKING ALTERNATIVE FIELD NAMES ===');
-            const alternativeFields = [
-              'beneficiaries_c', 'beneficiaries_list', 'target_beneficiaries',
-              'partners_c', 'partners_list', 'collaborating_partners',
-              'delivery_method', 'modality', 'implementation_method',
-              'geographic_coverage', 'scope', 'coverage_area',
-              'project_category', 'type', 'category',
-              'budget_icesco_c', 'icesco_budget', 'total_budget',
-              'budget_member_c', 'member_budget', 'member_state_budget',
-              'budget_sponsor_c', 'sponsor_budget', 'sponsorship_budget',
-              'contact_person', 'primary_contact', 'project_contact',
-              'email', 'contact_email_c', 'primary_email',
-              'phone', 'contact_phone_c', 'primary_phone',
-              'position', 'role_c', 'contact_position'
-            ];
             
-            alternativeFields.forEach(field => {
-              if (crmProject[field] !== undefined) {
-                console.log(`Found alternative field ${field}:`, crmProject[field]);
-              }
-            });
             
-            // Special debugging for partners field
-            console.log('=== PARTNERS FIELD DEBUG ===');
-            console.log('partners:', crmProject.partners);
-            console.log('partners_c:', crmProject.partners_c);
-            console.log('partners_list:', crmProject.partners_list);
-            console.log('collaborating_partners:', crmProject.collaborating_partners);
             
-            // Check if partners data exists in any form
-            const partnersFields = ['partners', 'partners_c', 'partners_list', 'collaborating_partners'];
-            partnersFields.forEach(field => {
-              if (crmProject[field] !== undefined && crmProject[field] !== null && crmProject[field] !== '') {
-                console.log(`✅ Found partners data in field ${field}:`, crmProject[field]);
-              } else {
-                console.log(`❌ No partners data in field ${field}:`, crmProject[field]);
-              }
-            });
+            
+            
+            
             
             // Helper function to get field value with fallbacks
             const getFieldValue = (primaryField: string, ...fallbackFields: string[]) => {
@@ -259,7 +230,23 @@ const ProjectDetailsPage = () => {
               rationale: getFieldValue('problem_statement', 'rationale', 'justification', 'background'),
               start_date: getFieldValue('start_date', 'date_start', 'project_start', 'begin_date'),
               end_date: getFieldValue('end_date', 'date_end', 'project_end', 'completion_date'),
-              project_frequency: getFieldValue('frequency', 'project_frequency', 'frequency_c', 'recurrence'),
+              project_frequency: (() => {
+                // Check all possible frequency fields from the CRM data - prioritize project_frequency first
+                const frequencyFields = [
+                  'project_frequency', 'frequency', 'frequency_c', 'project_frequency_c',
+                  'frequency_duration', 'recurrence', 'freq', 'duration', 'timing', 'schedule',
+                  // Check if there are any other fields in the raw data
+                  ...Object.keys(crmProject).filter(key => 
+                    key.toLowerCase().includes('freq') || 
+                    key.toLowerCase().includes('duration') || 
+                    key.toLowerCase().includes('recur') ||
+                    key.toLowerCase().includes('timing') ||
+                    key.toLowerCase().includes('schedule')
+                  )
+                ];
+                const result = getFieldValue(frequencyFields[0], ...frequencyFields.slice(1));
+                return result;
+              })(),
               delivery_modality: getFieldValue('delivery_modality', 'delivery_method', 'modality', 'implementation_method'),
               geographic_scope: getFieldValue('geographic_scope', 'geographic_coverage', 'scope', 'coverage_area'),
               convening_method: getFieldValue('project_type', 'convening_method', 'project_category', 'type', 'category'),
@@ -274,30 +261,25 @@ const ProjectDetailsPage = () => {
               }
             };
 
-            console.log('=== TRANSFORMED PROJECT DATA ===');
-            console.log('Transformed project:', transformedProject);
-            console.log('Transformed beneficiaries:', transformedProject.beneficiaries);
-            console.log('Transformed partners:', transformedProject.partners);
-            console.log('Transformed budget:', transformedProject.budget);
+            
+            
+            
 
             setProject(transformedProject);
+            setLoading(false);
             console.log('✅ Project loaded successfully');
           } else {
             console.log('❌ Project not found in CRM');
+            console.log('Looking for project ID:', projectId);
+            console.log('Available project IDs:', data.projects?.map((p: AnyProject) => p.id) || []);
+            console.log('Total projects found:', data.projects?.length || 0);
             setError('Project not found in CRM');
+            setLoading(false);
           }
-        } else {
-          console.log('❌ API call failed with status:', response.status);
-          setError('Failed to fetch project details from CRM');
-        }
       } catch (err) {
         console.error('❌ Error fetching project:', err);
-        setError(err instanceof Error && err.message === 'Request timeout' 
-          ? 'Request timed out. Please try again.' 
-          : 'An error occurred while loading the project');
-      } finally {
-        console.log('🔄 Setting loading to false');
-        setLoading(false);
+        // Don't set error state or loading to false - keep retrying indefinitely
+        // The retry logic will handle this automatically
       }
     };
 
@@ -474,6 +456,139 @@ const ProjectDetailsPage = () => {
     </div>
   );
 
+  // Handle edit project - navigate to project submission form with pre-filled data
+  const handleEditProject = () => {
+    
+    if (!project) {
+      console.error('❌ Cannot edit project: project is null or undefined');
+      console.log('Loading:', loading);
+      console.log('Error:', error);
+      return;
+    }
+
+    // Set session storage flag to indicate we're coming from project edit
+    sessionStorage.setItem('fromProjectEdit', 'true');
+
+    
+    
+    
+
+    // Map project data to form format
+    const formData = {
+      // Basic project info
+      title: project.name || '',
+      brief: project.brief || project.description || '',
+      rationale: project.rationale || '',
+      
+      // Strategic selections (extract from hierarchy or project data)
+      selectedGoal: project.strategic_goal_id || '',
+      selectedPillar: project.pillar_id || '',
+      selectedService: project.service_id || '',
+      selectedSubService: project.sub_service_id || project.subservice_id || '',
+      
+      // Strategic selection names for display
+      selectedGoalName: project.strategic_goal || '',
+      selectedPillarName: project.pillar || '',
+      selectedServiceName: project.service || '',
+      selectedSubServiceName: project.sub_service || project.subservice_name || '',
+      
+      // Beneficiaries
+      beneficiaries: project.beneficiaries || [],
+      otherBeneficiary: project.other_beneficiaries || '',
+      
+      // Budget and timeline
+      budget: {
+        icesco: project.budget_icesco?.toString() || '',
+        member_state: project.budget_member_state?.toString() || '',
+        sponsorship: project.budget_sponsorship?.toString() || '',
+      },
+      startDate: project.start_date || '',
+      endDate: project.end_date || '',
+      projectFrequency: (() => {
+        // Check all possible frequency field names and values
+        const frequencyFields = [
+          'project_frequency', 'frequency', 'frequency_duration', 'frequency_c',
+          'project_frequency_c', 'freq', 'duration', 'timing', 'schedule'
+        ];
+        
+        let rawFrequency = '';
+        for (const field of frequencyFields) {
+          if ((project as any)[field] && (project as any)[field] !== '') {
+            rawFrequency = (project as any)[field];
+            break;
+          }
+        }
+        
+        
+        let normalizedFrequency = rawFrequency;
+        if (rawFrequency === 'Onetime') {
+          normalizedFrequency = 'One-time';
+        } else if (rawFrequency === 'Continuous') {
+          normalizedFrequency = 'Continuous';
+        } else if (rawFrequency === 'One-time') {
+          normalizedFrequency = 'One-time';
+        } else if (!rawFrequency || rawFrequency === '') {
+          normalizedFrequency = '';
+        }
+        
+        return normalizedFrequency;
+      })(),
+      frequencyDuration: project.frequency_duration || '',
+      
+      // Partners and scope
+      partners: project.partners || [],
+      geographicScope: project.geographic_scope || '',
+      deliveryModality: project.delivery_modality || '',
+      conveningMethod: project.convening_method || project.project_type || '',
+      conveningMethodOther: project.convening_method_other || project.project_type_other || '',
+      
+      // Monitoring and evaluation
+      milestones: project.milestones || [],
+      kpis: project.kpis || [],
+      expectedOutputs: project.expected_outputs || '',
+      
+      // Contact information
+      contact: {
+        name: project.contact_name || '',
+        email: project.contact_email || '',
+        phone: project.contact_phone || '',
+        role: project.contact_role || '',
+      },
+      contact_id: project.contact_id || '',
+      
+      // Additional info
+      comments: project.comments || '',
+      
+      // Files (if any)
+      files: project.files || [],
+    };
+
+    // Store the form data in localStorage for the project submission form
+    console.log('=== PROJECT EDIT DATA STORAGE DEBUG ===');
+    console.log('Storing project data for editing:', formData);
+    console.log('Key fields being stored:');
+    console.log('- startDate:', formData.startDate);
+    console.log('- endDate:', formData.endDate);
+    console.log('- partners:', formData.partners);
+    console.log('- beneficiaries:', formData.beneficiaries);
+    console.log('- expectedOutputs:', formData.expectedOutputs);
+    console.log('- projectFrequency:', formData.projectFrequency);
+    console.log('- frequencyDuration:', formData.frequencyDuration);
+    console.log('========================================');
+    
+    
+    localStorage.setItem('projectDetails', JSON.stringify(formData));
+    
+    
+    // Store the project ID for update purposes
+    localStorage.setItem('editingProjectId', project.id);
+    localStorage.setItem('isEditingProject', 'true');
+    
+    // Navigate to the project submission form
+    router.push('/#next-section');
+  };
+
+
   // State for hierarchy data to make it reactive to language changes
   const [hierarchyData, setHierarchyData] = useState<{
     goal: { code: string | null; title: string | null };
@@ -516,14 +631,35 @@ const ProjectDetailsPage = () => {
   console.log('Error:', error);
   console.log('Project:', project);
   console.log('Project ID from params:', params?.id);
+  console.log('Hierarchy Data:', hierarchyData);
+  
+  // Force render debug
+  console.log('=== FORCE RENDER DEBUG ===');
+  console.log('Should show content:', !loading && !error && project);
+  console.log('Content conditions:');
+  console.log('- !loading:', !loading);
+  console.log('- !error:', !error);
+  console.log('- project exists:', !!project);
+  
+  if (project) {
+    console.log('=== PROJECT HIERARCHY DEBUG ===');
+    console.log('Project source:', project.source);
+    console.log('Project subservice_id:', project.subservice_id);
+    console.log('Project subservice_name:', project.subservice_name);
+    console.log('Project sub_service_id:', project.sub_service_id);
+    console.log('Project sub_service:', project.sub_service);
+    
+    const subserviceCode = getSubServiceCodeFromProject(project);
+    console.log('Subservice code from function:', subserviceCode);
+  }
 
   return (
-    <div className="min-h-screen bg-white-100 relative" dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-gray-50 relative" dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'} style={{ zIndex: 1 }}>
      
       
       {/* Header */}
-      <div className="relative z-10">
-        <ProjectsHeader 
+      <div className="relative z-1">
+        <ProjectsPageHeader 
           breadcrumbs={[
             { label: t('projects'), href: '/projects' },
             { label: project?.name || t('loading') }
@@ -531,16 +667,17 @@ const ProjectDetailsPage = () => {
         />
       </div>
 
+
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative mt-8" style={{ zIndex: 1, marginTop: '2rem' }}>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-8">
            
 
-            {/* Show loading or error states */}
+            {/* Show loading states */}
             {loading && (
-              <div className="relative z-0">
+              <div className="relative z-1">
                 <LoadingSection title={t('projectOverview')} />
                 <LoadingSection title={t('rationaleImpact')} />
                 <LoadingSection title={t('implementationBudget')} />
@@ -552,9 +689,44 @@ const ProjectDetailsPage = () => {
               </div>
             )}
 
+
+            {/* Error State */}
             {error && (
-              <div className="relative z-0">
-                <ErrorSection message={error} />
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-red-900 mb-2">
+                  {t('error') || 'Error'}
+                </h3>
+                <p className="text-red-700 mb-4">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  {t('retry') || 'Retry'}
+                </button>
+              </div>
+            )}
+
+            {/* No Project State */}
+            {!loading && !error && !project && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-8 text-center">
+                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileX className="w-8 h-8 text-yellow-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                  {t('projectNotFound') || 'Project Not Found'}
+                </h3>
+                <p className="text-yellow-700 mb-4">
+                  {t('projectNotFoundMessage') || 'The requested project could not be found.'}
+                </p>
+                <button
+                  onClick={() => router.push('/projects')}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                >
+                  {t('backToProjects') || 'Back to Projects'}
+                </button>
               </div>
             )}
 
@@ -564,15 +736,34 @@ const ProjectDetailsPage = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden relative"
+              style={{ 
+                zIndex: 1, 
+                position: 'relative', 
+                visibility: 'visible', 
+                display: 'block',
+                opacity: 1,
+                backgroundColor: 'white'
+              }}
             >
               <div className="bg-gradient-to-r from-teal-50 to-blue-50 px-8 py-6 border-b border-gray-100">
-                <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
-                  <div className={`w-10 h-10 bg-teal-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
-                    <FileText className="w-6 h-6 text-white" />
-                  </div>
-                  {t('projectOverview')}
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
+                    <div className={`w-10 h-10 bg-teal-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
+                      <FileText className="w-6 h-6 text-white" />
+                    </div>
+                    {t('projectOverview')}
+                  </h2>
+                  
+                  {/* Edit Button */}
+                  <button
+                    onClick={handleEditProject}
+                    className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    {t('editProject') || 'Edit Project'}
+                  </button>
+                </div>
               </div>
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -685,15 +876,22 @@ const ProjectDetailsPage = () => {
                         <span className="text-sm font-medium text-gray-600">{t('endDate')}</span>
                         <span className="text-sm font-semibold text-gray-900">{formatDate(project.end_date)}</span>
                       </div>
-                      {project.project_frequency && (
-                        <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
-                          <span className="text-sm font-medium text-gray-600">{t('frequency')}</span>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {translateFrequency(project.project_frequency || ('frequency' in project ? (project as any).frequency : ''))} 
-                            {project.frequency_duration && ` (${project.frequency_duration})`}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
+                        <span className="text-sm font-medium text-gray-600">{t('frequency')}</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {(() => {
+                            const frequencyValue = project.project_frequency || project.frequency || project.frequency_duration;
+                            
+                            if (frequencyValue && frequencyValue.trim() !== '') {
+                              return translateFrequency(frequencyValue);
+                            } else {
+                              // Show "Not Specified" when no frequency is found
+                              return t('notSpecified') || 'Not Specified';
+                            }
+                          })()}
+                          {project.frequency_duration && project.frequency_duration.trim() !== '' && ` (${project.frequency_duration})`}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -949,7 +1147,7 @@ const ProjectDetailsPage = () => {
             )}
 
             {/* Project Hierarchy (for CRM projects) */}
-            {!loading && !error && project && hierarchyData && (
+            {!loading && !error && project && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -964,9 +1162,10 @@ const ProjectDetailsPage = () => {
                   </h2>
                 </div>
                 <div className="p-6 space-y-6">
-
-                  {/* Goal */}
-                  {hierarchyData.goal.code && (
+                  {hierarchyData ? (
+                    <>
+                      {/* Goal */}
+                      {hierarchyData.goal.code && (
                     <div className="group relative overflow-hidden rounded-xl border border-blue-200/60 bg-gradient-to-r from-blue-50 to-blue-100/50 p-4 hover:shadow-md transition-all duration-200">
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
@@ -1050,6 +1249,20 @@ const ProjectDetailsPage = () => {
                           </p>
                         </div>
                       </div>
+                    </div>
+                  )}
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Tag className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {t('projectHierarchy')}
+                      </h3>
+                      <p className="text-gray-500 text-sm">
+                        {t('hierarchyNotAvailable') || 'Project hierarchy information is not available for this project.'}
+                      </p>
                     </div>
                   )}
                 </div>

@@ -78,36 +78,12 @@ const Rooms = () => {
   const { isRTL, currentLanguage } = useI18n();
   const [currentStep, setCurrentStep] = useState(1);
   const stepFiveRef = useRef<StepFiveRef>(null);
-  const { submitProject, isSubmitting, submissionResult, resetSubmission } = useProjectSubmission();
-  const [localSubmissionResult, setSubmissionResult] = useState<{success: boolean, projectId?: string, message?: string, error?: string} | null>(null);
-
-  // GSAP animation refs
-  const containerRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const descriptionRef = useRef<HTMLParagraphElement>(null);
-  const stepperRef = useRef<HTMLDivElement>(null);
-  const contentRefs = useRef<HTMLDivElement[]>([]);
-  const [isLanguageLoaded, setIsLanguageLoaded] = useState(false);
-  const [hasAnimated, setHasAnimated] = useState(false);
-
-  // Function to add ref to contentRefs array
-  const addContentRef = (el: HTMLDivElement | null) => {
-    if (el && !contentRefs.current.includes(el)) {
-      contentRefs.current.push(el);
-    }
-  };
-
-  // Language loading effect
-  useEffect(() => {
-    setIsLanguageLoaded(true);
-    setHasAnimated(false); // Reset animation state when language changes
-  }, [currentLanguage]);
-
-  // Clear refs when language changes
-  useEffect(() => {
-    contentRefs.current = [];
-    setHasAnimated(false); // Reset animation state when language changes
-  }, [currentLanguage]);
+  const { submitProject, saveAsDraft, updateProject, isSubmitting, submissionResult, resetSubmission } = useProjectSubmission();
+  const [showDraftButton, setShowDraftButton] = useState(false);
+  const [showFloatingDraft, setShowFloatingDraft] = useState(true);
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
+  const [isEditingLoading, setIsEditingLoading] = useState(false);
+  const [isReconstructingCards, setIsReconstructingCards] = useState(false);
 
   // User selections
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
@@ -120,6 +96,288 @@ const Rooms = () => {
   const [showTwoColumns, setShowTwoColumns] = useState(false);
   const rightColumnRef = useRef<HTMLDivElement>(null);
   const [selectedCards, setSelectedCards] = useState<any[]>([]);
+
+  // Debug draft button state changes
+  useEffect(() => {
+    console.log('🎫 Draft button state changed:', showDraftButton);
+  }, [showDraftButton]);
+
+  // Hide draft button when project is successfully submitted
+  useEffect(() => {
+    if (submissionResult?.success) {
+      console.log('✅ Project submitted successfully, hiding draft button');
+      setShowDraftButton(false);
+    }
+  }, [submissionResult?.success]);
+
+  // Show two-column layout when selected cards are loaded (for editing mode)
+  useEffect(() => {
+    const isEditing = localStorage.getItem('isEditingProject') === 'true';
+    console.log('🔍 Sidebar check - isEditing:', isEditing, 'selectedCards.length:', selectedCards.length, 'showTwoColumns:', showTwoColumns);
+    if (isEditing && selectedCards.length > 0) {
+      console.log('✅ Selected cards loaded in editing mode, showing sidebar');
+      setShowTwoColumns(true);
+    }
+  }, [selectedCards, showTwoColumns]);
+
+  // Check for editing mode and pre-fill form data - optimized
+  useEffect(() => {
+    // Use requestIdleCallback for non-critical initialization
+    const initEditingMode = () => {
+      const isEditing = localStorage.getItem('isEditingProject') === 'true';
+      const editingProjectId = localStorage.getItem('editingProjectId');
+      
+      if (isEditing && editingProjectId) {
+        console.log('🔄 Editing mode detected for project:', editingProjectId);
+        setIsEditingLoading(true);
+        
+        // Load the saved form data
+        const savedData = localStorage.getItem('projectDetails');
+        if (savedData) {
+          try {
+            const parsedData = JSON.parse(savedData);
+            console.log('📝 Loading saved form data for editing:', parsedData);
+            
+            // Pre-fill the form with saved data
+            setProjectDetails(parsedData);
+            
+            // Set selected cards based on strategic selections
+            if (parsedData.selectedGoal) {
+              setSelectedGoal(parsedData.selectedGoal);
+            }
+            if (parsedData.selectedPillar) {
+              setSelectedPillar(parsedData.selectedPillar);
+            }
+            if (parsedData.selectedService) {
+              setSelectedService(parsedData.selectedService);
+            }
+            if (parsedData.selectedSubService) {
+              setSelectedSubService(parsedData.selectedSubService);
+            }
+
+            // Store the parsed data for later reconstruction when data is loaded
+            localStorage.setItem('editingProjectData', JSON.stringify(parsedData));
+            
+            // Load services and subservices based on selected pillar and service
+            if (parsedData.selectedPillar) {
+              const pillarServicesRaw = pillarServicesData[parsedData.selectedPillar] || [];
+              const pillarServices = pillarServicesRaw.map((s: any, index: number) => {
+                return {
+                  id: s.id || s.code || `service-${index}`,
+                  code: s.code,
+                  title: s.description_service,
+                  description: s.description,
+                  description_service: s.description_service,
+                  description_service_fr_c: s.description_service_fr_c,
+                  description_service_ar_c: s.description_service_ar_c,
+                  name_service_fr_c: s.name_service_fr_c,
+                  name_service_ar_c: s.name_service_ar_c,
+                  name_service: s.description_service,
+                };
+              });
+              setServices(pillarServices);
+              
+              // Load subservices if service is selected
+              if (parsedData.selectedService) {
+                const serviceSubservicesRaw = serviceSubservicesData[parsedData.selectedService as keyof typeof serviceSubservicesData] || [];
+                const serviceSubservices = serviceSubservicesRaw.map((s: any, index: number) => {
+                  return {
+                    id: s.id || s.code || `subservice-${index}`,
+                    code: s.code,
+                    title: s.description_subservice,
+                    description: s.description,
+                    description_subservice: s.description_subservice,
+                    description_subservice_fr_c: s.description_subservice_fr_c,
+                    description_subservice_ar_c: s.description_subservice_ar_c,
+                    name_subservice_fr_c: s.name_subservice_fr_c,
+                    name_subservice_ar_c: s.name_subservice_ar_c,
+                    name_subservice: s.description_subservice,
+                  };
+                });
+                setSubServices(serviceSubservices);
+              }
+            }
+            
+            // Go directly to step 5 but keep selected cards visible
+            setCurrentStep(5);
+            
+            // Show two-column layout for selected cards sidebar
+            // This will be shown when selected cards are loaded
+            
+            // Show draft button since we have project title
+            setShowDraftButton(true);
+            
+          } catch (error) {
+            console.error('Error parsing saved form data:', error);
+          }
+        }
+        
+        // Set editing loading to false after initialization
+        setIsEditingLoading(false);
+      } else {
+        // Normal flow - check draft button state
+        const hasSelectedCards = selectedCards.length > 0;
+        
+        if (hasSelectedCards) {
+          // Check localStorage for project title when cards are selected
+          try {
+            const savedData = localStorage.getItem('projectDetails');
+            if (savedData) {
+              const parsedData = JSON.parse(savedData);
+              const hasProjectTitle = parsedData.title && parsedData.title.trim() !== '';
+              console.log('🔄 Checking draft button on mount/change - hasProjectTitle:', hasProjectTitle);
+              setShowDraftButton(hasProjectTitle);
+            }
+          } catch (error) {
+            console.error('Error checking localStorage on mount:', error);
+          }
+        }
+      }
+    };
+
+    // Initialize editing mode immediately
+    initEditingMode();
+  }, []); // Remove selectedCards dependency to prevent infinite reloads
+
+  // GSAP animation refs
+  const containerRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const stepperRef = useRef<HTMLDivElement>(null);
+  const contentRefs = useRef<HTMLDivElement[]>([]);
+  const [isLanguageLoaded, setIsLanguageLoaded] = useState(true); // Start as loaded
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  // Function to add ref to contentRefs array
+  const addContentRef = (el: HTMLDivElement | null) => {
+    if (el && !contentRefs.current.includes(el)) {
+      contentRefs.current.push(el);
+    }
+  };
+
+  // Language loading effect - optimized
+  useEffect(() => {
+    setHasAnimated(false);
+  }, [currentLanguage]);
+
+  // Show draft button when cards are selected and project title is filled
+  useEffect(() => {
+    const checkDraftButton = () => {
+      const hasSelectedCards = selectedCards.length > 0;
+      
+      // Check both projectDetails state and localStorage for project title
+      let hasProjectTitle = false;
+      if (projectDetails?.title && projectDetails.title.trim() !== '') {
+        hasProjectTitle = true;
+        console.log('✅ Project title found in projectDetails:', projectDetails.title);
+      } else {
+        // Check localStorage for project title
+        try {
+          const savedData = localStorage.getItem('projectDetails');
+          if (savedData) {
+            const parsedData = JSON.parse(savedData);
+            hasProjectTitle = parsedData.title && parsedData.title.trim() !== '';
+            if (hasProjectTitle) {
+              console.log('✅ Project title found in localStorage:', parsedData.title);
+            } else {
+              console.log('❌ No project title in localStorage:', parsedData);
+            }
+          } else {
+            console.log('❌ No projectDetails in localStorage');
+          }
+        } catch (error) {
+          console.error('Error checking localStorage for project title:', error);
+        }
+      }
+      
+      console.log('=== DRAFT BUTTON DEBUG ===');
+      console.log('Selected cards count:', selectedCards.length);
+      console.log('Selected cards:', selectedCards);
+      console.log('Has selected cards:', hasSelectedCards);
+      console.log('Has project title:', hasProjectTitle);
+      console.log('Submission successful:', submissionResult?.success);
+      console.log('Should show draft button:', hasSelectedCards && hasProjectTitle && !submissionResult?.success);
+      console.log('========================');
+      
+      setShowDraftButton(hasSelectedCards && hasProjectTitle && !submissionResult?.success);
+    };
+
+    // Check immediately
+    checkDraftButton();
+
+    // Listen for localStorage changes from other tabs/windows
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'projectDetails') {
+        console.log('🔄 localStorage changed, rechecking draft button');
+        checkDraftButton();
+      }
+    };
+
+    // Listen for focus events (when user returns to tab)
+    const handleFocus = () => {
+      console.log('🔄 Window focused, rechecking draft button');
+      checkDraftButton();
+    };
+
+    // Add event listeners
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleFocus);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [selectedCards, submissionResult?.success]); // Remove projectDetails dependency to prevent infinite reloads
+
+  // Listen for real-time updates from StepFive component
+  useEffect(() => {
+    const handleProjectDetailsUpdate = (event: CustomEvent) => {
+      // console.log('🔄 handleProjectDetailsUpdate called');
+      const hasSelectedCards = selectedCards.length > 0;
+      
+      if (hasSelectedCards && event.detail?.formValues) {
+        const hasProjectTitle = event.detail.formValues.title && event.detail.formValues.title.trim() !== '';
+        console.log('🔄 Custom event - hasProjectTitle:', hasProjectTitle, 'title:', event.detail.formValues.title);
+        
+        // Update projectDetails state with the latest form values
+        setProjectDetails(event.detail.formValues);
+        
+        setShowDraftButton(hasProjectTitle && !submissionResult?.success);
+      }
+    };
+
+    // Listen for custom event from StepFive
+    window.addEventListener('projectDetailsUpdated', handleProjectDetailsUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('projectDetailsUpdated', handleProjectDetailsUpdate as EventListener);
+    };
+  }, [submissionResult?.success]); // Remove selectedCards dependency to prevent infinite reloads
+
+  // Scroll detection for floating draft button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (currentStep === 5 || currentStep === 6) {
+        // Check if Next/Submit button is visible
+        const nextButton = document.querySelector('button[onclick*="onNext"], button[onclick*="handleSubmit"]');
+        if (nextButton) {
+          const rect = nextButton.getBoundingClientRect();
+          const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+          setShowFloatingDraft(!isVisible);
+        }
+      } else {
+        setShowFloatingDraft(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial state
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [currentStep]);
 
   // Memoize selected cards to force re-render when language changes
   const memoizedSelectedCards = useMemo(() => {
@@ -145,34 +403,29 @@ const Rooms = () => {
         };
       }
       
-      return {
-        ...migratedCard,
-        // Force re-evaluation of title text when language changes
-        _langKey: i18n.language
-      };
+      return migratedCard;
     });
     
-    // Save migrated cards back to localStorage if any were migrated
+    // Only save to localStorage if cards actually changed to prevent infinite loops
     const hasStringCards = selectedCards.some(card => 
       typeof card.title === 'string' || typeof card.desc === 'string'
     );
     
     if (hasStringCards) {
-      const cardsToSave = migratedCards.map(card => {
-        const { _langKey, ...cardWithoutLangKey } = card;
-        return cardWithoutLangKey;
-      });
-      localStorage.setItem('selectedCards', JSON.stringify(cardsToSave));
+      // Check if the migrated cards are different from what's already in localStorage
+      const currentStoredCards = localStorage.getItem('selectedCards');
+      const migratedCardsString = JSON.stringify(migratedCards);
+      
+      if (currentStoredCards !== migratedCardsString) {
+        localStorage.setItem('selectedCards', migratedCardsString);
+      }
     }
     
     return migratedCards;
-  }, [selectedCards, i18n.language]);
+  }, [selectedCards]); // Remove i18n.language dependency to prevent infinite reloads
 
-  // Force re-render when language changes
+  // Language key for forcing re-renders when needed
   const [languageKey, setLanguageKey] = useState(0);
-  useEffect(() => {
-    setLanguageKey(prev => prev + 1);
-  }, [i18n.language]);
 
   // Create a component that will re-render when language changes
   const SelectedCardText = React.memo(({ card }: { card: any }) => {
@@ -363,6 +616,301 @@ const Rooms = () => {
   const [services, setServices] = useState<any[]>([]);
   const [subServices, setSubServices] = useState<any[]>([]);
 
+  // Fallback function to use names when hierarchy lookup fails
+  const useFallbackCards = (parsedData: any) => {
+    const fallbackCards = [];
+    
+    if (parsedData.selectedGoalName) {
+      fallbackCards.push({
+        type: 'goal',
+        id: parsedData.selectedGoal || 'unknown',
+        title: parsedData.selectedGoalName,
+        desc: parsedData.selectedGoalName,
+        code: 'Unknown',
+        colorIndex: 0
+      });
+    }
+    
+    if (parsedData.selectedPillarName) {
+      fallbackCards.push({
+        type: 'pillar',
+        id: parsedData.selectedPillar || 'unknown',
+        title: parsedData.selectedPillarName,
+        desc: parsedData.selectedPillarName,
+        code: 'Unknown',
+        colorIndex: 1
+      });
+    }
+    
+    if (parsedData.selectedServiceName) {
+      fallbackCards.push({
+        type: 'service',
+        id: parsedData.selectedService || 'unknown',
+        title: parsedData.selectedServiceName,
+        desc: parsedData.selectedServiceName,
+        code: 'Unknown',
+        colorIndex: 2
+      });
+    }
+    
+    if (parsedData.selectedSubServiceName) {
+      fallbackCards.push({
+        type: 'subService',
+        id: parsedData.selectedSubService || 'unknown',
+        title: parsedData.selectedSubServiceName,
+        desc: parsedData.selectedSubServiceName,
+        code: 'Unknown',
+        colorIndex: 3
+      });
+    }
+    
+    if (fallbackCards.length > 0) {
+      console.log('Using fallback cards:', fallbackCards);
+      setSelectedCards(fallbackCards);
+      setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
+      localStorage.removeItem('editingProjectData'); // Clean up
+    }
+  };
+
+  // Reconstruct selected cards when data is loaded (for editing mode)
+  useEffect(() => {
+    const editingData = localStorage.getItem('editingProjectData');
+    const isEditing = localStorage.getItem('isEditingProject') === 'true';
+    
+    if (editingData && isEditing) {
+      try {
+        const parsedData = JSON.parse(editingData);
+        console.log('🔄 Reconstructing cards from hierarchy...');
+        console.log('Subservice ID:', parsedData.selectedSubService);
+        setIsReconstructingCards(true);
+        
+        // If we have a subservice ID, use the hierarchy API to get the complete chain
+        if (parsedData.selectedSubService) {
+          const reconstructFromHierarchy = async () => {
+            try {
+              const response = await fetch(`/api/crm/project-hierarchy?subserviceId=${parsedData.selectedSubService}`);
+              const hierarchyData = await response.json();
+              
+              console.log('Hierarchy data received:', hierarchyData);
+              
+              if (hierarchyData.success && hierarchyData.hierarchy) {
+                const { goal, pillar, service, subservice } = hierarchyData.hierarchy;
+                const reconstructedCards = [];
+                
+                // Add goal card
+                if (goal) {
+                  reconstructedCards.push({
+                    type: 'goal',
+                    id: goal.id,
+                    title: goal.title,
+                    desc: goal.desc,
+                    code: goal.code,
+                    colorIndex: 0
+                  });
+                }
+                
+                // Add pillar card
+                if (pillar) {
+                  reconstructedCards.push({
+                    type: 'pillar',
+                    id: pillar.id,
+                    title: pillar.title,
+                    desc: pillar.title,
+                    code: pillar.code,
+                    colorIndex: 1
+                  });
+                }
+                
+                // Add service card
+                if (service) {
+                  // Get the current language for multilingual support
+                  const currentLang = typeof window !== 'undefined' ? (localStorage.getItem('language') || 'en') : 'en';
+                  
+                  let serviceTitle = 'Unknown Service';
+                  let serviceDesc = 'No description';
+                  
+                  // Get title based on language
+                  if (currentLang === 'ar' && service.name_service_ar_c) {
+                    serviceTitle = service.name_service_ar_c;
+                  } else if (currentLang === 'fr' && service.name_service_fr_c) {
+                    serviceTitle = service.name_service_fr_c;
+                  } else if (service.description_service) {
+                    serviceTitle = service.description_service;
+                  }
+                  
+                  // Get description based on language
+                  if (currentLang === 'ar' && service.description_service_ar_c) {
+                    serviceDesc = service.description_service_ar_c;
+                  } else if (currentLang === 'fr' && service.description_service_fr_c) {
+                    serviceDesc = service.description_service_fr_c;
+                  } else if (service.description_service) {
+                    serviceDesc = service.description_service;
+                  } else if (service.description) {
+                    serviceDesc = service.description;
+                  }
+                  
+                  reconstructedCards.push({
+                    type: 'service',
+                    id: service.id,
+                    title: serviceTitle,
+                    desc: serviceDesc,
+                    code: service.code || service.id,
+                    colorIndex: 2
+                  });
+                }
+                
+                // Add subservice card
+                if (subservice) {
+                  // Get the current language for multilingual support
+                  const currentLang = typeof window !== 'undefined' ? (localStorage.getItem('language') || 'en') : 'en';
+                  
+                  let subserviceTitle = 'Unknown Subservice';
+                  let subserviceDesc = 'No description';
+                  
+                  // Get title based on language
+                  if (currentLang === 'ar' && subservice.name_ar_c) {
+                    subserviceTitle = subservice.name_ar_c;
+                  } else if (currentLang === 'fr' && subservice.name_fr_c) {
+                    subserviceTitle = subservice.name_fr_c;
+                  } else if (subservice.description_subservice) {
+                    subserviceTitle = subservice.description_subservice;
+                  } else if (subservice.name) {
+                    subserviceTitle = subservice.name;
+                  }
+                  
+                  // Get description based on language
+                  if (currentLang === 'ar' && subservice.description_subservice_ar_c) {
+                    subserviceDesc = subservice.description_subservice_ar_c;
+                  } else if (currentLang === 'fr' && subservice.description_subservice_fr_c) {
+                    subserviceDesc = subservice.description_subservice_fr_c;
+                  } else if (subservice.description_subservice) {
+                    subserviceDesc = subservice.description_subservice;
+                  } else if (subservice.description) {
+                    subserviceDesc = subservice.description;
+                  }
+                  
+                  reconstructedCards.push({
+                    type: 'subService',
+                    id: subservice.id,
+                    title: subserviceTitle,
+                    desc: subserviceDesc,
+                    code: subservice.name || subservice.id, // Use the code (like "5.4.7.3") as the code
+                    colorIndex: 3
+                  });
+                }
+                
+                if (reconstructedCards.length > 0) {
+                  console.log('✅ Reconstructed cards from hierarchy:', reconstructedCards);
+                  setSelectedCards(reconstructedCards);
+                  setShowTwoColumns(true); // Show sidebar when cards are loaded
+                  localStorage.removeItem('editingProjectData'); // Clean up
+                } else {
+                  console.log('⚠️ No cards from hierarchy, using fallback...');
+                  createFallbackCards(parsedData);
+                }
+                
+                setIsReconstructingCards(false);
+              } else {
+                console.log('⚠️ Hierarchy API failed, using fallback...');
+                createFallbackCards(parsedData);
+                setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
+                setIsReconstructingCards(false);
+              }
+            } catch (error) {
+              console.error('Error fetching hierarchy:', error);
+              createFallbackCards(parsedData);
+              setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
+              setIsReconstructingCards(false);
+            }
+          };
+          
+          reconstructFromHierarchy();
+        } else {
+          // No subservice ID, use fallback with names
+          createFallbackCards(parsedData);
+          setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
+          setIsReconstructingCards(false);
+        }
+      } catch (error) {
+        console.error('Error reconstructing cards:', error);
+        setIsReconstructingCards(false);
+      }
+    } else {
+      // Not in editing mode, ensure loading state is false
+      setIsReconstructingCards(false);
+    }
+  }, []);
+
+  // Function to create fallback cards when hierarchy reconstruction fails
+  const createFallbackCards = (parsedData: any) => {
+    console.log('🔄 Creating fallback cards from parsed data:', parsedData);
+    
+    const fallbackCards: any[] = [];
+    
+    // Create cards based on the parsed data selections
+    if (parsedData.selectedGoal) {
+      const goal = goalsData.find(g => g.id === parsedData.selectedGoal);
+      if (goal) {
+        fallbackCards.push({
+          type: 'goal',
+          id: goal.id,
+          title: goal.title,
+          desc: goal.desc,
+          code: goal.code,
+          colorIndex: 0
+        });
+      }
+    }
+    
+    if (parsedData.selectedPillar) {
+      const goalPillars = pillarsData[parsedData.selectedGoal] || [];
+      const pillar = goalPillars.find(p => p.id === parsedData.selectedPillar);
+      if (pillar) {
+        fallbackCards.push({
+          type: 'pillar',
+          id: pillar.id,
+          title: pillar.title,
+          desc: (pillar as any).desc ?? pillar.title,
+          code: pillar.code,
+          colorIndex: 1
+        });
+      }
+    }
+    
+    if (parsedData.selectedService) {
+      const pillarServicesRaw = pillarServicesData[parsedData.selectedPillar] || [];
+      const service = pillarServicesRaw.find(s => s.id === parsedData.selectedService || s.code === parsedData.selectedService);
+      if (service) {
+        fallbackCards.push({
+          type: 'service',
+          id: service.id || service.code,
+          title: service.description_service || (service as any).name_service || 'Unknown Service',
+          desc: service.description || service.description_service || 'No description',
+          code: service.code,
+          colorIndex: 2
+        });
+      }
+    }
+    
+    if (parsedData.selectedSubService) {
+      const serviceSubservicesRaw = (serviceSubservicesData as any)[parsedData.selectedService] || [];
+      const subservice = serviceSubservicesRaw.find((s: any) => s.id === parsedData.selectedSubService || s.name === parsedData.selectedSubService);
+      if (subservice) {
+        fallbackCards.push({
+          type: 'subService',
+          id: subservice.id || subservice.name,
+          title: subservice.description_subservice || subservice.name || 'Unknown Subservice',
+          desc: subservice.description || subservice.description_subservice || 'No description',
+          code: subservice.name || subservice.id,
+          colorIndex: 3
+        });
+      }
+    }
+    
+    console.log('✅ Created fallback cards:', fallbackCards);
+    setSelectedCards(fallbackCards);
+  };
+
   const cardColors = [
     { bg: "bg-[#3870ba]", text: "text-[#3870ba]" },
     { bg: "bg-[#f2c600]", text: "text-[#f2c600]" },
@@ -393,7 +941,7 @@ const Rooms = () => {
   };
 
 
-  // Load goals
+  // Load goals immediately
   useEffect(() => {
     setGoals(goalsData);
   }, []);
@@ -422,13 +970,14 @@ useEffect(() => {
 }, []);
 
 
-  // Load selected cards from localStorage on component mount
- useEffect(() => {
-  const loadSelectedCards = () => {
-    try {
-      const savedCards = localStorage.getItem("selectedCards");
-      if (savedCards) {
-        const parsedCards = JSON.parse(savedCards);
+  // Load selected cards from localStorage on component mount - optimized
+  useEffect(() => {
+    const loadSelectedCards = () => {
+      // console.log('🔄 loadSelectedCards called - language:', i18n.language);
+      try {
+        const savedCards = localStorage.getItem("selectedCards");
+        if (savedCards) {
+          const parsedCards = JSON.parse(savedCards);
 
         // ✅ Ensure every card keeps its type for the badge and extract correct language values
         const currentLang = (i18n.language || "en") as "en" | "fr" | "ar";
@@ -540,8 +1089,9 @@ useEffect(() => {
     }
   };
 
+  // Load cards immediately
   loadSelectedCards();
-}, [i18n.language]);
+}, []); // Remove language dependency to prevent infinite reloads
 
 
   // Handle goal selection
@@ -721,12 +1271,271 @@ useEffect(() => {
     }
   };
 
+  // Handle draft saving
+  const handleSaveAsDraft = async () => {
+    // Get project details from state or localStorage
+    let currentProjectDetails = projectDetails;
+    
+    if (!currentProjectDetails) {
+      try {
+        const savedData = localStorage.getItem('projectDetails');
+        if (savedData) {
+          currentProjectDetails = JSON.parse(savedData);
+        }
+      } catch (error) {
+        console.error('Error loading project details from localStorage:', error);
+      }
+    }
+    
+    if (!currentProjectDetails) {
+      console.error('No project details available for draft save');
+      return;
+    }
+
+    // Check if we're editing an existing project
+    const editingProjectId = localStorage.getItem('editingProjectId');
+    const isEditing = editingProjectId && localStorage.getItem('isEditingProject') === 'true';
+    
+    console.log('🔍 Edit mode check:');
+    console.log('- editingProjectId:', editingProjectId);
+    console.log('- isEditingProject flag:', localStorage.getItem('isEditingProject'));
+    console.log('- isEditing:', isEditing);
+    
+    if (isEditing) {
+      console.log('🔄 Updating existing project:', editingProjectId);
+    } else {
+      console.log('🆕 Creating new project');
+    }
+
+    setIsDraftSaving(true);
+    try {
+      // Handle file uploads first
+      let supportingDocuments: string[] = [];
+      if (currentProjectDetails.files && currentProjectDetails.files.length > 0) {
+        console.log('Uploading files for draft:', currentProjectDetails.files);
+        supportingDocuments = await handleMultipleFileUploads(currentProjectDetails.files);
+        console.log('Files uploaded successfully for draft:', supportingDocuments);
+      }
+      
+      // Prepare project data for draft submission
+      const projectData = {
+        // Project ID for updates
+        ...(isEditing && editingProjectId ? { id: editingProjectId } : {}),
+        
+        // Basic project info
+        name: currentProjectDetails.title || '',
+        description: currentProjectDetails.brief || '',
+        project_brief: currentProjectDetails.brief || '',
+        problem_statement: currentProjectDetails.rationale || '',
+        rationale_impact: currentProjectDetails.rationale || '',
+        
+        // Strategic selections - get codes from selectedCards
+        strategic_goal: (() => {
+          const goalCard = selectedCards.find(card => card.type === 'goal');
+          const code = goalCard?.code;
+          return typeof code === 'string' ? code : selectedGoal || '';
+        })(),
+        strategic_goal_id: selectedGoal || '',
+        pillar: (() => {
+          const pillarCard = selectedCards.find(card => card.type === 'pillar');
+          const code = pillarCard?.code;
+          return typeof code === 'string' ? code : selectedPillar || '';
+        })(),
+        pillar_id: selectedPillar || '',
+        service: (() => {
+          const serviceCard = selectedCards.find(card => card.type === 'service');
+          const code = serviceCard?.code;
+          return typeof code === 'string' ? code : selectedService || '';
+        })(),
+        service_id: selectedService || '',
+        sub_service: (() => {
+          const subServiceCard = selectedCards.find(card => card.type === 'subService');
+          const code = subServiceCard?.code;
+          return typeof code === 'string' ? code : selectedSubService || '';
+        })(),
+        sub_service_id: selectedSubService || '',
+        
+        // Beneficiaries
+        beneficiaries: (currentProjectDetails.beneficiaries || []).map((b: any) => typeof b === 'string' ? b : String(b)),
+        other_beneficiaries: currentProjectDetails.otherBeneficiary || '',
+        
+        // Budget and timeline
+        budget_icesco: parseFloat(currentProjectDetails.budget?.icesco) || 0,
+        budget_member_state: parseFloat(currentProjectDetails.budget?.member_state) || 0,
+        budget_sponsorship: parseFloat(currentProjectDetails.budget?.sponsorship) || 0,
+        start_date: currentProjectDetails.startDate || '',
+        end_date: currentProjectDetails.endDate || '',
+        frequency: currentProjectDetails.projectFrequency || '',
+        frequency_duration: currentProjectDetails.frequencyDuration || '',
+        
+        // Partners and scope
+        partners: (currentProjectDetails.partners || []).map((p: any) => typeof p === 'string' ? p : String(p)),
+        institutions: (currentProjectDetails.partners || []).map((p: any) => typeof p === 'string' ? p : String(p)),
+        delivery_modality: currentProjectDetails.deliveryModality || '',
+        geographic_scope: currentProjectDetails.geographicScope || '',
+        convening_method: currentProjectDetails.conveningMethod || '',
+        project_type: currentProjectDetails.conveningMethod || '',
+        project_type_other: currentProjectDetails.conveningMethodOther || '',
+        
+        // Monitoring and evaluation
+        milestones: (currentProjectDetails.milestones || []).map((m: any) => typeof m === 'string' ? m : String(m)),
+        expected_outputs: currentProjectDetails.expectedOutputs || '',
+        kpis: (currentProjectDetails.kpis || []).map((k: any) => typeof k === 'string' ? k : String(k)),
+        
+        // Contact information
+        contact_name: currentProjectDetails.contact?.name || '',
+        contact_email: currentProjectDetails.contact?.email || '',
+        contact_phone: currentProjectDetails.contact?.phone || '',
+        contact_role: currentProjectDetails.contact?.role || '',
+        contact_id: (() => {
+          try {
+            // If editing a project, use the contact ID from the project data
+            if (isEditing && currentProjectDetails.contact_id) {
+              console.log('✅ Using contact ID from project data:', currentProjectDetails.contact_id);
+              return currentProjectDetails.contact_id;
+            }
+            
+            // For new projects, try to get from localStorage
+            const contactData = localStorage.getItem('contactData');
+            if (contactData) {
+              const parsed = JSON.parse(contactData);
+              if (parsed.id) {
+                console.log('✅ Contact ID found in contactData:', parsed.id);
+                return parsed.id;
+              }
+            }
+            
+            // If not found, try to get from contactInfo
+            const contactInfo = localStorage.getItem('contactInfo');
+            if (contactInfo) {
+              const parsed = JSON.parse(contactInfo);
+              if (parsed.id) {
+                console.log('✅ Contact ID found in contactInfo:', parsed.id);
+                return parsed.id;
+              }
+            }
+            
+            console.log('❌ No contact ID found');
+            return '';
+          } catch (error) {
+            console.error('Error getting contact ID:', error);
+            return '';
+          }
+        })(),
+        
+        // Additional info
+        comments: currentProjectDetails.comments || '',
+        supporting_documents: [], // Empty array since we have URLs, not Files
+      };
+
+      console.log('=== DEBUG: About to save draft ===');
+      console.log('Project data keys:', Object.keys(projectData));
+      console.log('Project data sample:', {
+        name: projectData.name,
+        contact_id: projectData.contact_id,
+        contact_name: projectData.contact_name,
+        contact_email: projectData.contact_email,
+        contact_phone: projectData.contact_phone,
+        contact_role: projectData.contact_role,
+        strategic_goal_id: projectData.strategic_goal_id,
+        pillar_id: projectData.pillar_id,
+        service_id: projectData.service_id,
+        sub_service_id: projectData.sub_service_id,
+        status: 'Draft'
+      });
+      
+      console.log('=== CONTACT INFORMATION DEBUG ===');
+      console.log('Contact name:', projectData.contact_name);
+      console.log('Contact email:', projectData.contact_email);
+      console.log('Contact phone:', projectData.contact_phone);
+      console.log('Contact role:', projectData.contact_role);
+      console.log('Contact ID:', projectData.contact_id);
+      console.log('================================');
+
+      // Add status field to ensure it's treated as a draft
+      const draftProjectData = {
+        ...projectData,
+        status: 'Draft'
+      };
+
+      // Use updateProject if editing, otherwise use saveAsDraft
+      const result = isEditing 
+        ? await updateProject(draftProjectData as ProjectSubmissionData & { id: string })
+        : await saveAsDraft(draftProjectData);
+      
+      if (result.success) {
+        console.log(isEditing ? '✅ Project updated successfully!' : '✅ Draft saved successfully!');
+        // The hook will handle setting the submission result
+        
+        // Clear editing flags
+        if (isEditing) {
+          localStorage.removeItem('editingProjectId');
+          localStorage.removeItem('isEditingProject');
+        }
+        
+        // Redirect to projects page after 2 seconds
+        setTimeout(() => {
+          window.location.href = '/projects';
+        }, 2000);
+      } else {
+        console.error('❌ Draft save failed:', result.error);
+        console.log('🔍 Error details for debugging:', {
+          error: result.error,
+          includesETIMEDOUT: result.error?.includes('ETIMEDOUT'),
+          includesFailedAuth: result.error?.includes('Failed to authenticate'),
+          includesConnectETIMEDOUT: result.error?.includes('connect ETIMEDOUT'),
+          includesInternalServer: result.error?.includes('Internal server error')
+        });
+        
+        // If CRM is unavailable or any server error, save locally as fallback
+        const isServerError = result.error && (
+          result.error.includes('ETIMEDOUT') || 
+          result.error.includes('Failed to authenticate') ||
+          result.error.includes('connect ETIMEDOUT') ||
+          result.error.includes('Internal server error') ||
+          result.error.includes('HTTP error! status: 500')
+        );
+        
+        if (isServerError) {
+          console.log('🔄 CRM unavailable or server error, saving locally as fallback...');
+          
+          try {
+            // Save to local storage as backup
+            const localProjectId = saveProjectToLocal(projectData);
+            console.log('✅ Project saved locally with ID:', localProjectId);
+            
+            // Redirect to projects page after 2 seconds
+            setTimeout(() => {
+              window.location.href = '/projects';
+            }, 2000);
+          } catch (localError) {
+            console.error('❌ Local save also failed:', localError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Draft save error:', error);
+      // The hook will handle setting the submission result
+    } finally {
+      setIsDraftSaving(false);
+    }
+  };
+
   // Handle project submission (step 6)
   const handleProjectSubmission = async () => {
     if (!projectDetails) {
       console.error('No project details available for submission');
       return;
     }
+
+    // Check if we're editing an existing project
+    const editingProjectId = localStorage.getItem('editingProjectId');
+    const isEditing = editingProjectId && localStorage.getItem('isEditingProject') === 'true';
+    
+    console.log('🔍 Project submission edit mode check:');
+    console.log('- editingProjectId:', editingProjectId);
+    console.log('- isEditingProject flag:', localStorage.getItem('isEditingProject'));
+    console.log('- isEditing:', isEditing);
     
     try {
       // Handle file uploads first
@@ -803,7 +1612,7 @@ useEffect(() => {
         
         // Monitoring and evaluation - ensure all are strings
         milestones: (projectDetails.milestones || []).map((m: any) => typeof m === 'string' ? m : String(m)),
-        expected_outputs: projectDetails.expectedOutputs ? [String(projectDetails.expectedOutputs)] : [],
+        expected_outputs: projectDetails.expectedOutputs || '',
         kpis: (projectDetails.kpis || []).map((k: any) => typeof k === 'string' ? k : String(k)),
         
         // Contact information
@@ -826,6 +1635,9 @@ useEffect(() => {
         // Note: supporting_documents is expected to be File[] but we have URLs
         // We'll store the URLs in comments instead
         supporting_documents: [], // Empty array since we have URLs, not Files
+        
+        // Status - Published for normal submission, Draft for save as draft
+        status: 'Published'
       };
 
       // Submit to CRM using the hook
@@ -840,111 +1652,40 @@ useEffect(() => {
         sub_service_id: projectData.sub_service_id
       });
       
-      const result = await submitProject(projectData);
+      // Use updateProject if editing, otherwise use submitProject
+      const result = isEditing 
+        ? await updateProject({ ...projectData, id: editingProjectId! })
+        : await submitProject(projectData);
+      
       console.log('=== DEBUG: Submission result ===');
       console.log('Result success:', result.success);
       console.log('Result error:', result.error);
       console.log('Result projectId:', result.projectId);
       
       if (result.success) {
+        // Clear editing flags after successful update
+        if (isEditing) {
+          localStorage.removeItem('editingProjectId');
+          localStorage.removeItem('isEditingProject');
+          console.log('✅ Editing flags cleared after successful update');
+        }
+        
         // Also save to local storage for backup
         const projectId = saveProjectToLocal(projectData);
-        console.log('Project submitted to CRM and saved locally with ID:', projectId);
+        console.log(isEditing ? 'Project updated in CRM and saved locally with ID:' : 'Project submitted to CRM and saved locally with ID:', projectId);
         
-        // Update submission result to show success
-        setSubmissionResult({
-          success: true,
-          projectId: result.projectId || projectId,
-          message: result.message || String(t('projectSubmittedSuccessfully'))
-        });
+        // The hook will handle setting the submission result
       } else {
-        // If CRM submission fails, still save locally as draft
-        const projectId = saveProjectToLocal(projectData);
-        console.log('CRM submission failed, saved locally as draft with ID:', projectId);
+        // If CRM submission fails, show error message
+        console.log('CRM submission failed:', result.error);
         
-        setSubmissionResult({
-          success: false,
-          error: result.error || 'Failed to submit project to CRM. Saved locally as draft.',
-          projectId: projectId
-        });
+        // The hook will handle setting the submission result
       }
       
     } catch (error) {
       console.error('Error during project submission:', error);
       
-      // Try to save locally as backup
-      try {
-        // Create a minimal project data for local backup
-        const backupProjectData = {
-          name: projectDetails.title || 'Draft Project',
-          description: projectDetails.brief || '',
-          project_brief: projectDetails.brief || '',
-          problem_statement: projectDetails.rationale || '',
-          rationale_impact: projectDetails.rationale || '',
-          strategic_goal: (() => {
-            const goalCard = selectedCards.find(card => card.type === 'goal');
-            const code = goalCard?.code;
-            return typeof code === 'string' ? code : selectedGoal || '';
-          })(),
-          strategic_goal_id: selectedGoal || '',
-          pillar: (() => {
-            const pillarCard = selectedCards.find(card => card.type === 'pillar');
-            const code = pillarCard?.code;
-            return typeof code === 'string' ? code : selectedPillar || '';
-          })(),
-          pillar_id: selectedPillar || '',
-          service: (() => {
-            const serviceCard = selectedCards.find(card => card.type === 'service');
-            const code = serviceCard?.code;
-            return typeof code === 'string' ? code : selectedService || '';
-          })(),
-          service_id: selectedService || '',
-          sub_service: (() => {
-            const subServiceCard = selectedCards.find(card => card.type === 'subService');
-            const code = subServiceCard?.code;
-            return typeof code === 'string' ? code : selectedSubService || '';
-          })(),
-          sub_service_id: selectedSubService || '',
-          beneficiaries: projectDetails.beneficiaries || [],
-          other_beneficiaries: projectDetails.otherBeneficiary || '',
-          budget_icesco: parseFloat(projectDetails.budget?.icesco) || 0,
-          budget_member_state: parseFloat(projectDetails.budget?.member_state) || 0,
-          budget_sponsorship: parseFloat(projectDetails.budget?.sponsorship) || 0,
-          start_date: projectDetails.startDate || '',
-          end_date: projectDetails.endDate || '',
-          frequency: projectDetails.projectFrequency || '',
-          frequency_duration: projectDetails.frequencyDuration || '',
-          partners: projectDetails.partners || [],
-          institutions: projectDetails.partners || [],
-          delivery_modality: projectDetails.deliveryModality || '',
-          geographic_scope: projectDetails.geographicScope || '',
-          convening_method: projectDetails.conveningMethod || '',
-          project_type: projectDetails.conveningMethod || '',
-          project_type_other: projectDetails.conveningMethodOther || '',
-          milestones: projectDetails.milestones || [],
-          expected_outputs: projectDetails.expectedOutputs ? [projectDetails.expectedOutputs] : [],
-          kpis: projectDetails.kpis || [],
-          contact_name: projectDetails.contact?.name || '',
-          contact_email: projectDetails.contact?.email || '',
-          contact_phone: projectDetails.contact?.phone || '',
-          contact_role: projectDetails.contact?.role || '',
-          comments: projectDetails.comments || '',
-          supporting_documents: []
-        };
-        
-        const projectId = saveProjectToLocal(backupProjectData);
-        setSubmissionResult({
-          success: false,
-          error: 'Failed to submit project. Saved locally as draft.',
-          projectId: projectId
-        });
-      } catch (localError) {
-        console.error('Error saving locally:', localError);
-        setSubmissionResult({
-          success: false,
-          error: 'Failed to submit project and save locally. Please try again.'
-        });
-      }
+      // The hook will handle setting the submission result
     }
   };
 
@@ -1156,90 +1897,178 @@ useEffect(() => {
     };
   }, [showTwoColumns]);
 
-  // Intersection Observer for scroll-triggered animations
+  // Intersection Observer for scroll-triggered animations - optimized
   useEffect(() => {
     if (!isLanguageLoaded || hasAnimated || !containerRef.current) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !hasAnimated) {
-            console.log('Content section came into view - starting GSAP animations...', {
-              titleRef: !!titleRef.current,
-              descriptionRef: !!descriptionRef.current,
-              stepperRef: !!stepperRef.current,
-              contentRefs: contentRefs.current.length,
-              containerRef: !!containerRef.current
-            });
+    // Use requestIdleCallback for animation setup
+    const setupAnimations = () => {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting && !hasAnimated) {
+              console.log('Content section came into view - starting GSAP animations...');
 
-            setHasAnimated(true);
+              setHasAnimated(true);
 
-            const ctx = gsap.context(() => {
-              // Animate title
-              if (titleRef.current) {
-                console.log('Animating Content title...');
-      gsap.fromTo(
-                  titleRef.current,
-                  { opacity: 0, y: 30, scale: 0.95 },
-                  { opacity: 1, y: 0, scale: 1, duration: 1, ease: "power3.out" }
-                );
-              }
+              const ctx = gsap.context(() => {
+                // Animate title
+                if (titleRef.current) {
+                  gsap.fromTo(
+                    titleRef.current,
+                    { opacity: 0, y: 30, scale: 0.95 },
+                    { opacity: 1, y: 0, scale: 1, duration: 1, ease: "power3.out" }
+                  );
+                }
 
-              // Animate description
-              if (descriptionRef.current) {
-                console.log('Animating Content description...');
-                gsap.fromTo(
-                  descriptionRef.current,
-                  { opacity: 0, y: 20 },
-                  { opacity: 1, y: 0, duration: 0.8, ease: "power3.out", delay: 0.2 }
-                );
-              }
+                // Animate description
+                if (descriptionRef.current) {
+                  gsap.fromTo(
+                    descriptionRef.current,
+                    { opacity: 0, y: 20 },
+                    { opacity: 1, y: 0, duration: 0.8, ease: "power3.out", delay: 0.2 }
+                  );
+                }
 
-              // Animate stepper
-              if (stepperRef.current) {
-                console.log('Animating Content stepper...');
-                gsap.fromTo(
-                  stepperRef.current,
-                  { opacity: 0, y: 40 },
-                  { opacity: 1, y: 0, duration: 1.2, ease: "power3.out", delay: 0.4 }
-                );
-              }
+                // Animate stepper
+                if (stepperRef.current) {
+                  gsap.fromTo(
+                    stepperRef.current,
+                    { opacity: 0, y: 40 },
+                    { opacity: 1, y: 0, duration: 1.2, ease: "power3.out", delay: 0.4 }
+                  );
+                }
 
-              // Animate content elements
-              if (contentRefs.current && contentRefs.current.length > 0) {
-                console.log('Animating Content elements...', contentRefs.current.length);
-                gsap.fromTo(
-                  contentRefs.current,
-                  { opacity: 0, y: 30 },
-                  { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", delay: 0.6 }
-                );
-              }
-            }, containerRef);
+                // Animate content elements
+                if (contentRefs.current && contentRefs.current.length > 0) {
+                  gsap.fromTo(
+                    contentRefs.current,
+                    { opacity: 0, y: 30 },
+                    { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", delay: 0.6 }
+                  );
+                }
+              }, containerRef);
 
-            // Disconnect observer after animation
-            observer.disconnect();
-          }
-        });
-      },
-      {
-        threshold: 0.1, // Trigger when 10% of the section is visible
-        rootMargin: '0px 0px -50px 0px' // Start animation slightly before fully in view
+              // Disconnect observer after animation
+              observer.disconnect();
+            }
+          });
+        },
+        {
+          threshold: 0.1,
+          rootMargin: '0px 0px -50px 0px'
+        }
+      );
+
+      if (containerRef.current) {
+        observer.observe(containerRef.current);
       }
-    );
 
-    observer.observe(containerRef.current);
-
-    return () => {
-      observer.disconnect();
+      return () => {
+        observer.disconnect();
+      };
     };
+
+    // Use requestIdleCallback for animation setup
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(setupAnimations);
+    } else {
+      setTimeout(setupAnimations, 0);
+    }
   }, [isLanguageLoaded, hasAnimated]);
 
+
+  // Show editing skeleton while loading project data
+  if (isEditingLoading || isReconstructingCards) {
+    return (
+      <section 
+        ref={containerRef}
+        id="next-section" 
+        className="bg-white py-6 lg:py-8 w-full px-4 md:px-6 lg:px-8 relative overflow-x-hidden"
+        style={{ zIndex: 10, position: 'relative' }}
+      >
+        <div className="text-center mt-6 sm:mt-8 xl:mt-0">
+          <div className="h-8 bg-gray-200 rounded-lg w-64 mx-auto mb-4 animate-pulse"></div>
+          <div className="h-4 bg-gray-200 rounded w-48 mx-auto animate-pulse"></div>
+        </div>
+
+        {/* Stepper Skeleton */}
+        <section className="mt-8 md:mt-12 flex flex-col items-center">
+          <div className="w-full max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              {[1, 2, 3, 4, 5, 6].map((step) => (
+                <div key={step} className="flex-1 flex justify-center relative">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              {[1, 2, 3, 4, 5, 6].map((step) => (
+                <div key={step} className="flex-1 flex justify-center">
+                  <div className="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Two-column layout skeleton */}
+          <div className="relative w-full px-4 md:px-6 lg:px-8 mt-8 overflow-x-hidden flex flex-col md:flex-row gap-12">
+            {/* Left column skeleton */}
+            <div className="hidden md:flex md:w-1/3 flex-col-reverse justify-between mt-8 mb-4 md:mb-0">
+              <div className="h-[80px]"></div>
+              <div className="sticky top-4 space-y-3">
+                <div className="h-4 bg-gray-200 rounded w-24 animate-pulse"></div>
+                {/* Selected cards skeleton */}
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-20 bg-gray-200 rounded-3xl animate-pulse"></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right column skeleton */}
+            <div className="w-full md:w-2/3 overflow-x-hidden">
+              <div className="bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
+                <div className="space-y-6">
+                  {/* Form fields skeleton */}
+                  <div className="space-y-4">
+                    <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                    <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="h-4 bg-gray-200 rounded w-24 animate-pulse"></div>
+                    <div className="h-24 bg-gray-200 rounded-lg animate-pulse"></div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="h-4 bg-gray-200 rounded w-28 animate-pulse"></div>
+                    <div className="h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                  </div>
+                  
+                  {/* Loading indicator */}
+                  <div className="flex items-center justify-center py-8">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>
+                      <span className="text-gray-600 text-sm">Loading project details...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    );
+  }
 
   return (
     <section 
       ref={containerRef}
       id="next-section" 
-      className="bg-white-100 py-6 lg:py-8 w-full px-4 md:px-6 lg:px-8 relative overflow-x-hidden"
+      className="bg-white py-6 lg:py-8 w-full px-4 md:px-6 lg:px-8 relative overflow-x-hidden"
+      style={{ zIndex: 10, position: 'relative' }}
     >
       <div className="text-center mt-6 sm:mt-8 xl:mt-0">
           <h2 
@@ -1376,7 +2205,7 @@ useEffect(() => {
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
                 <StepErrorBoundary stepName="Step 5 (Project Details)">
-                  <StepFive ref={stepFiveRef} onNext={handleProjectDetails} onPrevious={handlePrevious} />
+                  <StepFive ref={stepFiveRef} onNext={handleProjectDetails} onPrevious={handlePrevious} onSaveAsDraft={handleSaveAsDraft} selectedCards={selectedCards} isDraftSaving={isDraftSaving} showDraftButton={showDraftButton && !showFloatingDraft} />
                 </StepErrorBoundary>
                 </div>
               )}
@@ -1393,8 +2222,11 @@ useEffect(() => {
                     onClearData={clearAllData}
                     onEditProjectDetails={handleEditProjectDetails}
                     onSubmit={handleProjectSubmission}
-                  submissionResult={localSubmissionResult || submissionResult}
-                  isSubmitting={isSubmitting}
+                    onSaveAsDraft={handleSaveAsDraft}
+                    submissionResult={submissionResult}
+                    isSubmitting={isSubmitting}
+                    isDraftSaving={isDraftSaving}
+                    showDraftButton={showDraftButton && !showFloatingDraft}
                 />
                 </StepErrorBoundary>
                 </div>
@@ -1403,6 +2235,61 @@ useEffect(() => {
           </div>
         </div>
       </section>
+
+
+
+{/* Floating Save as Draft Button - Vertical Style */}
+{showDraftButton && showFloatingDraft && (
+  <div className="fixed top-1/2 right-0 z-50 transform -translate-y-1/2">
+    <motion.button
+      initial={{ opacity: 0, scale: 0.9, x: 20 }}
+      animate={{ opacity: 1, scale: 1, x: 0 }}
+      exit={{ opacity: 0, scale: 0.9, x: 20 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      onClick={handleSaveAsDraft}
+      disabled={isDraftSaving}
+      className="group relative bg-teal-600 hover:bg-teal-700 text-white 
+                 w-10 sm:w-12 md:w-12 h-32 sm:h-36 md:h-40 
+                 shadow-xl hover:shadow-2xl transition-all duration-300 
+                 font-semibold flex flex-col items-center justify-center rounded-l-xl 
+                 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <div className="flex flex-col items-center justify-center space-y-4">
+  {isDraftSaving ? (
+    <>
+      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      <span className="text-[10px] sm:text-xs font-medium -rotate-90 whitespace-nowrap">
+        Saving...
+      </span>
+    </>
+  ) : (
+    <>
+  
+      <span className="text-[10px] sm:text-xs font-medium  -rotate-90 whitespace-nowrap">
+        Save as Draft
+      </span>
+    </>
+  )}
+</div>
+
+
+      {/* Tooltip */}
+      <div className="absolute right-full top-1/2 mr-2 sm:mr-3 px-2 sm:px-3 py-1.5 sm:py-2 
+                      bg-gray-900 text-white text-[10px] sm:text-xs rounded-lg 
+                      opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap 
+                      transform -translate-y-1/2 shadow-lg">
+        Save your progress and continue later
+        <div className="absolute left-full top-1/2 w-0 h-0 border-l-4 border-l-gray-900 
+                        border-t-4 border-t-transparent border-b-4 border-b-transparent transform -translate-y-1/2"></div>
+      </div>
+    </motion.button>
+  </div>
+)}
+
+
+
+
+
     </section>
   );
 };

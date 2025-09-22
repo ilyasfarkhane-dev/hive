@@ -58,6 +58,22 @@ export const getSubServiceCodeFromName = (subserviceName: string): string | null
     return null;
   }
   
+  // First try to find in serviceSubservicesData (has name field with codes like "5.4.7.3")
+  for (const serviceId in serviceSubservicesData) {
+    const subServices = (serviceSubservicesData as any)[serviceId];
+    const subService = subServices.find((s: any) => 
+      s.name === subserviceName || 
+      s.name.toLowerCase().includes(subserviceName.toLowerCase()) ||
+      subserviceName.toLowerCase().includes(s.name.toLowerCase()) ||
+      s.description.toLowerCase().includes(subserviceName.toLowerCase()) ||
+      subserviceName.toLowerCase().includes(s.description.toLowerCase())
+    );
+    if (subService) {
+      return subService.name; // Return the code (e.g., "5.4.7.3")
+    }
+  }
+  
+  // Fallback: try subServicesByService (has title field)
   for (const serviceCode in subServicesByService) {
     const subServices = subServicesByService[serviceCode];
     const subService = subServices.find(s => 
@@ -73,19 +89,28 @@ export const getSubServiceCodeFromName = (subserviceName: string): string | null
 
 // Helper function to get subservice code from project data (handles both ID and name)
 export const getSubServiceCodeFromProject = (project: any): string | null => {
-  // First try to get from subservice_id
+  // First try to get from sub_service_id (CRM field name)
+  if (project.sub_service_id && project.sub_service_id.trim() !== '') {
+    const codeFromId = getSubServiceCodeFromId(project.sub_service_id);
+    if (codeFromId) return codeFromId;
+  }
+  
+  // Then try to get from sub_service (CRM field name)
+  if (project.sub_service && project.sub_service.trim() !== '') {
+    const codeFromName = getSubServiceCodeFromName(project.sub_service);
+    if (codeFromName) return codeFromName;
+  }
+  
+  // Fallback: try old field names for backward compatibility
   if (project.subservice_id && project.subservice_id.trim() !== '') {
     const codeFromId = getSubServiceCodeFromId(project.subservice_id);
     if (codeFromId) return codeFromId;
   }
   
-  // Then try to get from subservice_name
   if (project.subservice_name && project.subservice_name.trim() !== '') {
     const codeFromName = getSubServiceCodeFromName(project.subservice_name);
     if (codeFromName) return codeFromName;
   }
-  
-  // Manual mapping is no longer needed since we're getting subservice data directly from CRM relationships
   
   return null;
 };

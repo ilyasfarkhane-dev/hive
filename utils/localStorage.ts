@@ -32,7 +32,7 @@ export interface ProjectData {
   project_type: string;
   project_type_other: string;
   milestones: string[];
-  expected_outputs: string[];
+  expected_outputs: string;
   kpis: string[];
   contact_name: string;
   contact_email: string;
@@ -91,7 +91,7 @@ const cleanProjectData = (project: ProjectData): ProjectData => {
     partners: project.partners?.map(cleanBeneficiaryString) || [],
     institutions: project.institutions?.map(cleanBeneficiaryString) || [],
     milestones: project.milestones?.map(cleanBeneficiaryString) || [],
-    expected_outputs: project.expected_outputs?.map(cleanBeneficiaryString) || [],
+    expected_outputs: project.expected_outputs ? cleanBeneficiaryString(project.expected_outputs) : '',
     kpis: project.kpis?.map(cleanBeneficiaryString) || [],
   };
 };

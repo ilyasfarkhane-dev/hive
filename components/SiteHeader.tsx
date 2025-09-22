@@ -1,250 +1,364 @@
 "use client"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { gsap } from "gsap"
 import { ScrollToPlugin } from "gsap/ScrollToPlugin"
 import Image from "next/image"
 import Lottie from "lottie-react"
-import vector14 from "@/public/maquettes.png"
-import image1 from "@/public/Logo-01.svg"
-import BurgerMenu from "./BurgerMenu"
 import { useTranslation } from "react-i18next"
 import { useI18n } from "@/context/I18nProvider"
 import scrollDownAnimation from "@/public/scroll-down.json"
+import logoImage from "@/public/Logo-01.svg"
 import LanguageSwitcher from "./LanguageSwitcher"
+import BurgerMenu from "./BurgerMenu"
+import "../styles/siteHeader.css"
 
 gsap.registerPlugin(ScrollToPlugin)
 
-const About = () => {
+// Types
+interface AnimationRefs {
+  container: HTMLElement | null
+  logo: HTMLImageElement | null
+  textElements: HTMLDivElement[]
+}
+
+interface SiteHeaderProps {
+  className?: string
+  showScrollIndicator?: boolean
+}
+
+// Constants
+const ANIMATION_CONFIG = {
+  logo: {
+    duration: 1.4,
+    ease: "power3.out",
+    from: { opacity: 0, y: 40, scale: 0.9 },
+    to: { opacity: 1, y: 0, scale: 1 }
+  },
+  text: {
+    duration: 1.2,
+    stagger: 0.3,
+    delay: 0.4,
+    ease: "power3.out",
+    from: { opacity: 0, y: 30 },
+    to: { opacity: 1, y: 0 }
+  },
+  logoFloat: {
+    duration: 3,
+    repeat: -1,
+    yoyo: true,
+    ease: "sine.inOut",
+    delay: 1.6,
+    movement: "+=8"
+  }
+}
+
+const LAYOUT_CONFIG = {
+  container: "bg-gradient-to-br from-[#0e7378] to-[#1B3B36] min-h-screen relative overflow-hidden",
+  background: {
+    className: "absolute inset-0 w-full h-full object-cover opacity-80",
+    style: { zIndex: 1 }
+  },
+  overlay: {
+    className: "absolute inset-0 bg-black/40 z-10",
+    style: { zIndex: 10 }
+  },
+  content: {
+    className: "relative z-20 flex flex-col lg:flex-row items-center justify-between min-h-screen px-6 sm:px-8 md:px-12 lg:px-16 xl:px-24",
+    style: { direction: 'ltr' }
+  }
+}
+
+// Custom hook for animations
+const useGSAPAnimations = (refs: AnimationRefs, isLanguageLoaded: boolean) => {
+  useEffect(() => {
+    if (!isLanguageLoaded || !refs.container) return
+
+    const ctx = gsap.context(() => {
+      // Logo animation
+      if (refs.logo) {
+        gsap.fromTo(
+          refs.logo,
+          ANIMATION_CONFIG.logo.from,
+          { ...ANIMATION_CONFIG.logo.to, duration: ANIMATION_CONFIG.logo.duration, ease: ANIMATION_CONFIG.logo.ease }
+        )
+
+        // Logo floating animation
+        gsap.to(refs.logo, {
+          y: ANIMATION_CONFIG.logoFloat.movement,
+          duration: ANIMATION_CONFIG.logoFloat.duration,
+          repeat: ANIMATION_CONFIG.logoFloat.repeat,
+          yoyo: ANIMATION_CONFIG.logoFloat.yoyo,
+          ease: ANIMATION_CONFIG.logoFloat.ease,
+          delay: ANIMATION_CONFIG.logoFloat.delay,
+        })
+      }
+
+      // Text elements animation
+      if (refs.textElements.length > 0) {
+        gsap.fromTo(
+          refs.textElements,
+          ANIMATION_CONFIG.text.from,
+          {
+            ...ANIMATION_CONFIG.text.to,
+            duration: ANIMATION_CONFIG.text.duration,
+            stagger: ANIMATION_CONFIG.text.stagger,
+            ease: ANIMATION_CONFIG.text.ease,
+            delay: ANIMATION_CONFIG.text.delay
+          }
+        )
+      }
+    }, refs.container)
+
+    return () => ctx.revert()
+  }, [isLanguageLoaded, refs.container, refs.logo, refs.textElements])
+}
+
+// Background component
+const BackgroundImage = ({ src, alt }: { src: string; alt: string }) => (
+  <Image
+    src={src}
+    alt={alt}
+    width={1920}
+    height={1080}
+    priority
+    className={`fixed-background ${LAYOUT_CONFIG.background.className}`}
+    style={{
+      ...LAYOUT_CONFIG.background.style,
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      zIndex: 1
+    }}
+  />
+)
+
+// Overlay component
+const Overlay = () => (
+  <div 
+    className={LAYOUT_CONFIG.overlay.className}
+    style={LAYOUT_CONFIG.overlay.style}
+  />
+)
+
+// Logo component
+const LogoSection = ({ 
+  logoRef, 
+  logoImage, 
+  alt 
+}: { 
+  logoRef: React.RefObject<HTMLImageElement>
+  logoImage: any
+  alt: string 
+}) => (
+  <div className="flex justify-center items-center lg:flex-1 order-1">
+    <div className="relative">
+      <Image
+        ref={logoRef}
+        src={logoImage}
+        alt={alt}
+        width={200}
+        height={80}
+        priority
+        className="w-32 sm:w-40 md:w-48 lg:w-64 xl:w-80 h-auto"
+      />
+    </div>
+  </div>
+)
+
+// Header controls (language switcher, menu, etc.)
+const HeaderControls = ({ onMenuStateChange }: { onMenuStateChange: (isOpen: boolean) => void }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  
+  // Notify parent component when menu state changes
+  useEffect(() => {
+    onMenuStateChange(isMenuOpen)
+  }, [isMenuOpen, onMenuStateChange])
+  
+  return (
+    <div className="absolute top-6 right-6 flex items-center gap-3 z-30">
+      {/* Language Switcher - Only visible when menu is closed */}
+      {!isMenuOpen && <LanguageSwitcher showLabels={false} />}
+      <BurgerMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />
+    </div>
+  )
+}
+
+// Text content component
+const TextContent = ({ 
+  currentLanguage, 
+  isRTL, 
+  addTextRef 
+}: { 
+  currentLanguage: string
+  isRTL: boolean
+  addTextRef: (el: HTMLDivElement | null) => void 
+}) => {
+  const { t } = useTranslation("common")
+  
+  const textDirection = isRTL ? 'rtl' : 'ltr'
+  
+  return (
+    <div 
+      className="flex flex-col lg:flex-1 items-center text-center space-y-6 order-2"
+      style={{ direction: 'ltr' }}
+    >
+      {/* Main title section */}
+      <div className="space-y-4">
+        <h1
+          ref={addTextRef}
+          className="title-text uppercase text-white font-bold leading-tight"
+          dir={textDirection}
+          style={{ 
+            direction: textDirection,
+            textAlign: 'center'
+          }}
+        >
+          {t("siteTitle")}
+        </h1>
+        
+        <div 
+          className="subtitle-text text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold"
+          dir={textDirection}
+          style={{ direction: textDirection }}
+        >
+          <span className="text-white/90">{t("memberStatesPortal")}</span>
+          <br />
+          <span className="text-white/70">{t("poweredBy")} </span>
+          <span className="text-[#d19500] font-bold">{t("hiveFlow")}</span>
+        </div>
+      </div>
+
+      {/* Description */}
+      <p
+        ref={addTextRef}
+        className="text-white/80 text-sm sm:text-base md:text-lg lg:text-xl max-w-2xl leading-relaxed"
+        dir={textDirection}
+        style={{ 
+          direction: textDirection,
+          textAlign: 'center'
+        }}
+      >
+        {t("takePartStrategy")}
+      </p>
+    </div>
+  )
+}
+
+// Scroll indicator component
+const ScrollIndicator = ({ onClick }: { onClick: () => void }) => (
+  <div 
+    className="scroll-indicator absolute bottom-8 left-1/2 cursor-pointer z-20 opacity-30 hover:opacity-100 transition-opacity duration-300"
+    onClick={onClick}
+  >
+    <Lottie 
+      animationData={scrollDownAnimation} 
+      loop={true} 
+      className="w-20 h-16" 
+    />
+  </div>
+)
+
+// Loading component
+const LoadingSpinner = () => (
+  <div className="bg-gradient-to-br from-[#0e7378] to-[#1B3B36] min-h-screen flex items-center justify-center">
+    <div className="loading-spinner"></div>
+  </div>
+)
+
+// Main SiteHeader component
+const SiteHeader: React.FC<SiteHeaderProps> = ({ 
+  className = "", 
+  showScrollIndicator = true 
+}) => {
   const { t } = useTranslation("common")
   const { isRTL, currentLanguage } = useI18n()
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [currentRTL, setCurrentRTL] = useState(false) // Initialize as false
   const [isLanguageLoaded, setIsLanguageLoaded] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
+  // Refs
   const containerRef = useRef<HTMLElement>(null)
   const logoRef = useRef<HTMLImageElement>(null)
   const textRefs = useRef<HTMLDivElement[]>([])
 
-  // Function to add ref to textRefs array
-  const addTextRef = (el: HTMLDivElement | null) => {
+  // Animation refs object
+  const animationRefs: AnimationRefs = {
+    container: containerRef.current,
+    logo: logoRef.current,
+    textElements: textRefs.current
+  }
+  
+  // Add text ref function
+  const addTextRef = useCallback((el: HTMLDivElement | null) => {
     if (el && !textRefs.current.includes(el)) {
       textRefs.current.push(el)
     }
-  }
-
-  // Update RTL state when language changes or on mount
-  useEffect(() => {
-    setCurrentRTL(isRTL)
-    setIsLanguageLoaded(true)
-  }, [isRTL, currentLanguage])
-
-  // Additional effect to ensure RTL state is set correctly on page load
-  useEffect(() => {
-    // Check localStorage directly for language on mount
-    if (typeof window !== 'undefined') {
-      const savedLanguage = localStorage.getItem('i18nextLng') || 'en'
-      const isArabic = savedLanguage === 'ar'
-      setCurrentRTL(isArabic)
-      setIsLanguageLoaded(true)
+  }, [])
+  
+  // Handle scroll to next section
+  const handleScrollDown = useCallback(() => {
+    const nextSection = document.querySelector("#next-section")
+    if (nextSection) {
+      nextSection.scrollIntoView({ behavior: "smooth" })
     }
   }, [])
+  
+  // Initialize language loading
+  useEffect(() => {
+    setIsLanguageLoaded(true)
+  }, [])
 
-  // Clear refs when language changes
+  // Clear text refs when language changes
   useEffect(() => {
     textRefs.current = []
   }, [currentLanguage])
 
-  useEffect(() => {
-    // Only run animations when language is loaded and elements are rendered
-    if (!isLanguageLoaded) return
-
-    console.log('GSAP Animation starting...', {
-      logoRef: !!logoRef.current,
-      textRefs: textRefs.current.length,
-      containerRef: !!containerRef.current
-    })
-
-    const ctx = gsap.context(() => {
-      // Safety check for logo element
-      if (logoRef.current) {
-        console.log('Animating logo...')
-        gsap.fromTo(
-          logoRef.current,
-          { opacity: 0, y: 40, scale: 0.9 },
-          { opacity: 1, y: 0, scale: 1, duration: 1.4, ease: "power3.out" }
-        )
-
-        gsap.to(logoRef.current, {
-          y: "+=8",
-          duration: 3,
-          repeat: -1,
-          yoyo: true,
-          ease: "sine.inOut",
-          delay: 1.6,
-        })
-      }
-
-      // Safety check for text elements
-      if (textRefs.current && textRefs.current.length > 0) {
-        console.log('Animating text elements...', textRefs.current.length)
-        gsap.fromTo(
-          textRefs.current,
-          { opacity: 0, y: 30 },
-          { opacity: 1, y: 0, duration: 1.2, stagger: 0.3, ease: "power3.out", delay: 0.4 }
-        )
-      }
-    }, containerRef)
-
-    return () => ctx.revert()
-  }, [isLanguageLoaded])
-
-  const handleScrollDown = () => {
-    const nextSection = document.querySelector("#next-section");
-    if (nextSection) {
-      nextSection.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
-  // Show loading state until language is properly loaded
+  // Run animations
+  useGSAPAnimations(animationRefs, isLanguageLoaded)
+  
+  // Show loading state
   if (!isLanguageLoaded) {
-    return (
-      <div className="bg-[#00797d] h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-      </div>
-    );
+    return <LoadingSpinner />
   }
 
   return (
     <main
-      key={`header-${currentLanguage}`}
       ref={containerRef}
       id="about"
-      className="bg-[#00797d] h-screen relative w-full px-5 sm:px-8 md:px-12 lg:px-20 xl:px-32 overflow-hidden"
-      style={{
-        direction: 'ltr' // Force LTR for the main container
-      }}
+      className={`site-header ${LAYOUT_CONFIG.container} ${className}`}
+      style={{ direction: 'ltr' as const }}
     >
-      {/* Background vector - Always stays on the right */}
-      <Image
-        src={vector14}
-        alt={t("vectorLine")}
-        className="absolute right-0 top-0 h-full w-full object-cover block opacity-80"
-        style={{ 
-          position: 'absolute',
-          right: '0',
-          top: '0',
-          zIndex: 1,
-          transform: 'none',
-          direction: 'ltr', // Force LTR for this element
-          left: 'auto' // Ensure left is not set
-        }}
-      />
-
-      {/* Two-column layout */}
-      <div className="flex flex-col lg:flex-row gap-8 items-center lg:justify-between justify-center h-full relative z-10 lg:gap-6">
-        {/* Logo - Always stays on the left */}
-        <div 
-          className="flex justify-center items-center lg:flex-1"
-          style={{
-            order: 1 // Ensure logo always comes first (left side)
-          }}
-        >
-          <Image
-            ref={logoRef}
-            priority
-            src={image1}
-            alt={t("logo")}
-            width={200}
-            height={80}
-            className="w-35 sm:w-28 md:w-40 lg:w-96 h-auto"
-          />
-        </div>
-
-        {/* Burger menu + Language Switcher - Always stays on the right */}
-        <div 
-          className="absolute top-6 right-6 flex flex-row items-end gap-3 z-[99999]"
-          style={{
-            position: 'absolute',
-            top: '1.5rem',
-            right: '1.5rem',
-            left: 'auto', // Ensure left is not set
-            zIndex: 99999,
-            direction: 'ltr' // Force LTR for this element
-          }}
-        >
-          {/* Language Switcher */}
-          <LanguageSwitcher showLabels={false} />
-          
-          {/* Burger */}
-          <BurgerMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />
-        </div>
-
-        {/* Text Content - Only text moves for RTL */}
-        <div 
-          key={`text-content-${currentLanguage}`} 
-          className="flex flex-col lg:flex-1 relative lg:gap-4 lg:items-center"
-          style={{
-            order: 2, // Ensure text always comes second (right side)
-            direction: 'ltr' // Always LTR for container positioning
-          }}
-        >
-          <div key={`text-container-${currentLanguage}`} className="flex flex-col lg:justify-center lg:flex-1 relative lg:gap-0 lg:items-center" dir={currentRTL ? 'rtl' : 'ltr'} style={{ direction: currentRTL ? 'rtl' : 'ltr' }}>
-            <h3
-              ref={addTextRef}
-              className={`uppercase text-white text-5xl sm:text-2xl md:text-4xl lg:text-8xl xl:text-[8rem]`}
-              style={{ 
-                direction: currentRTL ? 'rtl' : 'ltr', 
-                textAlign: 'center',
-                unicodeBidi: 'normal',
-                textJustify: 'inter-word',
-                wordSpacing: 'normal',
-                writingMode: 'horizontal-tb'
-              }}
-            >
-              {t("siteTitle")}
-            </h3>
-            <h3 className={`block text-sm sm:text-base md:text-[1.55rem] text-secondary mt-4 font-bold`} style={{ 
-              direction: currentRTL ? 'rtl' : 'ltr', 
-              textAlign: 'center',
-              unicodeBidi: 'normal',
-              textJustify: 'inter-word',
-              wordSpacing: 'normal',
-              writingMode: 'horizontal-tb'
-            }}>
-              {t("memberStatesPortal")} <br />
-              <span className="text-white">{t("poweredBy")}</span>{" "}
-              <span className="text-secondary">{t("hiveFlow")}</span>
-            </h3>
-          </div>  
-
-          <p
-            ref={addTextRef}
-            className={`text-white text-opacity-70 text-xs sm:text-sm md:text-base lg:text-2xl mt-8 
-                        max-w-md`}
-            dir={currentRTL ? 'rtl' : 'ltr'}
-            style={{ 
-              direction: currentRTL ? 'rtl' : 'ltr', 
-              textAlign: 'center',
-              textAlignLast: 'center',
-              unicodeBidi: 'normal',
-              textJustify: 'inter-word',
-              wordSpacing: 'normal',
-              writingMode: 'horizontal-tb'
-            }}
-          >
-            {t("takePartStrategy")}
-          </p>
-        </div>
+      {/* Background */}
+      <BackgroundImage src="/ice-ban.jpg" alt={t("vectorLine")} />
+      
+      {/* Overlay */}
+      <Overlay />
+      
+      {/* Main content */}
+      <div className={LAYOUT_CONFIG.content.className} style={{ ...LAYOUT_CONFIG.content.style, direction: 'ltr' as const }}>
+        {/* Header controls */}
+        <HeaderControls onMenuStateChange={setIsMenuOpen} />
+        
+        {/* Logo section */}
+        <LogoSection 
+          logoRef={logoRef}
+          logoImage={logoImage}
+          alt={t("logo")}
+        />
+        
+        {/* Text content */}
+        <TextContent 
+          currentLanguage={currentLanguage}
+          isRTL={isRTL}
+          addTextRef={addTextRef}
+        />
       </div>
 
-      {/* Scroll Lottie Animation */}
-      {!isMenuOpen && (
-        <div className="absolute opacity-30 hover:opacity-100 transition-opacity duration-300 bottom-8 left-1/2 -translate-x-1/2 cursor-pointer z-20" onClick={handleScrollDown}>
-          <Lottie animationData={scrollDownAnimation} loop={true} className="w-[100px] h-18" />
-        </div>
-      )}
+      {/* Scroll indicator */}
+      {showScrollIndicator && !isMenuOpen && <ScrollIndicator onClick={handleScrollDown} />}
     </main>
   )
 }
 
-export default About
+export default SiteHeader

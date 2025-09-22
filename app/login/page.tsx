@@ -4,13 +4,14 @@ import { Eye, EyeOff, LogIn, User } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import logo from "@/public/Logo-01.svg";
-import maquettes from "@/public/maquettes.png";
+// import maquettes from "@/public/maquettes.png"; // Removed during cleanup
 import { useTranslation } from 'react-i18next';
 
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import i18n from 'i18next';
 import axios from "axios";
-import { resetValidationFlag } from '@/utils/sessionValidation';
+import { useAuth } from '@/context/AuthContext';
+// import { resetValidationFlag } from '@/utils/sessionValidation'; // Removed during cleanup
 
 const demoCredentials = [
   { username: "admin", password: "admin123", role: "Administrator" },
@@ -20,23 +21,16 @@ const demoCredentials = [
 
 const LoginPage = () => {
   const { t } = useTranslation('common');
+  const { login: authLogin, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [credentials, setCredentials] = useState({ login: "", password: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-
-
-  useEffect(() => {
-    const storedSessionId = localStorage.getItem("session_id");
-    const storedHash = localStorage.getItem("contactEeemailHash");
-    if (storedSessionId || storedHash) {
-      setIsLoggedIn(true);
-      // Redirect to main page if already logged in
-      window.location.href = "/";
-    }
-  }, []);
+  // If already authenticated, don't show login page
+  if (isAuthenticated) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,33 +38,14 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await axios.post("/api/login", {
-        email: credentials.login,
-        password: credentials.password,
-        language: i18n.language || 'en'
-      });
-
-      console.log("Login response:", response);
-
-      if (response.status === 200 && response.data.hashedEmail) {
-        console.log('=== DEBUG: Storing Contact Info in localStorage ===');
-        console.log('Contact Info:', response.data.contactInfo);
-        console.log('Session ID:', response.data.sessionId);
-        console.log('Goals Count:', response.data.goals?.length || 0);
-        console.log('================================================');
-
-        localStorage.setItem("contactEeemailHash", response.data.hashedEmail);
-        localStorage.setItem("contactInfo", JSON.stringify(response.data.contactInfo));
-        localStorage.setItem("goals", JSON.stringify(response.data.goals));
-        localStorage.setItem("session_id", response.data.sessionId);
-        resetValidationFlag(); // Reset validation flag after successful login
-        setIsLoggedIn(true);
-        window.location.href = "/";
-      } else {
-        setError(response.data.message || t('invalidCredentials'));
+      const success = await authLogin(credentials.login, credentials.password);
+      
+      if (!success) {
+        setError(t('invalidCredentials'));
       }
+      // If successful, AuthContext will handle the state change and redirect
     } catch (err: any) {
-      setError(err.response?.data?.message || t('loginFailed'));
+      setError(t('loginFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -88,14 +63,14 @@ const LoginPage = () => {
     setError("");
   };
 
-  if (isLoggedIn) return null;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0e7378] to-[#1B3B36] flex flex-col justify-center py-4 px-4 sm:py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background maquette image - similar to site header */}
       <Image
-        src={maquettes}
+        src="/ice-ban.jpg"
         alt="Background maquette"
+        width={800}
+        height={600}
         className="absolute right-0 top-0 h-full w-full object-cover block opacity-60 sm:opacity-80"
         style={{ 
           position: 'absolute',
@@ -108,7 +83,6 @@ const LoginPage = () => {
         }}
       />
       
-      {/* Language Switcher - Top Right */}
       <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
         <LanguageSwitcher showLabels={false} />
       </div>

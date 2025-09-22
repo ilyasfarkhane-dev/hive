@@ -16,14 +16,18 @@ const debugRender = (value: any, context: string) => {
 type Step5Props = {
   onNext?: (details: any) => void;
   onPrevious?: () => void;
+  onSaveAsDraft?: () => void;
   initialValues?: any;
+  selectedCards?: any[];
+  isDraftSaving?: boolean;
+  showDraftButton?: boolean;
 };
 
 export type StepFiveRef = {
   getFormValues: () => any;
 };
 
-const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, initialValues }, ref) => {
+const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSaveAsDraft, initialValues, selectedCards = [], isDraftSaving = false, showDraftButton = false }, ref) => {
   const { t: originalT, i18n } = useTranslation('common');
   const currentLanguage = i18n.language || 'en';
 
@@ -78,6 +82,10 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
   const [isInitialized, setIsInitialized] = useState(false);
 
 
+
+
+
+
   const otherBeneficiaryValue = t('beneficiaryOther');
   // Load saved data on component mount - only run once
   useEffect(() => {
@@ -87,18 +95,24 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
         if (savedData) {
           const parsedData = JSON.parse(savedData);
 
+
           // Check if "Other" beneficiary is selected to show the input
           if (parsedData.beneficiaries && parsedData.beneficiaries.includes(otherBeneficiaryValue)) {
             setShowOtherInput(true);
           }
 
-          setFormValues(prev => ({
-            ...prev,
-            ...parsedData,
-            // Note: Files from localStorage can't be restored as File objects
-            // We'll only keep actual File objects that were added after page load
-            files: prev.files || []
-          }));
+          setFormValues(prev => {
+            const newFormValues = {
+              ...prev,
+              ...parsedData,
+              // Note: Files from localStorage can't be restored as File objects
+              // We'll only keep actual File objects that were added after page load
+              files: prev.files || []
+            };
+            
+            
+            return newFormValues;
+          });
         }
       } catch (error) {
         console.error("Error loading saved data:", error);
@@ -111,21 +125,26 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     if (!isInitialized) {
       loadSavedData();
     }
-  }, [isInitialized]); // Include isInitialized in dependency array
+  }, [isInitialized, otherBeneficiaryValue]); // Include dependencies
 
   // Handle initialValues from props (when coming back from next step)
   useEffect(() => {
     if (initialValues && isInitialized) {
-      setFormValues(prev => ({
-        ...prev,
-        ...initialValues,
-      }));
+      
+      setFormValues(prev => {
+        const newFormValues = {
+          ...prev,
+          ...initialValues,
+        };
+        return newFormValues;
+      });
     }
   }, [initialValues, isInitialized]);
 
   // Save to localStorage - but only after initialization
   useEffect(() => {
     if (!isInitialized) return; // Don't save during initial load
+
 
     const serializableFiles = formValues.files.map((file) => ({
       name: file.name,
@@ -134,13 +153,18 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
       lastModified: file.lastModified,
     }));
 
-    localStorage.setItem(
-      "projectDetails",
-      JSON.stringify({
-        ...formValues,
-        files: serializableFiles,
-      })
-    );
+    const dataToSave = {
+      ...formValues,
+      files: serializableFiles,
+    };
+
+    localStorage.setItem("projectDetails", JSON.stringify(dataToSave));
+
+    // Dispatch custom event to notify other components about localStorage changes
+    const event = new CustomEvent('projectDetailsUpdated', {
+      detail: { formValues }
+    });
+    window.dispatchEvent(event);
   }, [formValues, isInitialized]);
 
   useImperativeHandle(
@@ -248,8 +272,60 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     }
   };
 
-  // Form validation function
+  // Check if we're in draft editing mode
+  const isDraftEditing = () => {
+    try {
+      const editingProjectId = localStorage.getItem('editingProjectId');
+      const isEditing = localStorage.getItem('isEditingProject') === 'true';
+      return !!(editingProjectId && isEditing);
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Form validation function for regular submission
   const isFormValid = () => {
+    // If we're editing a draft, use more lenient validation
+    if (isDraftEditing()) {
+      // For draft editing, only require essential fields
+      const essentialFields = [
+        formValues.title,
+        formValues.brief,
+        formValues.beneficiaries.length > 0,
+        formValues.budget.icesco,
+        formValues.budget.member_state,
+        formValues.budget.sponsorship,
+        formValues.projectFrequency,
+        formValues.partners.length > 0,
+        formValues.conveningMethod,
+        formValues.deliveryModality,
+        formValues.geographicScope,
+      ];
+
+      // Check if "Other" beneficiary is selected but no input provided
+      if (formValues.beneficiaries.includes(otherBeneficiaryValue) && !formValues.otherBeneficiary.trim()) {
+        return false;
+      }
+
+      // Check if "Other" convening method is selected but no input provided
+      if (formValues.conveningMethod === "Other" && !formValues.conveningMethodOther.trim()) {
+        return false;
+      }
+
+      // Check if continuous frequency is selected but no duration provided
+      if (formValues.projectFrequency === "Continuous" && !formValues.frequencyDuration.trim()) {
+        return false;
+      }
+
+      // Check email validation (if email is provided)
+      if (formValues.contact.email && !validateEmail(formValues.contact.email)) {
+        return false;
+      }
+
+      return essentialFields.every(field => field);
+    }
+
+    // For regular submission, require all fields
     const requiredFields = [
       formValues.title,
       formValues.brief,
@@ -291,6 +367,11 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
     return requiredFields.every(field => field);
   };
 
+  // Form validation function for draft saves - only requires title
+  const isDraftValid = () => {
+    return !!formValues.title && formValues.title.trim() !== '';
+  };
+
   // Helper function to get field validation class
   const getFieldValidationClass = (isValid: boolean) => {
     return isValid ? "" : "border-red-500 focus:border-red-500 focus:ring-red-100";
@@ -307,6 +388,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
           {debugRender(t('fillAllRequiredFields'), 'subtitle')}
         </p>
       </div>
+
+     
 
       <div className="space-y-8">
         {/* Project Identity */}
@@ -1119,45 +1202,79 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
             {debugRender(t('previous'), 'previous button')}
           </button>
 
-          <button
-            onClick={() => {
-              console.log('=== STEP 5 SUBMISSION DEBUG ===');
-              console.log('Form values being passed to next step:', formValues);
+          <div className="flex items-center gap-3">
+            {/* Save as Draft Button - Vertical Ticket Style */}
+            {showDraftButton && (
+              <button
+                onClick={onSaveAsDraft}
+                disabled={isDraftSaving || !isDraftValid()}
+                className={`group relative flex flex-col items-center justify-center w-16 h-32 rounded-full transition shadow-lg font-medium ${
+                  isDraftValid() && !isDraftSaving
+                    ? 'bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white hover:shadow-xl'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {isDraftSaving ? (
+                  <>
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <span className="text-xs font-medium transform -rotate-90 whitespace-nowrap">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    </svg>
+                    <span className="text-xs font-medium transform -rotate-90 whitespace-nowrap">Save as Draft</span>
+                  </>
+                )}
+                
+                {/* Tooltip */}
+                <div className="absolute right-full top-1/2 mr-3 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap transform -translate-y-1/2">
+                  {isDraftValid() ? 'Save your progress as a draft' : 'Fill required fields to save as draft'}
+                  <div className="absolute left-full top-1/2 w-0 h-0 border-l-4 border-l-gray-900 border-t-4 border-t-transparent border-b-4 border-b-transparent transform -translate-y-1/2"></div>
+                </div>
+              </button>
+            )}
 
-              // Check for multilingual objects in form values
-              const checkForMultilingualObjects = (obj: any, path = '') => {
-                for (const [key, value] of Object.entries(obj)) {
-                  const currentPath = path ? `${path}.${key}` : key;
-                  if (value && typeof value === 'object' && !Array.isArray(value)) {
-                    if (value.hasOwnProperty('en') && value.hasOwnProperty('fr') && value.hasOwnProperty('ar')) {
-                      console.warn(`Found multilingual object at ${currentPath}:`, value);
-                    } else {
-                      checkForMultilingualObjects(value, currentPath);
-                    }
-                  } else if (Array.isArray(value)) {
-                    value.forEach((item, index) => {
-                      if (item && typeof item === 'object') {
-                        checkForMultilingualObjects(item, `${currentPath}[${index}]`);
+            {/* Next Button */}
+            <button
+              onClick={() => {
+
+                // Check for multilingual objects in form values
+                const checkForMultilingualObjects = (obj: any, path = '') => {
+                  for (const [key, value] of Object.entries(obj)) {
+                    const currentPath = path ? `${path}.${key}` : key;
+                    if (value && typeof value === 'object' && !Array.isArray(value)) {
+                      if (value.hasOwnProperty('en') && value.hasOwnProperty('fr') && value.hasOwnProperty('ar')) {
+                        console.warn(`Found multilingual object at ${currentPath}:`, value);
+                      } else {
+                        checkForMultilingualObjects(value, currentPath);
                       }
-                    });
+                    } else if (Array.isArray(value)) {
+                      value.forEach((item, index) => {
+                        if (item && typeof item === 'object') {
+                          checkForMultilingualObjects(item, `${currentPath}[${index}]`);
+                        }
+                      });
+                    }
                   }
-                }
-              };
+                };
 
-              checkForMultilingualObjects(formValues);
-              onNext && onNext(formValues);
-            }}
-            disabled={!isFormValid()}
-            className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${isFormValid()
-                ? "bg-[#0e7378] text-white hover:bg-[#0a5d61] hover:shadow-xl transform hover:-translate-y-0.5"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-          >
-            {debugRender(t('next'), 'next button')}
-            <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+                checkForMultilingualObjects(formValues);
+                onNext && onNext(formValues);
+              }}
+              disabled={!isFormValid()}
+              className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${isFormValid()
+                  ? "bg-[#0e7378] text-white hover:bg-[#0a5d61] hover:shadow-xl transform hover:-translate-y-0.5"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+            >
+              {debugRender(t('next'), 'next button')}
+              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Validation Message */}
@@ -1168,7 +1285,24 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, init
                 <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               <p className="text-sm text-amber-700">
-                {debugRender(t('pleaseFillAllRequiredFields'), 'validation message')}
+                {isDraftEditing() 
+                  ? 'Please fill all essential fields to continue'
+                  : debugRender(t('pleaseFillAllRequiredFields'), 'validation message')
+                }
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Draft Validation Message */}
+        {!isDraftValid() && showDraftButton && (
+          <div className="mt-4 text-center">
+            <div className="inline-flex items-center px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-blue-700">
+                Enter a project title to save as draft
               </p>
             </div>
           </div>

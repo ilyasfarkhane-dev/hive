@@ -14,20 +14,20 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 if (!i18n.isInitialized) {
-  const savedLanguage =
-    typeof window !== "undefined"
-      ? localStorage.getItem("i18nextLng") || "en"
-      : "en";
+  // Use a default language for SSR, will be updated on client
+  const defaultLanguage = "en";
 
   i18n.use(initReactI18next).init({
-    lng: savedLanguage,
+    lng: defaultLanguage,
     fallbackLng: "en",
     defaultNS: "common",
     interpolation: { escapeValue: false },
     resources: {
       en: {
         common: {
+          "createNewProject": "Create New Project",
           "showing": "Showing",
+          "manageAndTrackYourProjects": "Manage and track your projects",
           "noCrmProjectsYet": "No project proposals are available at this time",
           "noCrmProjectsDescription": "No projects yet",
           "of": "of",
@@ -269,6 +269,8 @@ if (!i18n.isInitialized) {
       },
       fr: {
         common: {
+          "createNewProject": "Créer un nouveau projet",
+          "manageAndTrackYourProjects": "Gérer et suivre vos projets",
           "tryAdjustingFilters": "Essayez d'ajuster votre recherche ou vos filtres",
           "noProjectsFound": "Aucun projet trouvé",
           "titreprojet": "Titre du Projet",
@@ -512,6 +514,8 @@ if (!i18n.isInitialized) {
       },
       ar: {
         common: {
+          "createNewProject": "إنشاء مشروع جديد",
+          "manageAndTrackYourProjects": "إدارة وتتبع مشاريعك",
           "tryAdjustingFilters": "حاول تعديل البحث أو المرشحات",
           "noProjectsFound": "لا يوجد مشاريع بعد",
           "titreprojet": "عنوان المشروع",
@@ -755,8 +759,22 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const router = useRouter();
-  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
-  const [isRTL, setIsRTL] = useState(i18n.language === "ar");
+  const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [isRTL, setIsRTL] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(true);
+
+  // Initialize language from localStorage on client side
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedLanguage = localStorage.getItem("i18nextLng") || "en";
+      if (savedLanguage !== currentLanguage) {
+        setCurrentLanguage(savedLanguage);
+        setIsRTL(savedLanguage === "ar");
+        i18n.changeLanguage(savedLanguage);
+      }
+      setIsInitialized(true);
+    }
+  }, []);
 
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
@@ -774,7 +792,16 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <I18nContext.Provider value={{ currentLanguage, changeLanguage, isRTL }}>
-      <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
+      <I18nextProvider i18n={i18n}>
+        {isInitialized ? children : (
+          <div className="min-h-screen flex items-center justify-center bg-white">
+            <div className="flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0e7378]"></div>
+              <p className="text-gray-600 text-sm">Initializing...</p>
+            </div>
+          </div>
+        )}
+      </I18nextProvider>
     </I18nContext.Provider>
   );
 };

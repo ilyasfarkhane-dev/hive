@@ -15,23 +15,40 @@ export async function POST(request: NextRequest) {
     const projectData: ProjectSubmissionData = await request.json();
     console.log('Received project data:', JSON.stringify(projectData, null, 2));
 
-    // Validate required fields
-    const requiredFields = [
-      'name', 'description', 'strategic_goal', 'pillar', 'service', 'sub_service',
-      'contact_name', 'contact_email', 'contact_phone', 'session_id'
-    ];
-
-    const missingFields = requiredFields.filter(field => !projectData[field as keyof ProjectSubmissionData]);
+    // Validate required fields - check if this is a draft
+    const isDraft = projectData.status === 'Draft';
     
-    if (missingFields.length > 0) {
-      console.log('Missing required fields:', missingFields);
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Missing required fields: ${missingFields.join(', ')}` 
-        },
-        { status: 400 }
-      );
+    if (!isDraft) {
+      // For non-drafts, validate all required fields
+      const requiredFields = [
+        'name', 'description', 'strategic_goal', 'pillar', 'service', 'sub_service',
+        'contact_name', 'contact_email', 'contact_phone', 'session_id'
+      ];
+
+      const missingFields = requiredFields.filter(field => !projectData[field as keyof ProjectSubmissionData]);
+      
+      if (missingFields.length > 0) {
+        console.log('Missing required fields:', missingFields);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Missing required fields: ${missingFields.join(', ')}` 
+          },
+          { status: 400 }
+        );
+      }
+    } else {
+      // For drafts, only validate essential fields
+      if (!projectData.name || !projectData.session_id) {
+        console.log('Missing essential fields for draft:', { name: !!projectData.name, session_id: !!projectData.session_id });
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Missing essential fields: name and session_id are required for draft saves' 
+          },
+          { status: 400 }
+        );
+      }
     }
 
     console.log('CRM Config:', CRM_CONFIG);

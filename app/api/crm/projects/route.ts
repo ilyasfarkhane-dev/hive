@@ -3,12 +3,24 @@ import { getSessionId, getModuleEntries } from '@/utils/crm';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('=== CRM PROJECTS API CALLED ===');
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('CRM Admin User:', process.env.CRM_ADMIN_USER || 'NOT_SET');
+    console.log('CRM Admin Pass:', process.env.CRM_ADMIN_PASS ? 'SET' : 'NOT_SET');
+    console.log('CRM Base URL:', process.env.CRM_BASE_URL || 'NOT_SET');
+    
     // Get session ID with timeout and retry logic
     let sessionId: string;
     try {
+      console.log('Attempting to get session ID...');
       sessionId = await getSessionId();
+      console.log('Session ID obtained successfully:', sessionId ? 'YES' : 'NO');
     } catch (sessionError) {
       console.error('Failed to get session ID:', sessionError);
+      console.error('Session error details:', {
+        message: sessionError instanceof Error ? sessionError.message : 'Unknown error',
+        stack: sessionError instanceof Error ? sessionError.stack : 'No stack trace'
+      });
       
       // Check if it's a connection timeout error
       if (sessionError instanceof Error && (
@@ -17,12 +29,19 @@ export async function GET(request: NextRequest) {
         sessionError.message.includes('ECONNREFUSED') ||
         sessionError.message.includes('ENOTFOUND')
       )) {
+        console.log('Returning connection error response');
         return NextResponse.json({
           success: false,
           error: 'CRM server is currently unavailable. Please try again later.',
           errorType: 'CONNECTION_ERROR',
           projects: [],
-          count: 0
+          count: 0,
+          debug: {
+            environment: process.env.NODE_ENV,
+            crmUserSet: !!process.env.CRM_ADMIN_USER,
+            crmPassSet: !!process.env.CRM_ADMIN_PASS,
+            crmBaseUrlSet: !!process.env.CRM_BASE_URL
+          }
         }, { status: 503 }); // Service Unavailable
       }
       
@@ -32,6 +51,10 @@ export async function GET(request: NextRequest) {
     // Fetch projects from CRM with timeout handling
     let projectEntries: any[];
     try {
+      console.log('Fetching projects from CRM...');
+      console.log('Session ID length:', sessionId?.length);
+      console.log('Module: icesc_project_suggestions');
+      
       projectEntries = await getModuleEntries(
         sessionId,
         'icesc_project_suggestions',
@@ -135,6 +158,12 @@ export async function GET(request: NextRequest) {
       throw fetchError;
     }
     
+    console.log('Projects fetched successfully from CRM:', projectEntries.length);
+    console.log('Sample project:', projectEntries[0] ? {
+      id: projectEntries[0].id,
+      name: projectEntries[0].name,
+      status: projectEntries[0].status
+    } : 'No projects found');
     
     // Fetch subservice relationships for each project with retry logic
     const projectsWithSubservices = await Promise.allSettled(

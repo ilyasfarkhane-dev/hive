@@ -2,10 +2,11 @@
   "name": "hive",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/fetch-service-subservices.js",
     "lint": "next lint"
   },
   "dependencies": {
@@ -14,6 +15,7 @@
     "aos": "^2.3.4",
     "axios": "^1.11.0",
     "clsx": "^2.1.1",
+    "dotenv": "^17.2.2",
     "framer-motion": "^11.18.2",
     "gsap": "^3.13.0",
     "i18next": "^25.5.2",

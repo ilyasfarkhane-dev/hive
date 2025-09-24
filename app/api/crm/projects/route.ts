@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
           'contact_email',
           'contact_phone',
           'contact_role',
+          'contact_id',
           'budget_icesco',
           'budget_member_state',
           'budget_sponsorship',
@@ -420,30 +421,37 @@ export async function GET(request: NextRequest) {
         console.log(`\n--- CHECKING PROJECT: ${entry.id} ---`);
         console.log(`Project Name: "${entry.name}"`);
         console.log(`Created By: "${entry.created_by}"`);
+        console.log(`Contact ID: "${entry.contact_id}"`);
         console.log(`Contact Name: "${entry.contacts_icesc_project_suggestions_1_name}"`);
-        
+
+        // Check if the project's contact_id field matches the target contact
+        if (entry.contact_id === contactId) {
+          console.log(`✅ CONTACT ID MATCH: Project ${entry.id} belongs to contact ${contactId}`);
+          return true;
+        }
+
         // Check if the project was created by the contact
         if (entry.created_by === contactId) {
           console.log(`✅ CREATED BY MATCH: Project ${entry.id} was created by contact ${contactId}`);
           return true;
         }
-        
+
         // Check if the contact ID appears in the relationship data
         if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
           const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
           for (const contact of contactData) {
             const contactIdFromRel = contact.id?.value || contact.id;
             const contactName = contact.name?.value || contact.name;
-            
+
             console.log(`  - Checking relationship contact: ${contactName} (ID: ${contactIdFromRel})`);
-            
+
             if (contactIdFromRel === contactId) {
               console.log(`✅ RELATIONSHIP MATCH: Project ${entry.id} has relationship with contact ${contactId}`);
               return true;
             }
           }
         }
-        
+
         console.log(`❌ NO MATCH: Project ${entry.id} does not belong to contact ${contactId}`);
         return false;
       });

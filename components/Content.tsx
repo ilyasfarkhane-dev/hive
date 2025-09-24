@@ -2580,8 +2580,6 @@ useEffect(() => {
                     submissionResult={submissionResult}
                     isSubmitting={isSubmitting}
                     isRetrying={isRetrying}
-                    retryCount={retryCount}
-                    maxRetries={maxRetries}
                     isDraftSaving={isDraftSaving}
                     showDraftButton={showDraftButton && !showFloatingDraft}
                 />

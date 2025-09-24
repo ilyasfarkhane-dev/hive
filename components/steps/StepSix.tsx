@@ -27,14 +27,10 @@ type Step6Props = {
     projectId?: string;
     error?: string;
     message?: string;
-    retryCount?: number;
-    maxRetries?: number;
     canRetry?: boolean;
   } | null;
   isSubmitting?: boolean;
   isRetrying?: boolean;
-  retryCount?: number;
-  maxRetries?: number;
   isDraftSaving?: boolean;
   showDraftButton?: boolean;
 };
@@ -51,8 +47,6 @@ const Step6: React.FC<Step6Props> = ({
   submissionResult,
   isSubmitting = false,
   isRetrying = false,
-  retryCount = 0,
-  maxRetries = 3,
   isDraftSaving = false,
   showDraftButton = false,
 }) => {
@@ -619,11 +613,6 @@ const Step6: React.FC<Step6Props> = ({
                     <p className="font-medium text-red-800">
                       {t('error')}: {submissionResult.error}
                     </p>
-                    {submissionResult.retryCount && submissionResult.maxRetries && (
-                      <p className="text-sm text-red-600 mt-1">
-                        Attempt {submissionResult.retryCount} of {submissionResult.maxRetries}
-                      </p>
-                    )}
                   </div>
                   {submissionResult.canRetry && onRetry && (
                     <button

@@ -19,6 +19,7 @@ import {
   getServiceTitleFromCode,
   getSubServiceTitleFromCode
 } from '@/utils/codeMapping';
+import { useProjectSubmission } from '@/hooks/useProjectSubmission';
 
 // Union type for both project types
 type AnyProject = {
@@ -100,8 +101,22 @@ const ProjectDetailsPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProject, setEditedProject] = useState<AnyProject | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [showOtherBeneficiaryInput, setShowOtherBeneficiaryInput] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [draftMessage, setDraftMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Retry state management
+  const [retryCount, setRetryCount] = useState(0);
+  const [draftRetryCount, setDraftRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff delays in ms
+
+  // Use project submission hook for draft functionality
+  const { saveAsDraft } = useProjectSubmission();
+
+  // Helper function to delay execution
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   // Retry utility function with exponential backoff - retry indefinitely
   const retryWithBackoff = async (fn: () => Promise<any>, baseDelay: number = 1000) => {
@@ -487,11 +502,81 @@ const ProjectDetailsPage = () => {
     console.log('✅ Enabled inline editing for project:', project.id);
   };
 
+  // Retry function for save changes - runs automatically in background
+  const retrySaveChanges = async (updateData: any, currentAttempt: number = 1): Promise<{ success: boolean; error?: string }> => {
+    if (currentAttempt > MAX_RETRIES) {
+      return {
+        success: false,
+        error: `Failed to save changes after ${MAX_RETRIES} attempts. Please check your connection and try again later.`
+      };
+    }
+
+    // Only log to console, don't show to user
+    console.log(`🔄 Retrying save changes (attempt ${currentAttempt}/${MAX_RETRIES})...`);
+    
+    // Wait for exponential backoff delay
+    const delayMs = RETRY_DELAYS[Math.min(currentAttempt - 1, RETRY_DELAYS.length - 1)];
+    await delay(delayMs);
+
+    try {
+      // Call the update API
+      const response = await fetch('/api/update-project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      
+      const result = await response.json();
+      console.log('📥 CRM update response:', result);
+      
+      if (result.success) {
+        setRetryCount(0); // Reset retry count on success
+        return { success: true };
+      } else if (currentAttempt < MAX_RETRIES) {
+        // If still failing and we have retries left, continue retrying automatically
+        console.log(`🔄 Save changes failed, retrying... (${currentAttempt}/${MAX_RETRIES})`);
+        return await retrySaveChanges(updateData, currentAttempt + 1);
+      } else {
+        // Max retries reached
+        console.log(`❌ Max retries reached for save changes (${MAX_RETRIES} attempts)`);
+        return {
+          success: false,
+          error: result.error || 'Failed to save changes after multiple attempts'
+        };
+      }
+    } catch (error) {
+      if (currentAttempt < MAX_RETRIES) {
+        // If network error and we have retries left, continue retrying automatically
+        return await retrySaveChanges(updateData, currentAttempt + 1);
+      } else {
+        // Max retries reached
+        return {
+          success: false,
+          error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        };
+      }
+    }
+  };
+
   // Handle save changes
   const handleSaveChanges = async () => {
     if (!editedProject) return;
     
+    // Check if session_id is available
+    const sessionId = typeof window !== 'undefined' ? localStorage.getItem('session_id') : null;
+    if (!sessionId) {
+      setSaveMessage({
+        type: 'error',
+        message: 'Session expired. Please refresh the page and try again.'
+      });
+      return;
+    }
+    
     setIsSaving(true);
+    setRetryCount(0); // Reset retry count for new save attempt
+    
     try {
       console.log('💾 Saving project changes to CRM:', editedProject);
       console.log('📋 Original project data:', project);
@@ -567,41 +652,83 @@ const ProjectDetailsPage = () => {
         comments: editedProject.comments || '',
         
         // Metadata
-        session_id: 'dummy_session_id', // API will get fresh session ID internally
+        session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
         language: currentLanguage,
         submission_date: new Date().toISOString(),
         status: 'Published' // Mark as published when saving from details page
       };
       
       console.log('📤 Sending update data to CRM:', updateData);
+      console.log('🔑 Session ID in update data:', updateData.session_id ? 'Present' : 'Missing');
       
-      // Call the update API
-      const response = await fetch('/api/update-project', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-      
-      const result = await response.json();
-      console.log('📥 CRM update response:', result);
-      
-      if (result.success) {
-        // Update local state with the saved changes
-        setProject(editedProject);
-        setIsEditing(false);
-        setEditedProject(null);
+      // Try initial save
+      try {
+        const response = await fetch('/api/update-project', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData),
+        });
         
-        // Show success message
-        setSaveMessage({ type: 'success', message: 'Project updated successfully' });
-        console.log('✅ Project updated successfully in CRM');
+        const result = await response.json();
+        console.log('📥 CRM update response:', result);
         
-        // Clear success message after 3 seconds
-        setTimeout(() => setSaveMessage(null), 3000);
-      } else {
-        console.error('❌ Failed to update project in CRM:', result.error);
-        setSaveMessage({ type: 'error', message: `Failed to save changes: ${result.error}` });
+        if (result.success) {
+          // Update local state with the saved changes
+          setProject(editedProject);
+          setIsEditing(false);
+          setEditedProject(null);
+          
+          // Show success message
+          setSaveMessage({ type: 'success', message: 'Project updated successfully' });
+          console.log('✅ Project updated successfully in CRM');
+          
+          // Clear success message after 3 seconds
+          setTimeout(() => setSaveMessage(null), 3000);
+        } else {
+          // If initial save failed, try retry logic
+          console.log('🔄 Initial save failed, attempting automatic retry...');
+          const retryResult = await retrySaveChanges(updateData);
+          
+          if (retryResult.success) {
+            // Update local state with the saved changes
+            setProject(editedProject);
+            setIsEditing(false);
+            setEditedProject(null);
+            
+            // Show success message
+            setSaveMessage({ type: 'success', message: 'Project updated successfully' });
+            console.log('✅ Project updated successfully after retry');
+            
+            // Clear success message after 3 seconds
+            setTimeout(() => setSaveMessage(null), 3000);
+          } else {
+            console.error('❌ Failed to update project after retries:', retryResult.error);
+            setSaveMessage({ type: 'error', message: `Failed to save changes: ${retryResult.error}` });
+          }
+        }
+      } catch (error) {
+        // If initial save failed with network error, try retry logic
+        console.log('🔄 Network error occurred, attempting automatic retry...');
+        const retryResult = await retrySaveChanges(updateData);
+        
+        if (retryResult.success) {
+          // Update local state with the saved changes
+          setProject(editedProject);
+          setIsEditing(false);
+          setEditedProject(null);
+          
+          // Show success message
+          setSaveMessage({ type: 'success', message: 'Project updated successfully' });
+          console.log('✅ Project updated successfully after retry');
+          
+          // Clear success message after 3 seconds
+          setTimeout(() => setSaveMessage(null), 3000);
+        } else {
+          console.error('❌ Failed to update project after retries:', retryResult.error);
+          setSaveMessage({ type: 'error', message: `Failed to save changes: ${retryResult.error}` });
+        }
       }
       
     } catch (error) {
@@ -609,6 +736,235 @@ const ProjectDetailsPage = () => {
       setSaveMessage({ type: 'error', message: `Error saving changes: ${error instanceof Error ? error.message : 'Unknown error'}` });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Retry function for save as draft - runs automatically in background
+  const retrySaveAsDraft = async (draftData: any, currentAttempt: number = 1): Promise<{ success: boolean; error?: string }> => {
+    if (currentAttempt > MAX_RETRIES) {
+      console.log(`❌ Max retries reached for draft save (${MAX_RETRIES} attempts)`);
+      return {
+        success: false,
+        error: `Failed to save as draft after ${MAX_RETRIES} attempts. Please check your connection and try again later.`
+      };
+    }
+
+    // Only log to console, don't show to user
+    console.log(`🔄 Retrying save as draft (attempt ${currentAttempt}/${MAX_RETRIES})...`);
+    console.log(`📋 Draft data session_id: ${draftData.session_id ? 'Present' : 'Missing'}`);
+    
+    // Wait for exponential backoff delay
+    const delayMs = RETRY_DELAYS[Math.min(currentAttempt - 1, RETRY_DELAYS.length - 1)];
+    console.log(`⏳ Waiting ${delayMs}ms before retry...`);
+    await delay(delayMs);
+
+    try {
+      // Call the update API for draft save (not create API)
+      const response = await fetch('/api/update-project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(draftData),
+      });
+      
+      const result = await response.json();
+      console.log('📥 CRM draft update response:', result);
+      
+      if (result.success) {
+        setDraftRetryCount(0); // Reset retry count on success
+        return { success: true };
+      } else if (currentAttempt < MAX_RETRIES) {
+        // If still failing and we have retries left, continue retrying automatically
+        console.log(`🔄 Draft save failed, retrying... (${currentAttempt}/${MAX_RETRIES})`);
+        return await retrySaveAsDraft(draftData, currentAttempt + 1);
+      } else {
+        // Max retries reached
+        console.log(`❌ Max retries reached for draft save (${MAX_RETRIES} attempts)`);
+        return {
+          success: false,
+          error: result.error || 'Failed to save as draft after multiple attempts'
+        };
+      }
+    } catch (error) {
+      if (currentAttempt < MAX_RETRIES) {
+        // If network error and we have retries left, continue retrying automatically
+        return await retrySaveAsDraft(draftData, currentAttempt + 1);
+      } else {
+        // Max retries reached
+        return {
+          success: false,
+          error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        };
+      }
+    }
+  };
+
+  // Handle save as draft
+  const handleSaveAsDraft = async () => {
+    if (!editedProject) return;
+    
+    // Check if session_id is available
+    const sessionId = typeof window !== 'undefined' ? localStorage.getItem('session_id') : null;
+    if (!sessionId) {
+      setDraftMessage({
+        type: 'error',
+        message: 'Session expired. Please refresh the page and try again.'
+      });
+      return;
+    }
+    
+    setDraftRetryCount(0); // Reset retry count for new draft save attempt
+    setIsDraftSaving(true); // Set loading state to show spinner
+    
+    try {
+      console.log('💾 Saving project as draft:', editedProject);
+      
+      // Prepare the data for draft update (same as save changes but with Draft status)
+      const draftData = {
+        id: editedProject.id,
+        name: editedProject.name,
+        description: editedProject.description || editedProject.brief || '',
+        project_brief: editedProject.brief || editedProject.description || '',
+        problem_statement: editedProject.rationale || '',
+        rationale_impact: editedProject.rationale || '',
+        
+        // Strategic selections (preserve existing values if not changed)
+        strategic_goal: editedProject.strategic_goal || project?.strategic_goal || 'Strategic Goal',
+        strategic_goal_id: editedProject.strategic_goal_id || project?.strategic_goal_id || '',
+        pillar: editedProject.pillar || project?.pillar || 'Pillar',
+        pillar_id: editedProject.pillar_id || project?.pillar_id || '',
+        service: editedProject.service || project?.service || 'Service',
+        service_id: editedProject.service_id || project?.service_id || '',
+        sub_service: editedProject.sub_service || project?.sub_service || 'Subservice',
+        sub_service_id: editedProject.sub_service_id || project?.sub_service_id || '',
+        
+        // Beneficiaries
+        beneficiaries: editedProject.beneficiaries || [],
+        other_beneficiaries: editedProject.other_beneficiary || '',
+        
+        // Budget and timeline
+        budget_icesco: parseFloat(editedProject.budget?.icesco || '0') || 0,
+        budget_member_state: parseFloat(editedProject.budget?.member_state || '0') || 0,
+        budget_sponsorship: parseFloat(editedProject.budget?.sponsorship || '0') || 0,
+        start_date: editedProject.start_date || '',
+        end_date: editedProject.end_date || '',
+        frequency: editedProject.project_frequency || editedProject.frequency || '',
+        frequency_duration: editedProject.frequency_duration || '',
+        
+        // Partners and scope
+        partners: editedProject.partners || [],
+        institutions: editedProject.partners || [], // Same as partners for CRM
+        delivery_modality: editedProject.delivery_modality || '',
+        geographic_scope: editedProject.geographic_scope || '',
+        convening_method: editedProject.convening_method || '',
+        project_type: editedProject.convening_method || '',
+        project_type_other: editedProject.convening_method_other || '',
+        
+        // Monitoring and evaluation
+        milestones: editedProject.milestones || [],
+        expected_outputs: editedProject.expected_outputs || '',
+        kpis: editedProject.kpis || [],
+        
+        // Contact information
+        contact_name: editedProject.contact?.name || '',
+        contact_email: editedProject.contact?.email || '',
+        contact_phone: editedProject.contact?.phone || '',
+        contact_role: editedProject.contact?.role || '',
+        contact_id: editedProject.contact_id || project?.contact_id || '',
+        
+        // Account information
+        account_id: editedProject.account_id || project?.account_id || '',
+        account_name: editedProject.account_name || project?.account_name || '',
+        
+        // Additional info
+        comments: editedProject.comments || '',
+        
+        // Metadata
+        session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
+        language: currentLanguage,
+        submission_date: new Date().toISOString(),
+        status: 'Draft' // Mark as draft
+      };
+      
+      console.log('📤 Sending draft update data to CRM:', draftData);
+      console.log('🔑 Session ID in draft data:', draftData.session_id ? 'Present' : 'Missing');
+      
+      // Try initial draft update using the update API (not create API)
+      try {
+        const response = await fetch('/api/update-project', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(draftData),
+        });
+        
+        const result = await response.json();
+        console.log('📥 CRM draft update response:', result);
+        
+        if (result.success) {
+          // Update local state with the saved changes
+          setProject(editedProject);
+          setIsEditing(false);
+          setEditedProject(null);
+          
+          // Show success message
+          setDraftMessage({ type: 'success', message: 'Project saved as draft successfully' });
+          console.log('✅ Project saved as draft successfully');
+          
+          // Clear success message after 3 seconds
+          setTimeout(() => setDraftMessage(null), 3000);
+        } else {
+          // If initial draft save failed, try retry logic
+          console.log('🔄 Initial draft save failed, attempting automatic retry...');
+          const retryResult = await retrySaveAsDraft(draftData);
+          
+          if (retryResult.success) {
+            // Update local state with the saved changes
+            setProject(editedProject);
+            setIsEditing(false);
+            setEditedProject(null);
+            
+            // Show success message
+            setDraftMessage({ type: 'success', message: 'Project saved as draft successfully' });
+            console.log('✅ Project saved as draft successfully after retry');
+            
+            // Clear success message after 3 seconds
+            setTimeout(() => setDraftMessage(null), 3000);
+          } else {
+            console.error('❌ Failed to save project as draft after retries:', retryResult.error);
+            setDraftMessage({ type: 'error', message: `Failed to save as draft: ${retryResult.error}` });
+          }
+        }
+      } catch (error) {
+        // If initial draft save failed with network error, try retry logic
+        console.log('🔄 Network error occurred during draft save, attempting automatic retry...');
+        const retryResult = await retrySaveAsDraft(draftData);
+        
+        if (retryResult.success) {
+          // Update local state with the saved changes
+          setProject(editedProject);
+          setIsEditing(false);
+          setEditedProject(null);
+          
+          // Show success message
+          setDraftMessage({ type: 'success', message: 'Project saved as draft successfully' });
+          console.log('✅ Project saved as draft successfully after retry');
+          
+          // Clear success message after 3 seconds
+          setTimeout(() => setDraftMessage(null), 3000);
+        } else {
+          console.error('❌ Failed to save project as draft after retries:', retryResult.error);
+          setDraftMessage({ type: 'error', message: `Failed to save as draft: ${retryResult.error}` });
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error saving project as draft:', error);
+      setDraftMessage({ type: 'error', message: `Error saving as draft: ${error instanceof Error ? error.message : 'Unknown error'}` });
+    } finally {
+      setIsDraftSaving(false); // Always reset loading state
     }
   };
 
@@ -911,6 +1267,32 @@ const ProjectDetailsPage = () => {
           </div>
         )}
 
+        {/* Draft Message */}
+        {draftMessage && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            draftMessage.type === 'success' 
+              ? 'bg-blue-50 border-blue-200 text-blue-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="flex items-center">
+              <div className={`w-5 h-5 mr-3 ${
+                draftMessage.type === 'success' ? 'text-blue-500' : 'text-red-500'
+              }`}>
+                {draftMessage.type === 'success' ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <span className="font-medium">{draftMessage.message}</span>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-8">
@@ -1000,33 +1382,44 @@ const ProjectDetailsPage = () => {
                   {!isEditing ? (
                     <button
                       onClick={handleEditProject}
-                      className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"
+                      className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                     >
-                      <Settings className="w-4 h-4 mr-2" />
+                      <Settings className="w-4 h-4 mx-2 group-hover:rotate-90 transition-transform duration-200" />
                       {t('editProject') || 'Edit Project'}
                     </button>
                   ) : (
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={handleSaveChanges}
                         disabled={isSaving}
-                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md disabled:opacity-50"
+                        className="inline-flex items-center px-3 py-1.5 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 rounded transition-colors duration-150 disabled:cursor-not-allowed"
                       >
                         {isSaving ? (
                           <>
-                            <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-3 h-3 mx-1.5 border border-white border-t-transparent rounded-full animate-spin"></div>
                             Saving...
                           </>
                         ) : (
+                          'Save'
+                        )}
+                      </button>
+                      <button
+                        onClick={handleSaveAsDraft}
+                        disabled={isDraftSaving}
+                        className="inline-flex items-center px-3 py-1.5 text-sm text-slate-600 hover:text-slate-800 bg-yellow-200 hover:bg-yellow-100 disabled:bg-slate-50 rounded transition-colors duration-150 disabled:cursor-not-allowed"
+                      >
+                        {isDraftSaving ? (
                           <>
-                            <Settings className="w-4 h-4 mr-2" />
-                            Save Changes
+                            <div className="w-3 h-3 mx-1.5 border border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                            Saving...
                           </>
+                        ) : (
+                          'Draft'
                         )}
                       </button>
                       <button
                         onClick={handleCancelEditing}
-                        className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"
+                        className="inline-flex items-center px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors duration-150"
                       >
                         Cancel
                       </button>

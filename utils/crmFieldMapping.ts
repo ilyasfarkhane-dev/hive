@@ -302,6 +302,11 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     crmField: 'account_name',
     type: 'string',
     maxLength: 255
+  },
+  session_id: {
+    crmField: 'session_id',
+    type: 'string',
+    required: true
   }
 };
 

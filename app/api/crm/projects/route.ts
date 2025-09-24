@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
     console.log('CRM Admin User:', process.env.CRM_ADMIN_USER || 'NOT_SET');
     console.log('CRM Admin Pass:', process.env.CRM_ADMIN_PASS ? 'SET' : 'NOT_SET');
     console.log('CRM Base URL:', process.env.CRM_BASE_URL || 'NOT_SET');
+    console.log('Request URL:', request.url);
+    console.log('Cache-Busting Params:', request.nextUrl.searchParams.toString());
     
     // Get parameters from query string
     const { searchParams } = new URL(request.url);
@@ -689,7 +691,14 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Last-Modified': new Date().toUTCString()
+      }
+    });
     
   } catch (error) {
     console.error('Error in CRM projects API route:', error);

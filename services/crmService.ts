@@ -67,6 +67,7 @@ export interface ProjectSubmissionData {
   
   // Account information
   account_id?: string;
+  account_name?: string;
   
   // Additional info
   comments?: string;
@@ -105,10 +106,6 @@ class CRMService {
    */
   async authenticate(): Promise<string> {
     try {
-      console.log('=== CRM Authentication Started ===');
-      console.log('CRM Base URL:', this.config.baseUrl);
-      console.log('Username:', this.config.username);
-      console.log('Application:', this.config.application);
       
       // Try multiple authentication methods
       const authMethods = [
@@ -156,9 +153,6 @@ class CRMService {
 
       for (const method of authMethods) {
         try {
-          console.log(`Trying authentication method: ${method.name}`);
-          console.log('Auth data:', JSON.stringify(method.authData, null, 2));
-      
       const response = await fetch(`${this.config.baseUrl}/service/v4_1/rest.php`, {
         method: 'POST',
         headers: {
@@ -174,8 +168,6 @@ class CRMService {
         signal: AbortSignal.timeout(60000), // 60 second timeout
       });
 
-      console.log('Auth response status:', response.status);
-      console.log('Auth response headers:', Object.fromEntries(response.headers.entries()));
       
           // Check if response is ok before parsing JSON
           if (!response.ok) {
@@ -208,7 +200,6 @@ class CRMService {
             continue;
           }
           
-      console.log('Auth response data:', data);
       
       if (data.id) {
         this.sessionId = data.id;
@@ -332,8 +323,7 @@ class CRMService {
       };
       
       console.log('Submitting to CRM with data:', JSON.stringify(submissionData, null, 2));
-      console.log('Session ID being used:', this.sessionId);
-      console.log('CRM Base URL:', this.config.baseUrl);
+   
 
       // Retry logic for connection timeouts
       let response;
@@ -513,9 +503,16 @@ class CRMService {
           'phone_work',
           'title',
           'account_name',
+          'account_id',
           'primary_address_country',
           'login_c',
           'password_c'
+        ],
+        link_name_to_fields_array: [
+          {
+            name: 'accounts_contacts',
+            value: ['id', 'name']
+          }
         ],
         max_results: 1
       };
@@ -557,6 +554,12 @@ class CRMService {
             'primary_address_country',
             'login_c',
             'password_c'
+          ],
+          link_name_to_fields_array: [
+            {
+              name: 'accounts_contacts',
+              value: ['id', 'name']
+            }
           ],
           max_results: 50 // Get more results to search through
         };
@@ -618,6 +621,126 @@ class CRMService {
           
           console.log('Contact found and password verified:', matchingContact);
           
+          // Extract account information from relationship
+          let accountId = null;
+          let accountName = null;
+          
+          // Check if we have relationship data
+          if (data.relationship_list && data.relationship_list.length > 0) {
+            console.log('Relationship list found:', data.relationship_list.length);
+            
+            const accountRelationship = data.relationship_list.find((rel: any) => 
+              rel.name === 'accounts_contacts' && rel.records && rel.records.length > 0
+            );
+            
+            if (accountRelationship) {
+              console.log('Account relationship found:', accountRelationship);
+              console.log('Account records:', accountRelationship.records.length);
+              
+              if (accountRelationship.records.length > 0) {
+                // Get the first account from the relationship
+                const account = accountRelationship.records[0];
+                console.log('First account record:', account);
+                
+                accountId = account.id;
+                accountName = account.name_value_list?.name?.value || '';
+                console.log('Extracted account info:', { accountId, accountName });
+              }
+            } else {
+              console.log('No accounts_contacts relationship found');
+              console.log('Available relationships:', data.relationship_list.map((rel: any) => rel.name));
+            }
+          } else {
+            console.log('No relationship_list in response');
+          }
+          
+          // Fallback to direct account fields if no relationship data
+          if (!accountId) {
+            accountId = matchingContact.name_value_list.account_id?.value || null;
+            accountName = matchingContact.name_value_list.account_name?.value || '';
+            console.log('Using direct account fields:', { accountId, accountName });
+          }
+          
+          // If we have account name but no ID, try to find the account by name (optional)
+          if (accountName && !accountId) {
+            console.log('Have account name but no ID, searching for account...');
+            try {
+              // Try multiple search approaches
+              const searchQueries = [
+                `accounts.name='${accountName.replace(/'/g, "\\'")}'`, // With table prefix
+                `name='${accountName.replace(/'/g, "\\'")}'`, // Without table prefix
+                `name LIKE '%${accountName.replace(/'/g, "\\'")}%'` // Partial match
+              ];
+              
+              let accountFound = false;
+              
+              for (let i = 0; i < searchQueries.length && !accountFound; i++) {
+                console.log(`Trying account search query ${i + 1}:`, searchQueries[i]);
+                
+                try {
+                  const accountSearchData = {
+                    session: this.sessionId,
+                    module_name: 'Accounts',
+                    query: searchQueries[i],
+                    select_fields: ['id', 'name'],
+                    max_results: 1
+                  };
+                  
+                  const accountResponse = await fetch(`${this.config.baseUrl}/service/v4_1/rest.php`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                      method: 'get_entry_list',
+                      input_type: 'JSON',
+                      response_type: 'JSON',
+                      rest_data: JSON.stringify(accountSearchData),
+                    }),
+                    signal: AbortSignal.timeout(5000), // 5 second timeout per query
+                  });
+                  
+                  const responseText = await accountResponse.text();
+                  console.log(`Account search raw response ${i + 1}:`, responseText);
+                  
+                  try {
+                    const accountData = JSON.parse(responseText);
+                    console.log(`Account search parsed response ${i + 1}:`, accountData);
+                    
+                    if (accountData.entry_list && accountData.entry_list.length > 0) {
+                      accountId = accountData.entry_list[0].id;
+                      console.log('✅ Found account ID by name:', accountId);
+                      accountFound = true;
+                    } else {
+                      console.log(`❌ No results with query ${i + 1}`);
+                    }
+                  } catch (parseError) {
+                    console.error(`Failed to parse account search response ${i + 1}:`, parseError);
+                    console.log('Raw response was:', responseText);
+                    console.log('This might be a database error or invalid query');
+                  }
+                } catch (fetchError: any) {
+                  console.error(`Account search fetch error ${i + 1}:`, fetchError);
+                  if (fetchError?.name === 'TimeoutError' || fetchError?.code === 'UND_ERR_CONNECT_TIMEOUT') {
+                    console.log(`Query ${i + 1} timed out`);
+                  }
+                }
+              }
+              
+              if (!accountFound) {
+                console.log('❌ No account found with any search method for:', accountName);
+              }
+            } catch (searchError: any) {
+              console.error('Error searching for account by name:', searchError);
+              if (searchError?.name === 'TimeoutError' || searchError?.code === 'UND_ERR_CONNECT_TIMEOUT') {
+                console.log('Account search timed out during login - will retry during project submission');
+              } else {
+                console.log('Account search failed during login - will retry during project submission');
+              }
+              // Don't fail the login process if account search fails
+            }
+          }
+
           return {
             success: true,
             contact: {
@@ -627,7 +750,8 @@ class CRMService {
               email: matchingContact.name_value_list.email1?.value || login, // Use login as email if email1 is empty
               phone: matchingContact.name_value_list.phone_mobile?.value || matchingContact.name_value_list.phone_work?.value || '',
               title: matchingContact.name_value_list.title?.value || '',
-              account_name: matchingContact.name_value_list.account_name?.value || '',
+              account_name: accountName,
+              account_id: accountId,
               country: matchingContact.name_value_list.primary_address_country?.value || ''
             }
           };

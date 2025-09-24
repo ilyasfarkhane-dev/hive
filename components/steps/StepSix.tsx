@@ -21,13 +21,20 @@ type Step6Props = {
   onEditProjectDetails?: () => void;
   onSubmit?: () => void;
   onSaveAsDraft?: () => void;
+  onRetry?: (projectData: any) => Promise<any>;
   submissionResult?: {
     success: boolean;
     projectId?: string;
     error?: string;
     message?: string;
+    retryCount?: number;
+    maxRetries?: number;
+    canRetry?: boolean;
   } | null;
   isSubmitting?: boolean;
+  isRetrying?: boolean;
+  retryCount?: number;
+  maxRetries?: number;
   isDraftSaving?: boolean;
   showDraftButton?: boolean;
 };
@@ -40,8 +47,12 @@ const Step6: React.FC<Step6Props> = ({
   onEditProjectDetails,
   onSubmit,
   onSaveAsDraft,
+  onRetry,
   submissionResult,
   isSubmitting = false,
+  isRetrying = false,
+  retryCount = 0,
+  maxRetries = 3,
   isDraftSaving = false,
   showDraftButton = false,
 }) => {
@@ -571,12 +582,13 @@ const Step6: React.FC<Step6Props> = ({
         )}
 
         {/* Submission Status */}
-        {isSubmitting && (
+        {(isSubmitting || isRetrying) && (
           <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
               <p className="text-blue-800 font-medium">{t('loading')}...</p>
             </div>
+            
           </div>
         )}
 
@@ -596,7 +608,6 @@ const Step6: React.FC<Step6Props> = ({
                     <p className={`font-medium ${submissionResult.success ? 'text-green-800' : 'text-red-800'}`}>
                       {submissionResult.message || t('projectSubmittedSuccessfully')}
                     </p>
-                    
                   </div>
                 </>
               ) : (
@@ -604,11 +615,37 @@ const Step6: React.FC<Step6Props> = ({
                   <svg className="w-5 h-5 text-red-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium text-red-800">
                       {t('error')}: {submissionResult.error}
                     </p>
+                    {submissionResult.retryCount && submissionResult.maxRetries && (
+                      <p className="text-sm text-red-600 mt-1">
+                        Attempt {submissionResult.retryCount} of {submissionResult.maxRetries}
+                      </p>
+                    )}
                   </div>
+                  {submissionResult.canRetry && onRetry && (
+                    <button
+                      onClick={() => onRetry(projectDetails)}
+                      disabled={isRetrying}
+                      className="ml-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 flex items-center gap-2"
+                    >
+                      {isRetrying ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Retrying...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Retry
+                        </>
+                      )}
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -656,6 +693,8 @@ const Step6: React.FC<Step6Props> = ({
                 </div>
               </button>
             )}
+
+           
 
             {/* Submit/Clear Button */}
             {!submissionResult?.success && (

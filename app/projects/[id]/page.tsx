@@ -85,6 +85,7 @@ type AnyProject = {
   contact_email?: string;
   contact_phone?: string;
   contact_role?: string;
+  session_id?: string;
 };
 
 const ProjectDetailsPage = () => {
@@ -96,6 +97,11 @@ const ProjectDetailsPage = () => {
   const [project, setProject] = useState<AnyProject | null>(null);
   const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedProject, setEditedProject] = useState<AnyProject | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showOtherBeneficiaryInput, setShowOtherBeneficiaryInput] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Retry utility function with exponential backoff - retry indefinitely
   const retryWithBackoff = async (fn: () => Promise<any>, baseDelay: number = 1000) => {
@@ -141,7 +147,7 @@ const ProjectDetailsPage = () => {
         // Use retry logic for the API call
         
         const response = await retryWithBackoff(async () => {
-          const apiCall = fetch(`/api/crm/projects`, {
+          const apiCall = fetch(`/api/crm/projects?project_id=${projectId}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -163,6 +169,13 @@ const ProjectDetailsPage = () => {
 
         const data = await response.json();
         
+        console.log('🔍 Individual project fetch response:', {
+          success: data.success,
+          projectId: projectId,
+          projectsCount: data.projects?.length || 0,
+          projectIds: data.projects?.map((p: any) => p.id) || []
+        });
+        
         if (!data.success) {
           throw new Error(data.error || 'Failed to fetch projects from CRM');
         }
@@ -170,6 +183,7 @@ const ProjectDetailsPage = () => {
         const crmProject = data.projects?.find((p: AnyProject) => p.id === projectId);
 
         if (crmProject) {
+          console.log('✅ Found project in CRM:', crmProject.name);
             
             
             
@@ -456,8 +470,209 @@ const ProjectDetailsPage = () => {
     </div>
   );
 
-  // Handle edit project - navigate to project submission form with pre-filled data
+  // Handle edit project - enable inline editing
   const handleEditProject = () => {
+    if (!project) {
+      console.error('❌ Cannot edit project: project is null or undefined');
+      return;
+    }
+    
+    setIsEditing(true);
+    setEditedProject({ ...project });
+    
+    // Check if "Other" beneficiary is selected to show the input
+    const hasOtherBeneficiary = project.beneficiaries?.includes(t('beneficiaryOther')) || false;
+    setShowOtherBeneficiaryInput(hasOtherBeneficiary);
+    
+    console.log('✅ Enabled inline editing for project:', project.id);
+  };
+
+  // Handle save changes
+  const handleSaveChanges = async () => {
+    if (!editedProject) return;
+    
+    setIsSaving(true);
+    try {
+      console.log('💾 Saving project changes to CRM:', editedProject);
+      console.log('📋 Original project data:', project);
+      console.log('🎯 Strategic data from project:', {
+        strategic_goal: project?.strategic_goal,
+        strategic_goal_id: project?.strategic_goal_id,
+        pillar: project?.pillar,
+        pillar_id: project?.pillar_id,
+        service: project?.service,
+        service_id: project?.service_id,
+        sub_service: project?.sub_service,
+        sub_service_id: project?.sub_service_id
+      });
+      
+      // Prepare the data for CRM update
+      const updateData = {
+        id: editedProject.id,
+        name: editedProject.name,
+        description: editedProject.description || editedProject.brief || '',
+        project_brief: editedProject.brief || editedProject.description || '',
+        problem_statement: editedProject.rationale || '',
+        rationale_impact: editedProject.rationale || '',
+        
+        // Strategic selections (preserve existing values if not changed)
+        strategic_goal: editedProject.strategic_goal || project?.strategic_goal || 'Strategic Goal',
+        strategic_goal_id: editedProject.strategic_goal_id || project?.strategic_goal_id || '',
+        pillar: editedProject.pillar || project?.pillar || 'Pillar',
+        pillar_id: editedProject.pillar_id || project?.pillar_id || '',
+        service: editedProject.service || project?.service || 'Service',
+        service_id: editedProject.service_id || project?.service_id || '',
+        sub_service: editedProject.sub_service || project?.sub_service || 'Subservice',
+        sub_service_id: editedProject.sub_service_id || project?.sub_service_id || '',
+        
+        // Beneficiaries
+        beneficiaries: editedProject.beneficiaries || [],
+        other_beneficiaries: editedProject.other_beneficiary || '',
+        
+        // Budget and timeline
+        budget_icesco: parseFloat(editedProject.budget?.icesco || '0') || 0,
+        budget_member_state: parseFloat(editedProject.budget?.member_state || '0') || 0,
+        budget_sponsorship: parseFloat(editedProject.budget?.sponsorship || '0') || 0,
+        start_date: editedProject.start_date || '',
+        end_date: editedProject.end_date || '',
+        frequency: editedProject.project_frequency || editedProject.frequency || '',
+        frequency_duration: editedProject.frequency_duration || '',
+        
+        // Partners and scope
+        partners: editedProject.partners || [],
+        institutions: editedProject.partners || [], // Same as partners for CRM
+        delivery_modality: editedProject.delivery_modality || '',
+        geographic_scope: editedProject.geographic_scope || '',
+        convening_method: editedProject.convening_method || '',
+        project_type: editedProject.convening_method || '',
+        project_type_other: editedProject.convening_method_other || '',
+        
+        // Monitoring and evaluation
+        milestones: editedProject.milestones || [],
+        expected_outputs: editedProject.expected_outputs || '',
+        kpis: editedProject.kpis || [],
+        
+        // Contact information
+        contact_name: editedProject.contact?.name || '',
+        contact_email: editedProject.contact?.email || '',
+        contact_phone: editedProject.contact?.phone || '',
+        contact_role: editedProject.contact?.role || '',
+        contact_id: editedProject.contact_id || project?.contact_id || '',
+        
+        // Account information
+        account_id: editedProject.account_id || project?.account_id || '',
+        account_name: editedProject.account_name || project?.account_name || '',
+        
+        // Additional info
+        comments: editedProject.comments || '',
+        
+        // Metadata
+        session_id: 'dummy_session_id', // API will get fresh session ID internally
+        language: currentLanguage,
+        submission_date: new Date().toISOString(),
+        status: 'Published' // Mark as published when saving from details page
+      };
+      
+      console.log('📤 Sending update data to CRM:', updateData);
+      
+      // Call the update API
+      const response = await fetch('/api/update-project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      
+      const result = await response.json();
+      console.log('📥 CRM update response:', result);
+      
+      if (result.success) {
+        // Update local state with the saved changes
+        setProject(editedProject);
+        setIsEditing(false);
+        setEditedProject(null);
+        
+        // Show success message
+        setSaveMessage({ type: 'success', message: 'Project updated successfully' });
+        console.log('✅ Project updated successfully in CRM');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSaveMessage(null), 3000);
+      } else {
+        console.error('❌ Failed to update project in CRM:', result.error);
+        setSaveMessage({ type: 'error', message: `Failed to save changes: ${result.error}` });
+      }
+      
+    } catch (error) {
+      console.error('❌ Error saving project:', error);
+      setSaveMessage({ type: 'error', message: `Error saving changes: ${error instanceof Error ? error.message : 'Unknown error'}` });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle cancel editing
+  const handleCancelEditing = () => {
+    setIsEditing(false);
+    setEditedProject(null);
+    console.log('❌ Cancelled editing');
+  };
+
+  // Handle field changes
+  const handleFieldChange = (field: string, value: any) => {
+    if (!editedProject) return;
+    
+    setEditedProject(prev => ({
+      ...prev!,
+      [field]: value
+    }));
+  };
+
+  // Handle beneficiary changes
+  const handleBeneficiaryChange = (beneficiaryValue: string, isChecked: boolean) => {
+    if (!editedProject) return;
+    
+    const currentBeneficiaries = editedProject.beneficiaries || [];
+    
+    if (isChecked) {
+      // Add beneficiary
+      setEditedProject(prev => ({
+        ...prev!,
+        beneficiaries: [...currentBeneficiaries, beneficiaryValue]
+      }));
+      
+      // Show other input if "Other" is selected
+      if (beneficiaryValue === t('beneficiaryOther')) {
+        setShowOtherBeneficiaryInput(true);
+      }
+    } else {
+      // Remove beneficiary
+      setEditedProject(prev => ({
+        ...prev!,
+        beneficiaries: currentBeneficiaries.filter(b => b !== beneficiaryValue),
+        other_beneficiary: beneficiaryValue === t('beneficiaryOther') ? '' : prev?.other_beneficiary
+      }));
+      
+      // Hide other input if "Other" is deselected
+      if (beneficiaryValue === t('beneficiaryOther')) {
+        setShowOtherBeneficiaryInput(false);
+      }
+    }
+  };
+
+  // Handle other beneficiary input change
+  const handleOtherBeneficiaryChange = (value: string) => {
+    if (!editedProject) return;
+    
+    setEditedProject(prev => ({
+      ...prev!,
+      other_beneficiary: value
+    }));
+  };
+
+  // Handle edit project - navigate to project submission form with pre-filled data (old function)
+  const handleEditProjectOld = () => {
     
     if (!project) {
       console.error('❌ Cannot edit project: project is null or undefined');
@@ -587,7 +802,7 @@ const ProjectDetailsPage = () => {
     // Navigate to the project submission form
     router.push('/#next-section');
   };
-
+  
 
   // State for hierarchy data to make it reactive to language changes
   const [hierarchyData, setHierarchyData] = useState<{
@@ -670,6 +885,32 @@ const ProjectDetailsPage = () => {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative mt-8" style={{ zIndex: 1, marginTop: '2rem' }}>
+        {/* Save Message */}
+        {saveMessage && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            saveMessage.type === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="flex items-center">
+              <div className={`w-5 h-5 mr-3 ${
+                saveMessage.type === 'success' ? 'text-green-500' : 'text-red-500'
+              }`}>
+                {saveMessage.type === 'success' ? (
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <span className="font-medium">{saveMessage.message}</span>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-8">
@@ -755,29 +996,76 @@ const ProjectDetailsPage = () => {
                     {t('projectOverview')}
                   </h2>
                   
-                  {/* Edit Button */}
-                  <button
-                    onClick={handleEditProject}
-                    className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    {t('editProject') || 'Edit Project'}
-                  </button>
+                  {/* Edit/Save/Cancel Buttons */}
+                  {!isEditing ? (
+                    <button
+                      onClick={handleEditProject}
+                      className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      {t('editProject') || 'Edit Project'}
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveChanges}
+                        disabled={isSaving}
+                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md disabled:opacity-50"
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Settings className="w-4 h-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleCancelEditing}
+                        className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('titreprojet')}</label>
-                    <p className="text-lg font-medium text-gray-900">{project.name}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedProject?.name || ''}
+                        onChange={(e) => handleFieldChange('name', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent text-lg font-medium"
+                        placeholder="Project name"
+                      />
+                    ) : (
+                      <p className="text-lg font-medium text-gray-900">{project.name}</p>
+                    )}
                   </div>
                 
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('brief')}</label>
-                  <p className="text-gray-700 leading-relaxed text-lg">
-                    {project.description || project.brief || t('noDescription')}
-                  </p>
+                  {isEditing ? (
+                    <textarea
+                      value={editedProject?.description || editedProject?.brief || ''}
+                      onChange={(e) => handleFieldChange('description', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-700 leading-relaxed text-lg min-h-[100px]"
+                      placeholder="Project description"
+                    />
+                  ) : (
+                    <p className="text-gray-700 leading-relaxed text-lg">
+                      {project.description || project.brief || t('noDescription')}
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -801,31 +1089,90 @@ const ProjectDetailsPage = () => {
                 <div className="space-y-3">
                   <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('problemStatementPlaceholder')}</label>
                   <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                    <p className="text-gray-700 leading-relaxed">
-                      {project.rationale || ('problem_statement' in project ? (project as any).problem_statement : '') || t('noDescription')}
-                    </p>
+                    {isEditing ? (
+                      <textarea
+                        value={editedProject?.rationale || ('problem_statement' in (editedProject || {}) ? (editedProject as any).problem_statement : '') || ''}
+                        onChange={(e) => handleFieldChange('rationale', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-700 leading-relaxed min-h-[120px] bg-white"
+                        placeholder="Problem statement"
+                      />
+                    ) : (
+                      <p className="text-gray-700 leading-relaxed">
+                        {project.rationale || ('problem_statement' in project ? (project as any).problem_statement : '') || t('noDescription')}
+                      </p>
+                    )}
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('beneficiaries')}</label>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.isArray(project.beneficiaries) ? (
-                        project.beneficiaries.map((beneficiary, index) => (
-                          <span key={index} className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
-                            {translateBeneficiary(beneficiary)}
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {[
+                            { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: String(t('beneficiaryStudents')) },
+                            { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: String(t('beneficiaryTeachers')) },
+                            { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: String(t('beneficiaryYouth')) },
+                            { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: String(t('beneficiaryPublic')) },
+                            { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: String(t('beneficiaryPolicymakers')) },
+                            { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: String(t('beneficiaryOther')) },
+                          ].map((benef) => (
+                            <label
+                              key={benef.value}
+                              className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
+                                editedProject?.beneficiaries?.includes(benef.value)
+                                  ? 'border-teal-500 bg-teal-50 shadow-sm'
+                                  : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1 accent-teal-500 w-4 h-4"
+                                value={benef.value}
+                                checked={editedProject?.beneficiaries?.includes(benef.value) || false}
+                                onChange={(e) => handleBeneficiaryChange(benef.value, e.target.checked)}
+                              />
+                              <div className="flex-1">
+                                <span className="font-medium text-gray-900 text-sm">{benef.label}</span>
+                                <p className="text-gray-500 text-xs mt-1 leading-relaxed">{benef.desc}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+
+                        {/* Show input only when "Other" is selected */}
+                        {showOtherBeneficiaryInput && (
+                          <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
+                            <label className="block text-sm font-medium text-teal-800 mb-2">
+                              {t('otherBeneficiaryPlaceholder')}
+                            </label>
+                            <input
+                              type="text"
+                              className="w-full px-4 py-3 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                              placeholder={t('otherBeneficiaryPlaceholder')}
+                              value={editedProject?.other_beneficiary || ''}
+                              onChange={(e) => handleOtherBeneficiaryChange(e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray(project.beneficiaries) ? (
+                          project.beneficiaries.map((beneficiary, index) => (
+                            <span key={index} className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
+                              {translateBeneficiary(beneficiary)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-500 italic">{t('notSpecified')}</span>
+                        )}
+                        {project.other_beneficiary && (
+                          <span className="px-3 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium">
+                            {project.other_beneficiary}
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-500 italic">{t('notSpecified')}</span>
-                      )}
-                    </div>
-                    {project.other_beneficiary && (
-                      <div className="mt-3">
-                        <span className="px-3 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium">
-                          {project.other_beneficiary}
-                        </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -870,27 +1217,68 @@ const ProjectDetailsPage = () => {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
                         <span className="text-sm font-medium text-gray-600">{t('startDate')}</span>
-                        <span className="text-sm font-semibold text-gray-900">{formatDate(project.start_date)}</span>
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={editedProject?.start_date || ''}
+                            onChange={(e) => handleFieldChange('start_date', e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm font-semibold text-gray-900"
+                          />
+                        ) : (
+                          <span className="text-sm font-semibold text-gray-900">{formatDate(project.start_date)}</span>
+                        )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
                         <span className="text-sm font-medium text-gray-600">{t('endDate')}</span>
-                        <span className="text-sm font-semibold text-gray-900">{formatDate(project.end_date)}</span>
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            value={editedProject?.end_date || ''}
+                            onChange={(e) => handleFieldChange('end_date', e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm font-semibold text-gray-900"
+                          />
+                        ) : (
+                          <span className="text-sm font-semibold text-gray-900">{formatDate(project.end_date)}</span>
+                        )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
                         <span className="text-sm font-medium text-gray-600">{t('frequency')}</span>
-                        <span className="text-sm font-semibold text-gray-900">
-                          {(() => {
-                            const frequencyValue = project.project_frequency || project.frequency || project.frequency_duration;
-                            
-                            if (frequencyValue && frequencyValue.trim() !== '') {
-                              return translateFrequency(frequencyValue);
-                            } else {
-                              // Show "Not Specified" when no frequency is found
-                              return t('notSpecified') || 'Not Specified';
-                            }
-                          })()}
-                          {project.frequency_duration && project.frequency_duration.trim() !== '' && ` (${project.frequency_duration})`}
-                        </span>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={editedProject?.project_frequency || editedProject?.frequency || ''}
+                              onChange={(e) => handleFieldChange('project_frequency', e.target.value)}
+                              className="px-2 py-1 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="">{t('frequencySelect')}</option>
+                              <option value="One-time">{t('frequencyOneTime')}</option>
+                              <option value="Continuous">{t('frequencyContinuous')}</option>
+                            </select>
+                            {editedProject?.project_frequency === "Continuous" && (
+                              <input
+                                type="text"
+                                placeholder={t('frequencyDurationPlaceholder')}
+                                value={editedProject?.frequency_duration || ''}
+                                onChange={(e) => handleFieldChange('frequency_duration', e.target.value)}
+                                className="px-2 py-1 border border-gray-300 rounded text-sm w-32"
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm font-semibold text-gray-900">
+                            {(() => {
+                              const frequencyValue = project.project_frequency || project.frequency || project.frequency_duration;
+                              
+                              if (frequencyValue && frequencyValue.trim() !== '') {
+                                return translateFrequency(frequencyValue);
+                              } else {
+                                // Show "Not Specified" when no frequency is found
+                                return t('notSpecified') || 'Not Specified';
+                              }
+                            })()}
+                            {project.frequency_duration && project.frequency_duration.trim() !== '' && ` (${project.frequency_duration})`}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -906,21 +1294,72 @@ const ProjectDetailsPage = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center py-3 px-4 bg-blue-50 rounded-xl border border-blue-200">
                         <span className="text-sm font-medium text-blue-700">{t('budgetLabel_icesco')}</span>
-                        <span className="text-lg font-bold text-blue-900">
-                          {formatCurrency(project.budget?.icesco || ('budget_icesco' in project ? (project as any).budget_icesco : '') || '0')}
-                        </span>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editedProject?.budget?.icesco || ('budget_icesco' in (editedProject || {}) ? (editedProject as any).budget_icesco : '') || '0'}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (editedProject?.budget) {
+                                handleFieldChange('budget', { ...editedProject.budget, icesco: value });
+                              } else {
+                                handleFieldChange('budget_icesco', value);
+                              }
+                            }}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-lg font-bold text-blue-900 text-right"
+                            placeholder="0"
+                          />
+                        ) : (
+                          <span className="text-lg font-bold text-blue-900">
+                            {formatCurrency(project.budget?.icesco || ('budget_icesco' in project ? (project as any).budget_icesco : '') || '0')}
+                          </span>
+                        )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-green-50 rounded-xl border border-green-200">
                         <span className="text-sm font-medium text-green-700">{t('memberState')}</span>
-                        <span className="text-lg font-bold text-green-900">
-                          {formatCurrency(project.budget?.member_state || ('budget_member_state' in project ? (project as any).budget_member_state : '') || '0')}
-                        </span>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editedProject?.budget?.member_state || ('budget_member_state' in (editedProject || {}) ? (editedProject as any).budget_member_state : '') || '0'}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (editedProject?.budget) {
+                                handleFieldChange('budget', { ...editedProject.budget, member_state: value });
+                              } else {
+                                handleFieldChange('budget_member_state', value);
+                              }
+                            }}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-lg font-bold text-green-900 text-right"
+                            placeholder="0"
+                          />
+                        ) : (
+                          <span className="text-lg font-bold text-green-900">
+                            {formatCurrency(project.budget?.member_state || ('budget_member_state' in project ? (project as any).budget_member_state : '') || '0')}
+                          </span>
+                        )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-purple-50 rounded-xl border border-purple-200">
                         <span className="text-sm font-medium text-purple-700">{t('sponsorship')}</span>
-                        <span className="text-lg font-bold text-purple-900">
-                          {formatCurrency(project.budget?.sponsorship || ('budget_sponsorship' in project ? (project as any).budget_sponsorship : '') || '0')}
-                        </span>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editedProject?.budget?.sponsorship || ('budget_sponsorship' in (editedProject || {}) ? (editedProject as any).budget_sponsorship : '') || '0'}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (editedProject?.budget) {
+                                handleFieldChange('budget', { ...editedProject.budget, sponsorship: value });
+                              } else {
+                                handleFieldChange('budget_sponsorship', value);
+                              }
+                            }}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-lg font-bold text-purple-900 text-right"
+                            placeholder="0"
+                          />
+                        ) : (
+                          <span className="text-lg font-bold text-purple-900">
+                            {formatCurrency(project.budget?.sponsorship || ('budget_sponsorship' in project ? (project as any).budget_sponsorship : '') || '0')}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -949,20 +1388,104 @@ const ProjectDetailsPage = () => {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('deliveryModality')}</label>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          {[
+                            { value: "Physical", label: t('modalityPhysical') },
+                            { value: "Virtual", label: t('modalityVirtual') },
+                            { value: "Hybrid", label: t('modalityHybrid') }
+                          ].map((option) => (
+                            <label
+                              key={option.value}
+                              className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                                editedProject?.delivery_modality === option.value
+                                  ? 'border-teal-500 bg-teal-50 shadow-sm'
+                                  : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="deliveryModality"
+                                value={option.value}
+                                className="accent-teal-500 w-4 h-4"
+                                checked={editedProject?.delivery_modality === option.value}
+                                onChange={(e) => handleFieldChange('delivery_modality', e.target.value)}
+                              />
+                              <span className="font-medium text-gray-900 text-sm">{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <p className="text-gray-900 font-medium">{project.delivery_modality ? translateModality(project.delivery_modality) : t('notSpecified')}</p>
                       </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('geographicScope')}</label>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          {[
+                            { value: "National", label: t('scopeNational') },
+                            { value: "Regional", label: t('scopeRegional') },
+                            { value: "International", label: t('scopeInternational') }
+                          ].map((option) => (
+                            <label
+                              key={option.value}
+                              className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                                editedProject?.geographic_scope === option.value
+                                  ? 'border-teal-500 bg-teal-50 shadow-sm'
+                                  : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="geographicScope"
+                                value={option.value}
+                                className="accent-teal-500 w-4 h-4"
+                                checked={editedProject?.geographic_scope === option.value}
+                                onChange={(e) => handleFieldChange('geographic_scope', e.target.value)}
+                              />
+                              <span className="font-medium text-gray-900 text-sm">{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <p className="text-gray-900 font-medium">{project.geographic_scope ? translateScope(project.geographic_scope) : t('notSpecified')}</p>
                       </div>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('conveningMethod')}</label>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <select
+                            value={editedProject?.convening_method || ('project_type' in (editedProject || {}) ? (editedProject as any).project_type : '') || ''}
+                            onChange={(e) => handleFieldChange('convening_method', e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                          >
+                            <option value="">{t('projectTypeSelect')}</option>
+                            <option value="Training">{t('typeTraining')}</option>
+                            <option value="Workshop">{t('typeWorkshop')}</option>
+                            <option value="Conference">{t('typeConference')}</option>
+                            <option value="Campaign">{t('typeCampaign')}</option>
+                            <option value="Research">{t('typeResearch')}</option>
+                            <option value="Other">{t('other')}</option>
+                          </select>
+                          {(editedProject?.convening_method === "Other" || ('project_type' in (editedProject || {}) ? (editedProject as any).project_type === "Other" : false)) && (
+                            <input
+                              type="text"
+                              placeholder={t('projectTypeOtherPlaceholder')}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                              value={editedProject?.convening_method_other || ('project_type_other' in (editedProject || {}) ? (editedProject as any).project_type_other : '') || ''}
+                              onChange={(e) => handleFieldChange('convening_method_other', e.target.value)}
+                            />
+                          )}
+                        </div>
+                      ) : (
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <p className="text-gray-900 font-medium">
                           {(() => {
@@ -972,6 +1495,7 @@ const ProjectDetailsPage = () => {
                           {project.convening_method_other && ` (${project.convening_method_other})`}
                         </p>
                       </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -997,6 +1521,49 @@ const ProjectDetailsPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('partners')}</label>
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          {editedProject?.partners?.map((partner, index) => (
+                            <span key={index} className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                              {partner}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!editedProject) return;
+                                  const newPartners = editedProject.partners?.filter((_, i) => i !== index) || [];
+                                  setEditedProject(prev => ({ ...prev!, partners: newPartners }));
+                                }}
+                                className="w-4 h-4 flex items-center justify-center text-green-600 hover:text-green-900"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder={t('addPartnerPlaceholder')}
+                            className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.target as HTMLInputElement;
+                                const value = input.value.trim();
+                                if (value && editedProject && (!editedProject.partners || !editedProject.partners.includes(value))) {
+                                  setEditedProject(prev => ({
+                                    ...prev!,
+                                    partners: [...(prev?.partners || []), value]
+                                  }));
+                                  input.value = '';
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
                     <div className="flex flex-wrap gap-3">
                       {project.partners && Array.isArray(project.partners) && project.partners.length > 0 ? (
                         project.partners.map((partner, index) => (
@@ -1008,32 +1575,84 @@ const ProjectDetailsPage = () => {
                         <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
                       )}
                     </div>
+                    )}
                   </div>
                   <div className="space-y-4">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('beneficiaries')}</label>
-                    <div className="flex flex-wrap gap-3">
-                      {project.beneficiaries && Array.isArray(project.beneficiaries) && project.beneficiaries.length > 0 ? (
-                        project.beneficiaries.map((beneficiary, index) => (
-                          <span key={index} className="px-4 py-2 bg-blue-100 text-blue-800 rounded-xl text-sm font-medium border border-blue-200">
-                            {translateBeneficiary(beneficiary)}
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {[
+                            { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: String(t('beneficiaryStudents')) },
+                            { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: String(t('beneficiaryTeachers')) },
+                            { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: String(t('beneficiaryYouth')) },
+                            { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: String(t('beneficiaryPublic')) },
+                            { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: String(t('beneficiaryPolicymakers')) },
+                            { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: String(t('beneficiaryOther')) },
+                          ].map((benef) => (
+                            <label
+                              key={benef.value}
+                              className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
+                                editedProject?.beneficiaries?.includes(benef.value)
+                                  ? 'border-teal-500 bg-teal-50 shadow-sm'
+                                  : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1 accent-teal-500 w-4 h-4"
+                                value={benef.value}
+                                checked={editedProject?.beneficiaries?.includes(benef.value) || false}
+                                onChange={(e) => handleBeneficiaryChange(benef.value, e.target.checked)}
+                              />
+                              <div className="flex-1">
+                                <span className="font-medium text-gray-900 text-sm">{benef.label}</span>
+                                <p className="text-gray-500 text-xs mt-1 leading-relaxed">{benef.desc}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+
+                        {/* Show input only when "Other" is selected */}
+                        {showOtherBeneficiaryInput && (
+                          <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
+                            <label className="block text-sm font-medium text-teal-800 mb-2">
+                              {t('otherBeneficiaryPlaceholder')}
+                            </label>
+                            <input
+                              type="text"
+                              className="w-full px-4 py-3 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                              placeholder={t('otherBeneficiaryPlaceholder')}
+                              value={editedProject?.other_beneficiary || ''}
+                              onChange={(e) => handleOtherBeneficiaryChange(e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-3">
+                        {project.beneficiaries && Array.isArray(project.beneficiaries) && project.beneficiaries.length > 0 ? (
+                          project.beneficiaries.map((beneficiary, index) => (
+                            <span key={index} className="px-4 py-2 bg-blue-100 text-blue-800 rounded-xl text-sm font-medium border border-blue-200">
+                              {translateBeneficiary(beneficiary)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
+                        )}
+                        {project.other_beneficiary && (
+                          <span className="px-4 py-2 bg-gray-100 text-gray-800 rounded-xl text-sm font-medium border border-gray-200">
+                            {project.other_beneficiary}
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
-                      )}
-                      {project.other_beneficiary && (
-                        <span className="px-4 py-2 bg-gray-100 text-gray-800 rounded-xl text-sm font-medium border border-gray-200">
-                          {project.other_beneficiary}
-                        </span>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </motion.div>
 
             {/* Monitoring & Evaluation */}
-            {((project.milestones?.length || 0) > 0 || project.expected_outputs || (project.kpis?.length || 0) > 0) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1049,42 +1668,142 @@ const ProjectDetailsPage = () => {
                   </h2>
                 </div>
                 <div className="p-8 space-y-8">
-                  {project.milestones && Array.isArray(project.milestones) && project.milestones.length > 0 && (
                     <div className="space-y-4">
                       <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('milestones')}</label>
+                  {isEditing ? (
                       <div className="space-y-3">
-                        {project.milestones.map((milestone, index) => (
+                      <div className="flex flex-wrap gap-2">
+                        {editedProject?.milestones?.map((milestone, index) => (
+                          <span key={index} className="flex items-center gap-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+                            {milestone}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!editedProject) return;
+                                const newMilestones = editedProject.milestones?.filter((_, i) => i !== index) || [];
+                                setEditedProject(prev => ({ ...prev!, milestones: newMilestones }));
+                              }}
+                              className="w-4 h-4 flex items-center justify-center text-yellow-600 hover:text-yellow-900"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={t('milestoneNamePlaceholder')}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.target as HTMLInputElement;
+                              const value = input.value.trim();
+                              if (value && editedProject && (!editedProject.milestones || !editedProject.milestones.includes(value))) {
+                                setEditedProject(prev => ({
+                                  ...prev!,
+                                  milestones: [...(prev?.milestones || []), value]
+                                }));
+                                input.value = '';
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {project.milestones && Array.isArray(project.milestones) && project.milestones.length > 0 ? (
+                        project.milestones.map((milestone, index) => (
                           <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
                             <div className="w-3 h-3 bg-yellow-500 rounded-full flex-shrink-0"></div>
                             <span className="text-gray-900 font-medium">{milestone}</span>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {project.expected_outputs && (
-                    <div className="space-y-3">
-                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('expectedOutputs')}</label>
-                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <p className="text-gray-900 leading-relaxed">{project.expected_outputs}</p>
-                      </div>
-                    </div>
-                  )}
-                  {project.kpis && Array.isArray(project.kpis) && project.kpis.length > 0 && (
-                    <div className="space-y-4">
-                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('kpis')}</label>
-                      <div className="flex flex-wrap gap-3">
-                        {project.kpis.map((kpi, index) => (
-                          <span key={index} className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-xl text-sm font-medium border border-yellow-200">
-                            {kpi}
-                          </span>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
+                      )}
                     </div>
                   )}
                 </div>
-              </motion.div>
+
+                    <div className="space-y-3">
+                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('expectedOutputs')}</label>
+                  {isEditing ? (
+                    <textarea
+                      value={editedProject?.expected_outputs || ''}
+                      onChange={(e) => handleFieldChange('expected_outputs', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 min-h-[100px]"
+                      placeholder={t('expectedOutputsDeliverablesPlaceholder')}
+                    />
+                  ) : (
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <p className="text-gray-900 leading-relaxed">{project.expected_outputs || t('notSpecified')}</p>
+                    </div>
+                  )}
+                </div>
+
+                    <div className="space-y-4">
+                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('kpis')}</label>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {editedProject?.kpis?.map((kpi, index) => (
+                          <span key={index} className="flex items-center gap-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+                            {kpi}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!editedProject) return;
+                                const newKpis = editedProject.kpis?.filter((_, i) => i !== index) || [];
+                                setEditedProject(prev => ({ ...prev!, kpis: newKpis }));
+                              }}
+                              className="w-4 h-4 flex items-center justify-center text-yellow-600 hover:text-yellow-900"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={t('keyPerformanceIndicatorsPlaceholder')}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.target as HTMLInputElement;
+                              const value = input.value.trim();
+                              if (value && editedProject && (!editedProject.kpis || !editedProject.kpis.includes(value))) {
+                                setEditedProject(prev => ({
+                                  ...prev!,
+                                  kpis: [...(prev?.kpis || []), value]
+                                }));
+                                input.value = '';
+                              }
+                            }
+                          }}
+                        />
+                    </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-3">
+                      {project.kpis && Array.isArray(project.kpis) && project.kpis.length > 0 ? (
+                        project.kpis.map((kpi, index) => (
+                          <span key={index} className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-xl text-sm font-medium border border-yellow-200">
+                            {kpi}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
+                  )}
+                </div>
             )}
+                </div>
+              </div>
+            </motion.div>
 
             {/* Contact Information */}
             <motion.div
@@ -1105,28 +1824,126 @@ const ProjectDetailsPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('name')}</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedProject?.contact?.name || ('contact_name' in (editedProject || {}) ? (editedProject as any).contact_name : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, name: e.target.value });
+                          } else {
+                            handleFieldChange('contact_name', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactFullNamePlaceholder')}
+                      />
+                    ) : (
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                       <p className="text-gray-900 font-medium">{project.contact?.name || ('contact_name' in project ? (project as any).contact_name : '') || t('notSpecified')}</p>
                     </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('email')}</label>
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={editedProject?.contact?.email || ('contact_email' in (editedProject || {}) ? (editedProject as any).contact_email : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, email: e.target.value });
+                          } else {
+                            handleFieldChange('contact_email', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactEmailPlaceholder')}
+                      />
+                    ) : (
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                       <p className="text-gray-900 font-medium">{project.contact?.email || ('contact_email' in project ? (project as any).contact_email : '') || t('notSpecified')}</p>
                     </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('phone')}</label>
+                    {isEditing ? (
+                      <input
+                        type="tel"
+                        value={editedProject?.contact?.phone || ('contact_phone' in (editedProject || {}) ? (editedProject as any).contact_phone : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, phone: e.target.value });
+                          } else {
+                            handleFieldChange('contact_phone', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactPhonePlaceholder')}
+                      />
+                    ) : (
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                       <p className="text-gray-900 font-medium">{project.contact?.phone || ('contact_phone' in project ? (project as any).contact_phone : '') || t('notSpecified')}</p>
                     </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('role')}</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedProject?.contact?.role || ('contact_role' in (editedProject || {}) ? (editedProject as any).contact_role : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, role: e.target.value });
+                          } else {
+                            handleFieldChange('contact_role', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactRolePlaceholder')}
+                      />
+                    ) : (
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                       <p className="text-gray-900 font-medium">{project.contact?.role || ('contact_role' in project ? (project as any).contact_role : '') || t('notSpecified')}</p>
                     </div>
+                    )}
                   </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Comments */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-gray-50 to-slate-50 px-8 py-6 border-b border-gray-100">
+                <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
+                  <div className={`w-10 h-10 bg-gray-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
+                    <MessageSquare className="w-6 h-6 text-white" />
+                  </div>
+                  {t('comments')}
+                </h2>
+              </div>
+              <div className="p-8">
+                <div className="space-y-4">
+                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('comments')}</label>
+                  {isEditing ? (
+                    <textarea
+                      value={editedProject?.comments || ''}
+                      onChange={(e) => handleFieldChange('comments', e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200 min-h-[120px]"
+                      placeholder={t('commentsPlaceholder')}
+                    />
+                  ) : (
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <p className="text-gray-900 leading-relaxed">{project.comments || t('notSpecified')}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

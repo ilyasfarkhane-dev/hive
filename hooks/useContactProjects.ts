@@ -97,13 +97,35 @@ export function useContactProjects(): UseContactProjectsReturn {
         setError(null);
         setErrorType(null);
         
+        // Get contact ID from localStorage
+        let contactId = null;
+        try {
+          const contactInfo = localStorage.getItem('contactInfo');
+          if (contactInfo) {
+            const parsedContact = JSON.parse(contactInfo);
+            contactId = parsedContact.id;
+            console.log('Contact ID from localStorage:', contactId);
+          } else {
+            console.log('No contactInfo found in localStorage');
+          }
+        } catch (error) {
+          console.error('Error parsing contactInfo from localStorage:', error);
+        }
+        
         // Add a small delay on first attempt to allow serverless function to warm up
         if (attempt === 1) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
+        // Build URL with contact ID parameter
+        const url = contactId 
+          ? `/api/crm/projects?contact_id=${encodeURIComponent(contactId)}`
+          : '/api/crm/projects';
+        
+        console.log('Fetching projects from URL:', url);
+        
         // Fetch projects from our API route (which handles CORS)
-        const response = await fetch('/api/crm/projects', {
+        const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -125,10 +147,12 @@ export function useContactProjects(): UseContactProjectsReturn {
         console.log('=== FRONTEND: CRM PROJECTS RECEIVED ===');
         console.log('Success:', data.success);
         console.log('Count:', data.count);
+        console.log('Contact ID used for filtering:', contactId);
         console.log('Projects sample:', data.projects.slice(0, 2).map((p: CRMProject) => ({
           id: p.id,
           name: p.name,
           status: p.status,
+          contact_id: p.contact_id,
           sub_service: p.sub_service,
           sub_service_id: p.sub_service_id
         })));

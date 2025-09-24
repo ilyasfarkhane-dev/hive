@@ -56,6 +56,10 @@ export interface ProjectSubmissionData {
   contact_role: string;
   contact_id?: string;
   
+  // Account information
+  account_id?: string;
+  account_name?: string;
+  
   // Additional info
   comments?: string;
   supporting_documents?: File[];
@@ -67,17 +71,86 @@ export interface SubmissionResult {
   projectId?: string;
   error?: string;
   message?: string;
+  retryCount?: number;
+  maxRetries?: number;
+  canRetry?: boolean;
 }
 
 export const useProjectSubmission = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   const { sessionId } = useAuth();
   const { currentLanguage } = useI18n();
   const { logProjectSubmission } = useProjectSubmissionLogging();
   const { logProjects, refreshData } = useSessionTracking();
 
-  const submitProject = async (projectData: ProjectSubmissionData): Promise<SubmissionResult> => {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff delays in ms
+
+  // Helper function to delay execution
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Retry function for failed submissions
+  const retrySubmission = async (projectData: ProjectSubmissionData): Promise<SubmissionResult> => {
+    if (retryCount >= MAX_RETRIES) {
+      const errorResult = {
+        success: false,
+        error: `Submission failed after ${MAX_RETRIES} attempts. Please check your connection and try again later.`,
+        retryCount,
+        maxRetries: MAX_RETRIES,
+        canRetry: false,
+      };
+      setSubmissionResult(errorResult);
+      return errorResult;
+    }
+
+    setIsRetrying(true);
+    const currentRetry = retryCount + 1;
+    setRetryCount(currentRetry);
+
+    console.log(`🔄 Retrying submission (attempt ${currentRetry}/${MAX_RETRIES})...`);
+    
+    // Wait for exponential backoff delay
+    const delayMs = RETRY_DELAYS[Math.min(currentRetry - 1, RETRY_DELAYS.length - 1)];
+    await delay(delayMs);
+
+    // Call the actual submission function
+    const result = await performSubmission(projectData);
+    
+    if (result.success) {
+      setRetryCount(0); // Reset retry count on success
+      setIsRetrying(false);
+    } else if (currentRetry < MAX_RETRIES) {
+      // If still failing and we have retries left, show retry option
+      const retryResult = {
+        ...result,
+        retryCount: currentRetry,
+        maxRetries: MAX_RETRIES,
+        canRetry: true,
+      };
+      setSubmissionResult(retryResult);
+      setIsRetrying(false);
+      return retryResult;
+    } else {
+      // Max retries reached
+      const finalResult = {
+        ...result,
+        retryCount: currentRetry,
+        maxRetries: MAX_RETRIES,
+        canRetry: false,
+      };
+      setSubmissionResult(finalResult);
+      setIsRetrying(false);
+      return finalResult;
+    }
+
+    return result;
+  };
+
+  // Actual submission logic (extracted from submitProject)
+  const performSubmission = async (projectData: ProjectSubmissionData): Promise<SubmissionResult> => {
     console.log('=== PROJECT SUBMISSION DEBUG ===');
     console.log('Session ID:', sessionId);
     console.log('Project Data:', projectData);
@@ -90,9 +163,6 @@ export const useProjectSubmission = () => {
         error: 'No active session found. Please log in again.',
       };
     }
-
-    setIsSubmitting(true);
-    setSubmissionResult(null);
 
     try {
       // Prepare data for submission
@@ -128,12 +198,6 @@ export const useProjectSubmission = () => {
       console.log('API response:', result);
 
       if (result.success) {
-        setSubmissionResult({
-          success: true,
-          projectId: result.projectId,
-          message: result.message,
-        });
-        
         // Log all projects after successful submission
         console.log('=== PROJECT SUBMISSION SUCCESSFUL ===');
         console.log('New project submitted successfully!');
@@ -151,11 +215,6 @@ export const useProjectSubmission = () => {
         } catch (error) {
           console.error('Error refreshing project data:', error);
         }
-      } else {
-        setSubmissionResult({
-          success: false,
-          error: result.error,
-        });
       }
 
       return result;
@@ -170,6 +229,51 @@ export const useProjectSubmission = () => {
       const errorResult = {
         success: false,
         error: `Failed to submit project. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+      return errorResult;
+    }
+  };
+
+  // Main submission function with retry logic
+  const submitProject = async (projectData: ProjectSubmissionData): Promise<SubmissionResult> => {
+    setIsSubmitting(true);
+    setSubmissionResult(null);
+    setRetryCount(0);
+
+    try {
+      const result = await performSubmission(projectData);
+      
+      if (result.success) {
+        setSubmissionResult({
+          success: true,
+          projectId: result.projectId,
+          message: result.message,
+        });
+      } else {
+        // If submission failed, try retry logic
+        if (retryCount < MAX_RETRIES) {
+          console.log(`🔄 Initial submission failed, attempting retry...`);
+          return await retrySubmission(projectData);
+        } else {
+          const errorResult = {
+            ...result,
+            retryCount: 0,
+            maxRetries: MAX_RETRIES,
+            canRetry: true,
+          };
+          setSubmissionResult(errorResult);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Project submission error:', error);
+      const errorResult = {
+        success: false,
+        error: `Failed to submit project. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        retryCount: 0,
+        maxRetries: MAX_RETRIES,
+        canRetry: true,
       };
       setSubmissionResult(errorResult);
       return errorResult;
@@ -267,6 +371,8 @@ export const useProjectSubmission = () => {
 
   const resetSubmission = () => {
     setSubmissionResult(null);
+    setRetryCount(0);
+    setIsRetrying(false);
   };
 
   const updateProject = async (projectData: ProjectSubmissionData & { id: string }): Promise<SubmissionResult> => {
@@ -365,8 +471,12 @@ export const useProjectSubmission = () => {
     submitProject,
     saveAsDraft,
     updateProject,
+    retrySubmission,
     isSubmitting,
+    isRetrying,
     submissionResult,
+    retryCount,
+    maxRetries: MAX_RETRIES,
     resetSubmission,
   };
 };

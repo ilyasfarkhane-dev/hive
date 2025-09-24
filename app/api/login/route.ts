@@ -11,19 +11,15 @@ const CRM_CONFIG = {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== Login API Called ===');
     const { email, password, language = 'en' } = await request.json();
-    console.log('Login attempt for email:', email);
 
-    // CRM authentication only - no bypass mode
+    // CRM authentication 
     const crmService = new CRMService(CRM_CONFIG);
     
     // First authenticate with admin credentials from .env
-    console.log('Authenticating with CRM using portal credentials...');
     await crmService.authenticate();
     
     // Search for the contact in CRM using provided credentials
-    console.log('Searching for contact in CRM...');
     const contactResult = await crmService.searchContact(email, password);
     
     if (contactResult.success && contactResult.contact) {
@@ -32,15 +28,100 @@ export async function POST(request: NextRequest) {
       // Use the actual CRM session ID
       const sessionId = crmService.currentSessionId;
       
+      // Try to get account ID if we have account name but no ID
+      let accountId = contactResult.contact.account_id || null;
+      const accountName = contactResult.contact.account_name;
+      
+      if (accountName && !accountId) {
+        console.log('=== DEBUG: Trying to get account ID during login ===');
+        console.log('Account name:', accountName);
+        console.log('Account ID from contact:', accountId);
+        
+        try {
+          // Try multiple search approaches
+          const searchQueries = [
+            `accounts.name='${accountName.replace(/'/g, "\\'")}'`, // With table prefix
+            `name='${accountName.replace(/'/g, "\\'")}'`, // Without table prefix
+            `name LIKE '%${accountName.replace(/'/g, "\\'")}%'` // Partial match
+          ];
+          
+          let accountFound = false;
+          
+          for (let i = 0; i < searchQueries.length && !accountFound; i++) {
+            console.log(`Trying account search query ${i + 1}:`, searchQueries[i]);
+            
+            try {
+              const accountSearchData = {
+                session: sessionId,
+                module_name: 'Accounts',
+                query: searchQueries[i],
+                select_fields: ['id', 'name'],
+                max_results: 1
+              };
+              
+              const accountResponse = await fetch(`${CRM_CONFIG.baseUrl}/service/v4_1/rest.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                  method: 'get_entry_list',
+                  input_type: 'JSON',
+                  response_type: 'JSON',
+                  rest_data: JSON.stringify(accountSearchData),
+                }),
+                signal: AbortSignal.timeout(5000), // 5 second timeout per query
+              });
+              
+              const responseText = await accountResponse.text();
+              console.log(`Account search raw response ${i + 1}:`, responseText);
+              
+              try {
+                const accountData = JSON.parse(responseText);
+                console.log(`Account search parsed response ${i + 1}:`, accountData);
+                
+                if (accountData.entry_list && accountData.entry_list.length > 0) {
+                  accountId = accountData.entry_list[0].id;
+                  console.log('✅ Found account ID during login:', accountId);
+                  accountFound = true;
+                } else {
+                  console.log(`❌ No results with query ${i + 1}`);
+                }
+              } catch (parseError) {
+                console.error(`Failed to parse account search response ${i + 1}:`, parseError);
+                console.log('Raw response was:', responseText);
+                console.log('This might be a database error or invalid query');
+              }
+            } catch (fetchError: any) {
+              console.error(`Account search fetch error ${i + 1}:`, fetchError);
+              if (fetchError?.name === 'TimeoutError' || fetchError?.code === 'UND_ERR_CONNECT_TIMEOUT') {
+                console.log(`Query ${i + 1} timed out`);
+              }
+            }
+          }
+          
+          if (!accountFound) {
+            console.log('❌ No account found with any search method for:', accountName);
+          }
+        } catch (searchError: any) {
+          console.error('Account search failed during login:', searchError);
+          if (searchError?.name === 'TimeoutError' || searchError?.code === 'UND_ERR_CONNECT_TIMEOUT') {
+            console.log('Account search timed out during login - will retry during project submission');
+          }
+          // Don't fail login if account search fails
+        }
+      }
+      
       // Create contact info from CRM data
       const contactInfo = {
         id: contactResult.contact.id,
         name: `${contactResult.contact.first_name} ${contactResult.contact.last_name}`.trim(),
         email: contactResult.contact.email,
         phone: contactResult.contact.phone,
-        organization: contactResult.contact.account_name || 'ICESCO',
+        organization: accountName || 'ICESCO',
         role: contactResult.contact.title || 'Member',
-        country: contactResult.contact.country
+        country: contactResult.contact.country,
+        // Store account information for project submissions
+        account_id: accountId,
+        account_name: accountName
       };
 
       // Fetch goals dynamically from CRM

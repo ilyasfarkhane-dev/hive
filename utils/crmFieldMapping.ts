@@ -290,6 +290,18 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     crmField: 'sub_service',
     type: 'string',
     maxLength: 255
+  },
+
+  // Account information
+  account_id: {
+    crmField: 'accounts_icesc_project_suggestions_1',
+    type: 'string',
+    maxLength: 255
+  },
+  account_name: {
+    crmField: 'account_name',
+    type: 'string',
+    maxLength: 255
   }
 };
 

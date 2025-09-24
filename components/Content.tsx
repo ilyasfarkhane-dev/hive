@@ -78,9 +78,9 @@ const Rooms = () => {
   const { isRTL, currentLanguage } = useI18n();
   const [currentStep, setCurrentStep] = useState(1);
   const stepFiveRef = useRef<StepFiveRef>(null);
-  const { submitProject, saveAsDraft, updateProject, isSubmitting, submissionResult, resetSubmission } = useProjectSubmission();
+  const { submitProject, saveAsDraft, updateProject, retrySubmission, isSubmitting, isRetrying, submissionResult, retryCount, maxRetries, resetSubmission } = useProjectSubmission();
   const [showDraftButton, setShowDraftButton] = useState(false);
-  const [showFloatingDraft, setShowFloatingDraft] = useState(true);
+  const [showFloatingDraft, setShowFloatingDraft] = useState(false);
   const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [isEditingLoading, setIsEditingLoading] = useState(false);
   const [isReconstructingCards, setIsReconstructingCards] = useState(false);
@@ -131,32 +131,34 @@ const Rooms = () => {
         console.log('🔄 Editing mode detected for project:', editingProjectId);
         setIsEditingLoading(true);
         
-        // Load the saved form data
-        const savedData = localStorage.getItem('projectDetails');
-        if (savedData) {
-          try {
-            const parsedData = JSON.parse(savedData);
-            console.log('📝 Loading saved form data for editing:', parsedData);
+        // Add a small delay to ensure other components are ready
+        setTimeout(() => {
+          // Load the saved form data
+          const savedData = localStorage.getItem('projectDetails');
+          if (savedData) {
+            try {
+              const parsedData = JSON.parse(savedData);
+              console.log('📝 Loading saved form data for editing:', parsedData);
             
-            // Pre-fill the form with saved data
-            setProjectDetails(parsedData);
-            
-            // Set selected cards based on strategic selections
-            if (parsedData.selectedGoal) {
-              setSelectedGoal(parsedData.selectedGoal);
-            }
-            if (parsedData.selectedPillar) {
-              setSelectedPillar(parsedData.selectedPillar);
-            }
-            if (parsedData.selectedService) {
-              setSelectedService(parsedData.selectedService);
-            }
-            if (parsedData.selectedSubService) {
-              setSelectedSubService(parsedData.selectedSubService);
-            }
+              // Pre-fill the form with saved data
+              setProjectDetails(parsedData);
+              
+              // Set selected cards based on strategic selections
+              if (parsedData.selectedGoal) {
+                setSelectedGoal(parsedData.selectedGoal);
+              }
+              if (parsedData.selectedPillar) {
+                setSelectedPillar(parsedData.selectedPillar);
+              }
+              if (parsedData.selectedService) {
+                setSelectedService(parsedData.selectedService);
+              }
+              if (parsedData.selectedSubService) {
+                setSelectedSubService(parsedData.selectedSubService);
+              }
 
-            // Store the parsed data for later reconstruction when data is loaded
-            localStorage.setItem('editingProjectData', JSON.stringify(parsedData));
+              // Store the parsed data for later reconstruction when data is loaded
+              localStorage.setItem('editingProjectData', JSON.stringify(parsedData));
             
             // Load services and subservices based on selected pillar and service
             if (parsedData.selectedPillar) {
@@ -179,9 +181,16 @@ const Rooms = () => {
               
               // Load subservices if service is selected
               if (parsedData.selectedService) {
+                console.log('🔍 Loading subservices for editing mode:');
+                console.log('- Selected service:', parsedData.selectedService);
+                console.log('- Service subservices data keys:', Object.keys(serviceSubservicesData));
+                
                 const serviceSubservicesRaw = serviceSubservicesData[parsedData.selectedService as keyof typeof serviceSubservicesData] || [];
+                console.log('- Raw subservices data:', serviceSubservicesRaw);
+                console.log('- Number of raw subservices:', serviceSubservicesRaw.length);
+                
                 const serviceSubservices = serviceSubservicesRaw.map((s: any, index: number) => {
-                  return {
+                  const mappedSubservice = {
                     id: s.id || s.code || `subservice-${index}`,
                     code: s.code,
                     title: s.description_subservice,
@@ -193,8 +202,15 @@ const Rooms = () => {
                     name_subservice_ar_c: s.name_subservice_ar_c,
                     name_subservice: s.description_subservice,
                   };
+                  console.log(`- Mapped subservice ${index + 1}:`, mappedSubservice);
+                  return mappedSubservice;
                 });
+                
+                console.log('✅ Final subservices array:', serviceSubservices);
+                console.log('✅ Number of final subservices:', serviceSubservices.length);
                 setSubServices(serviceSubservices);
+              } else {
+                console.log('❌ No selected service found for subservices loading');
               }
             }
             
@@ -210,10 +226,13 @@ const Rooms = () => {
           } catch (error) {
             console.error('Error parsing saved form data:', error);
           }
+        } else {
+          setIsEditingLoading(false);
         }
         
         // Set editing loading to false after initialization
         setIsEditingLoading(false);
+        }, 200); // End of setTimeout
       } else {
         // Normal flow - check draft button state
         const hasSelectedCards = selectedCards.length > 0;
@@ -615,6 +634,13 @@ const Rooms = () => {
   const [services, setServices] = useState<any[]>([]);
   const [subServices, setSubServices] = useState<any[]>([]);
 
+  // Debug subservices state changes
+  useEffect(() => {
+    console.log('🔍 Subservices state changed:');
+    console.log('- Number of subservices:', subServices.length);
+    console.log('- Subservices data:', subServices);
+  }, [subServices]);
+
   // Fallback function to use names when hierarchy lookup fails
   const useFallbackCards = (parsedData: any) => {
     const fallbackCards = [];
@@ -683,24 +709,34 @@ const Rooms = () => {
         console.log('Subservice ID:', parsedData.selectedSubService);
         setIsReconstructingCards(true);
         
-        // If we have a subservice ID, use the hierarchy API to get the complete chain
-        if (parsedData.selectedSubService) {
-          const reconstructFromHierarchy = async () => {
-            try {
-              const response = await fetch(`/api/crm/project-hierarchy?subserviceId=${parsedData.selectedSubService}`);
-              const hierarchyData = await response.json();
-              
-              console.log('Hierarchy data received:', hierarchyData);
-              
-              if (hierarchyData.success && hierarchyData.hierarchy) {
-                const { goal, pillar, service, subservice } = hierarchyData.hierarchy;
-                const reconstructedCards = [];
+        // Add a small delay to ensure other components are ready
+        const reconstructWithDelay = async () => {
+          // Wait a bit for other components to initialize
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // If we have a subservice ID, use the hierarchy API to get the complete chain
+          if (parsedData.selectedSubService) {
+            const reconstructFromHierarchy = async () => {
+              try {
+                console.log('🌐 Fetching hierarchy data...');
+                const response = await fetch(`/api/crm/project-hierarchy?subserviceId=${parsedData.selectedSubService}`);
                 
-                // Add goal card
-                if (goal) {
-                  reconstructedCards.push({
-                    type: 'goal',
-                    id: goal.id,
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const hierarchyData = await response.json();
+                console.log('Hierarchy data received:', hierarchyData);
+                
+                if (hierarchyData.success && hierarchyData.hierarchy) {
+                  const { goal, pillar, service, subservice } = hierarchyData.hierarchy;
+                  const reconstructedCards = [];
+                  
+                  // Add goal card
+                  if (goal) {
+                    reconstructedCards.push({
+                      type: 'goal',
+                      id: goal.id,
                     title: goal.title,
                     desc: goal.desc,
                     code: goal.code,
@@ -798,38 +834,45 @@ const Rooms = () => {
                   });
                 }
                 
-                if (reconstructedCards.length > 0) {
-                  console.log('✅ Reconstructed cards from hierarchy:', reconstructedCards);
-                  setSelectedCards(reconstructedCards);
-                  setShowTwoColumns(true); // Show sidebar when cards are loaded
-                  localStorage.removeItem('editingProjectData'); // Clean up
+                  if (reconstructedCards.length > 0) {
+                    console.log('✅ Reconstructed cards from hierarchy:', reconstructedCards);
+                    setSelectedCards(reconstructedCards);
+                    setShowTwoColumns(true); // Show sidebar when cards are loaded
+                    // Don't remove editingProjectData immediately - let other components load first
+                    setTimeout(() => {
+                      localStorage.removeItem('editingProjectData');
+                    }, 500);
+                  } else {
+                    console.log('⚠️ No cards from hierarchy, using fallback...');
+                    createFallbackCards(parsedData);
+                  }
+                  
+                  setIsReconstructingCards(false);
                 } else {
-                  console.log('⚠️ No cards from hierarchy, using fallback...');
+                  console.log('⚠️ Hierarchy API failed, using fallback...');
                   createFallbackCards(parsedData);
+                  setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
+                  setIsReconstructingCards(false);
                 }
-                
-                setIsReconstructingCards(false);
-              } else {
-                console.log('⚠️ Hierarchy API failed, using fallback...');
+              } catch (error) {
+                console.error('Error fetching hierarchy:', error);
                 createFallbackCards(parsedData);
                 setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
                 setIsReconstructingCards(false);
               }
-            } catch (error) {
-              console.error('Error fetching hierarchy:', error);
-              createFallbackCards(parsedData);
-              setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
-              setIsReconstructingCards(false);
-            }
-          };
-          
-          reconstructFromHierarchy();
-        } else {
-          // No subservice ID, use fallback with names
-          createFallbackCards(parsedData);
-          setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
-          setIsReconstructingCards(false);
-        }
+            };
+            
+            reconstructFromHierarchy();
+          } else {
+            // No subservice ID, use fallback with names
+            createFallbackCards(parsedData);
+            setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
+            setIsReconstructingCards(false);
+          }
+        };
+        
+        // Start the reconstruction process
+        reconstructWithDelay();
       } catch (error) {
         console.error('Error reconstructing cards:', error);
         setIsReconstructingCards(false);
@@ -892,17 +935,29 @@ const Rooms = () => {
     }
     
     if (parsedData.selectedSubService) {
+      console.log('🔍 Fallback: Loading subservice for card reconstruction:');
+      console.log('- Selected subservice:', parsedData.selectedSubService);
+      console.log('- Selected service:', parsedData.selectedService);
+      
       const serviceSubservicesRaw = (serviceSubservicesData as any)[parsedData.selectedService] || [];
+      console.log('- Raw subservices data for fallback:', serviceSubservicesRaw);
+      
       const subservice = serviceSubservicesRaw.find((s: any) => s.id === parsedData.selectedSubService || s.name === parsedData.selectedSubService);
+      console.log('- Found subservice in fallback:', subservice);
+      
       if (subservice) {
-        fallbackCards.push({
+        const subserviceCard = {
           type: 'subService',
           id: subservice.id || subservice.name,
           title: subservice.description_subservice || subservice.name || 'Unknown Subservice',
           desc: subservice.description || subservice.description_subservice || 'No description',
           code: subservice.name || subservice.id,
           colorIndex: 3
-        });
+        };
+        console.log('✅ Adding subservice card to fallback:', subserviceCard);
+        fallbackCards.push(subserviceCard);
+      } else {
+        console.log('❌ Subservice not found in fallback data');
       }
     }
     
@@ -945,17 +1000,94 @@ const Rooms = () => {
     setGoals(goalsData);
   }, []);
 
-  // Clear localStorage on page refresh/unload
+  // Clear editing flags on mount to ensure fresh start for new projects
+  useEffect(() => {
+    // Only clear if we're not actually in editing mode (no valid project ID)
+    const editingProjectId = localStorage.getItem('editingProjectId');
+    const isEditingProject = localStorage.getItem('isEditingProject') === 'true';
+    
+    if (isEditingProject && !editingProjectId) {
+      console.log('🧹 Clearing invalid editing flags on mount');
+      
+      // Preserve specific localStorage items
+      const contactEeemailHash = localStorage.getItem('contactEeemailHash');
+      const contactInfo = localStorage.getItem('contactInfo');
+      const i18nextLng = localStorage.getItem('i18nextLng');
+      const session_id = localStorage.getItem('session_id');
+      
+      // Clear all localStorage
+      localStorage.clear();
+      
+      // Restore preserved items
+      if (contactEeemailHash) localStorage.setItem('contactEeemailHash', contactEeemailHash);
+      if (contactInfo) localStorage.setItem('contactInfo', contactInfo);
+      if (i18nextLng) localStorage.setItem('i18nextLng', i18nextLng);
+      if (session_id) localStorage.setItem('session_id', session_id);
+    }
+  }, []);
+
+  // Handle hash navigation (for "Create New Project" button)
+  useEffect(() => {
+    const handleHashNavigation = () => {
+      if (window.location.hash === '#next-section') {
+        console.log('🔍 Hash navigation detected: #next-section');
+        // Scroll to the section
+        const element = document.getElementById('next-section');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+          console.log('✅ Scrolled to next-section');
+        } else {
+          console.log('❌ next-section element not found');
+        }
+      }
+    };
+
+    // Check hash on mount
+    handleHashNavigation();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashNavigation);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashNavigation);
+    };
+  }, []);
+
+  // Clear localStorage on page refresh/unload (preserving specific items)
 useEffect(() => {
   const handleBeforeUnload = () => {
-    localStorage.removeItem('selectedCards');
-    localStorage.removeItem('projectDetails');
+    // Preserve specific localStorage items
+    const contactEeemailHash = localStorage.getItem('contactEeemailHash');
+    const contactInfo = localStorage.getItem('contactInfo');
+    const i18nextLng = localStorage.getItem('i18nextLng');
+    const session_id = localStorage.getItem('session_id');
+    
+    // Clear all localStorage
+    localStorage.clear();
+    
+    // Restore preserved items
+    if (contactEeemailHash) localStorage.setItem('contactEeemailHash', contactEeemailHash);
+    if (contactInfo) localStorage.setItem('contactInfo', contactInfo);
+    if (i18nextLng) localStorage.setItem('i18nextLng', i18nextLng);
+    if (session_id) localStorage.setItem('session_id', session_id);
   };
 
   const handleVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
-      localStorage.removeItem('selectedCards');
-      localStorage.removeItem('projectDetails');
+      // Preserve specific localStorage items
+      const contactEeemailHash = localStorage.getItem('contactEeemailHash');
+      const contactInfo = localStorage.getItem('contactInfo');
+      const i18nextLng = localStorage.getItem('i18nextLng');
+      const session_id = localStorage.getItem('session_id');
+      
+      // Clear all localStorage
+      localStorage.clear();
+      
+      // Restore preserved items
+      if (contactEeemailHash) localStorage.setItem('contactEeemailHash', contactEeemailHash);
+      if (contactInfo) localStorage.setItem('contactInfo', contactInfo);
+      if (i18nextLng) localStorage.setItem('i18nextLng', i18nextLng);
+      if (session_id) localStorage.setItem('session_id', session_id);
     }
   };
 
@@ -1182,24 +1314,36 @@ useEffect(() => {
     }
 
     // 🔹 Get sub-services for this serviceId
+    console.log('🔍 Loading subservices for service selection:');
+    console.log('- Service ID:', serviceId);
+    console.log('- Service subservices data keys:', Object.keys(serviceSubservicesData));
+    
     const serviceSubServicesRaw = (serviceSubservicesData as any)[serviceId] || [];
+    console.log('- Raw subservices data:', serviceSubServicesRaw);
+    console.log('- Number of raw subservices:', serviceSubServicesRaw.length);
 
-    const serviceSubServices: SubService[] = serviceSubServicesRaw.map((s: any) => ({
-      id: s.id,
-      name: s.name,
-      name_ar_c: s.name_ar_c,
-      name_fr_c: s.name_fr_c,
-      name_en_c: s.name_en_c,
-      description: s.description,
-      description_ar_c: s.description_ar_c,
-      description_fr_c: s.description_fr_c,
-      description_en_c: s.description_en_c,
-      description_subservice: s.description_subservice,
-      description_subservice_ar_c: s.description_subservice_ar_c,
-      description_subservice_fr_c: s.description_subservice_fr_c,
-      description_subservice_en_c: s.description_subservice_en_c,
-    }));
+    const serviceSubServices: SubService[] = serviceSubServicesRaw.map((s: any, index: number) => {
+      const mappedSubservice = {
+        id: s.id,
+        name: s.name,
+        name_ar_c: s.name_ar_c,
+        name_fr_c: s.name_fr_c,
+        name_en_c: s.name_en_c,
+        description: s.description,
+        description_ar_c: s.description_ar_c,
+        description_fr_c: s.description_fr_c,
+        description_en_c: s.description_en_c,
+        description_subservice: s.description_subservice,
+        description_subservice_ar_c: s.description_subservice_ar_c,
+        description_subservice_fr_c: s.description_subservice_fr_c,
+        description_subservice_en_c: s.description_subservice_en_c,
+      };
+      console.log(`- Mapped subservice ${index + 1}:`, mappedSubservice);
+      return mappedSubservice;
+    });
 
+    console.log('✅ Final subservices array for service selection:', serviceSubServices);
+    console.log('✅ Number of final subservices:', serviceSubServices.length);
     setSubServices(serviceSubServices);
     setCurrentStep(4);
   };
@@ -1210,9 +1354,15 @@ useEffect(() => {
 
   // Handle sub-service selection
   const handleSubServiceSelect = (subServiceId: string) => {
+    console.log('🔍 Subservice selection:');
+    console.log('- Selected subservice ID:', subServiceId);
+    console.log('- Available subservices:', subServices);
+    console.log('- Number of available subservices:', subServices.length);
+    
     setSelectedSubService(subServiceId);
 
     const subService = subServices.find((s) => s.id === subServiceId);
+    console.log('- Found subservice:', subService);
 
     if (subService && selectedColorIndex !== null) {
       // Extract the correct language value from the sub-service data
@@ -1422,6 +1572,88 @@ useEffect(() => {
           }
         })(),
         
+        // Account information - automatically get from localStorage
+        account_id: (() => {
+          try {
+            // If editing a project, use the account ID from the project data
+            if (isEditing && currentProjectDetails.account_id) {
+              console.log('✅ Using account ID from project data:', currentProjectDetails.account_id);
+              return currentProjectDetails.account_id;
+            }
+            
+            // For new projects, try to get from localStorage
+            const contactData = localStorage.getItem('contactData');
+            if (contactData) {
+              const parsed = JSON.parse(contactData);
+              if (parsed.account_id) {
+                console.log('✅ Account ID found in contactData:', parsed.account_id);
+                return parsed.account_id;
+              }
+            }
+            
+            // If not found, try to get from contactInfo
+            const contactInfo = localStorage.getItem('contactInfo');
+            if (contactInfo) {
+              const parsed = JSON.parse(contactInfo);
+              if (parsed.account_id) {
+                console.log('✅ Account ID found in contactInfo:', parsed.account_id);
+                return parsed.account_id;
+              }
+            }
+            
+            console.log('❌ No account ID found');
+            return '';
+          } catch (error) {
+            console.error('Error getting account ID:', error);
+            return '';
+          }
+        })(),
+        account_name: (() => {
+          try {
+            // If editing a project, use the account name from the project data
+            if (isEditing && currentProjectDetails.account_name) {
+              console.log('✅ Using account name from project data:', currentProjectDetails.account_name);
+              return currentProjectDetails.account_name;
+            }
+            
+            // For new projects, try to get from localStorage
+            const contactData = localStorage.getItem('contactData');
+            console.log('=== DEBUG: contactData from localStorage (handleSaveAsDraft) ===');
+            console.log('contactData:', contactData);
+            if (contactData) {
+              const parsed = JSON.parse(contactData);
+              console.log('Parsed contactData:', parsed);
+              console.log('Available keys in contactData:', Object.keys(parsed));
+              console.log('All contactData values:', JSON.stringify(parsed, null, 2));
+              if (parsed.account_name) {
+                console.log('✅ Account name found in contactData:', parsed.account_name);
+                return parsed.account_name;
+              }
+            }
+            
+            // If not found, try to get from contactInfo
+            const contactInfo = localStorage.getItem('contactInfo');
+            console.log('=== DEBUG: contactInfo from localStorage (handleSaveAsDraft) ===');
+            console.log('contactInfo:', contactInfo);
+            if (contactInfo) {
+              const parsed = JSON.parse(contactInfo);
+              console.log('Parsed contactInfo:', parsed);
+              console.log('Available keys in contactInfo:', Object.keys(parsed));
+              console.log('All contactInfo values:', JSON.stringify(parsed, null, 2));
+              if (parsed.account_name) {
+                console.log('✅ Account name found in contactInfo:', parsed.account_name);
+                return parsed.account_name;
+              }
+            }
+            
+            console.log('❌ No account name found');
+            return '';
+          } catch (error) {
+            console.error('Error getting account name:', error);
+            return '';
+          }
+        })(),
+        
         // Additional info
         comments: currentProjectDetails.comments || '',
         supporting_documents: [], // Empty array since we have URLs, not Files
@@ -1436,6 +1668,8 @@ useEffect(() => {
         contact_email: projectData.contact_email,
         contact_phone: projectData.contact_phone,
         contact_role: projectData.contact_role,
+        account_id: projectData.account_id,
+        account_name: projectData.account_name,
         strategic_goal_id: projectData.strategic_goal_id,
         pillar_id: projectData.pillar_id,
         service_id: projectData.service_id,
@@ -1449,6 +1683,8 @@ useEffect(() => {
       console.log('Contact phone:', projectData.contact_phone);
       console.log('Contact role:', projectData.contact_role);
       console.log('Contact ID:', projectData.contact_id);
+      console.log('Account ID:', projectData.account_id);
+      console.log('Account name:', projectData.account_name);
       console.log('================================');
 
       // Add status field to ensure it's treated as a draft
@@ -1468,8 +1704,20 @@ useEffect(() => {
         
         // Clear editing flags
         if (isEditing) {
-          localStorage.removeItem('editingProjectId');
-          localStorage.removeItem('isEditingProject');
+          // Preserve specific localStorage items
+          const contactEeemailHash = localStorage.getItem('contactEeemailHash');
+          const contactInfo = localStorage.getItem('contactInfo');
+          const i18nextLng = localStorage.getItem('i18nextLng');
+          const session_id = localStorage.getItem('session_id');
+          
+          // Clear all localStorage
+          localStorage.clear();
+          
+          // Restore preserved items
+          if (contactEeemailHash) localStorage.setItem('contactEeemailHash', contactEeemailHash);
+          if (contactInfo) localStorage.setItem('contactInfo', contactInfo);
+          if (i18nextLng) localStorage.setItem('i18nextLng', i18nextLng);
+          if (session_id) localStorage.setItem('session_id', session_id);
         }
         
         // Redirect to projects page after 2 seconds
@@ -1535,6 +1783,14 @@ useEffect(() => {
     console.log('- editingProjectId:', editingProjectId);
     console.log('- isEditingProject flag:', localStorage.getItem('isEditingProject'));
     console.log('- isEditing:', isEditing);
+    
+    // If we're not actually editing (no valid project ID), clear the flags and create new project
+    if (isEditing && !editingProjectId) {
+      console.log('⚠️ Editing flags found but no valid project ID, clearing flags and creating new project');
+      localStorage.removeItem('editingProjectId');
+      localStorage.removeItem('isEditingProject');
+      localStorage.removeItem('editingProjectData');
+    }
     
     try {
       // Handle file uploads first
@@ -1629,6 +1885,78 @@ useEffect(() => {
           }
         })(),
         
+        // Account information - automatically get from localStorage
+        account_id: (() => {
+          try {
+            // If editing a project, use the account ID from the project data
+            if (isEditing && projectDetails.account_id) {
+              console.log('✅ Using account ID from project data:', projectDetails.account_id);
+              return projectDetails.account_id;
+            }
+            
+            // For new projects, try to get from localStorage
+            const contactData = localStorage.getItem('contactData');
+            if (contactData) {
+              const parsed = JSON.parse(contactData);
+              if (parsed.account_id) {
+                console.log('✅ Account ID found in contactData:', parsed.account_id);
+                return parsed.account_id;
+              }
+            }
+            
+            // If not found, try to get from contactInfo
+            const contactInfo = localStorage.getItem('contactInfo');
+            if (contactInfo) {
+              const parsed = JSON.parse(contactInfo);
+              if (parsed.account_id) {
+                console.log('✅ Account ID found in contactInfo:', parsed.account_id);
+                return parsed.account_id;
+              }
+            }
+            
+            console.log('❌ No account ID found');
+            return '';
+          } catch (error) {
+            console.error('Error getting account ID:', error);
+            return '';
+          }
+        })(),
+        account_name: (() => {
+          try {
+            // If editing a project, use the account name from the project data
+            if (isEditing && projectDetails.account_name) {
+              console.log('✅ Using account name from project data:', projectDetails.account_name);
+              return projectDetails.account_name;
+            }
+            
+            // For new projects, try to get from localStorage
+            const contactData = localStorage.getItem('contactData');
+            if (contactData) {
+              const parsed = JSON.parse(contactData);
+              if (parsed.account_name) {
+                console.log('✅ Account name found in contactData:', parsed.account_name);
+                return parsed.account_name;
+              }
+            }
+            
+            // If not found, try to get from contactInfo
+            const contactInfo = localStorage.getItem('contactInfo');
+            if (contactInfo) {
+              const parsed = JSON.parse(contactInfo);
+              if (parsed.account_name) {
+                console.log('✅ Account name found in contactInfo:', parsed.account_name);
+                return parsed.account_name;
+              }
+            }
+            
+            console.log('❌ No account name found');
+            return '';
+          } catch (error) {
+            console.error('Error getting account name:', error);
+            return '';
+          }
+        })(),
+        
         // Additional info
         comments: projectDetails.comments || '',
         // Note: supporting_documents is expected to be File[] but we have URLs
@@ -1645,6 +1973,8 @@ useEffect(() => {
       console.log('Project data sample:', {
         name: projectData.name,
         contact_id: projectData.contact_id,
+        account_id: projectData.account_id,
+        account_name: projectData.account_name,
         strategic_goal_id: projectData.strategic_goal_id,
         pillar_id: projectData.pillar_id,
         service_id: projectData.service_id,
@@ -1664,8 +1994,21 @@ useEffect(() => {
       if (result.success) {
         // Clear editing flags after successful update
         if (isEditing) {
-          localStorage.removeItem('editingProjectId');
-          localStorage.removeItem('isEditingProject');
+          // Preserve specific localStorage items
+          const contactEeemailHash = localStorage.getItem('contactEeemailHash');
+          const contactInfo = localStorage.getItem('contactInfo');
+          const i18nextLng = localStorage.getItem('i18nextLng');
+          const session_id = localStorage.getItem('session_id');
+          
+          // Clear all localStorage
+          localStorage.clear();
+          
+          // Restore preserved items
+          if (contactEeemailHash) localStorage.setItem('contactEeemailHash', contactEeemailHash);
+          if (contactInfo) localStorage.setItem('contactInfo', contactInfo);
+          if (i18nextLng) localStorage.setItem('i18nextLng', i18nextLng);
+          if (session_id) localStorage.setItem('session_id', session_id);
+          
           console.log('✅ Editing flags cleared after successful update');
         }
         
@@ -1717,9 +2060,20 @@ useEffect(() => {
 
   // Clear all data and reset to step 1
   const clearAllData = () => {
-    // Clear localStorage
-    localStorage.removeItem('selectedCards');
-    localStorage.removeItem('projectDetails');
+    // Preserve specific localStorage items
+    const contactEeemailHash = localStorage.getItem('contactEeemailHash');
+    const contactInfo = localStorage.getItem('contactInfo');
+    const i18nextLng = localStorage.getItem('i18nextLng');
+    const session_id = localStorage.getItem('session_id');
+    
+    // Clear all localStorage
+    localStorage.clear();
+    
+    // Restore preserved items
+    if (contactEeemailHash) localStorage.setItem('contactEeemailHash', contactEeemailHash);
+    if (contactInfo) localStorage.setItem('contactInfo', contactInfo);
+    if (i18nextLng) localStorage.setItem('i18nextLng', i18nextLng);
+    if (session_id) localStorage.setItem('session_id', session_id);
 
     // Reset all state
     setSelectedCards([]);
@@ -2222,8 +2576,12 @@ useEffect(() => {
                     onEditProjectDetails={handleEditProjectDetails}
                     onSubmit={handleProjectSubmission}
                     onSaveAsDraft={handleSaveAsDraft}
+                    onRetry={retrySubmission}
                     submissionResult={submissionResult}
                     isSubmitting={isSubmitting}
+                    isRetrying={isRetrying}
+                    retryCount={retryCount}
+                    maxRetries={maxRetries}
                     isDraftSaving={isDraftSaving}
                     showDraftButton={showDraftButton && !showFloatingDraft}
                 />
@@ -2257,30 +2615,21 @@ useEffect(() => {
   {isDraftSaving ? (
     <>
       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-      <span className="text-[10px] sm:text-xs font-medium -rotate-90 whitespace-nowrap">
-        Saving...
+      <span className="text-[0.95rem] font-medium -rotate-90 whitespace-nowrap">
+        {t('saving')}...
       </span>
     </>
   ) : (
     <>
   
-      <span className="text-[10px] sm:text-xs font-medium  -rotate-90 whitespace-nowrap">
-        Save as Draft
+      <span className="text-[0.95rem] font-medium -rotate-90 whitespace-nowrap">
+        {t('saveAsDraft')}
       </span>
     </>
   )}
 </div>
 
 
-      {/* Tooltip */}
-      <div className="absolute right-full top-1/2 mr-2 sm:mr-3 px-2 sm:px-3 py-1.5 sm:py-2 
-                      bg-gray-900 text-white text-[10px] sm:text-xs rounded-lg 
-                      opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap 
-                      transform -translate-y-1/2 shadow-lg">
-        Save your progress and continue later
-        <div className="absolute left-full top-1/2 w-0 h-0 border-l-4 border-l-gray-900 
-                        border-t-4 border-t-transparent border-b-4 border-b-transparent transform -translate-y-1/2"></div>
-      </div>
     </motion.button>
   </div>
 )}

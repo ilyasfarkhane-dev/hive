@@ -1189,6 +1189,37 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
         </div>
       </div>
 
+      {/* Save as Draft Button - Centered at bottom */}
+      {showDraftButton && (
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <div className="flex justify-center">
+            <button
+              onClick={onSaveAsDraft}
+              disabled={isDraftSaving || !isDraftValid()}
+              className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${
+                isDraftValid() && !isDraftSaving
+                  ? 'bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white hover:shadow-xl transform hover:-translate-y-0.5'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {isDraftSaving ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <span className="font-medium">Saving...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  <span className="font-medium">Save as Draft</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Buttons */}
       <div className="mt-8 pt-6 border-t border-gray-200">
         <div className="flex justify-between items-center">
@@ -1203,39 +1234,6 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
           </button>
 
           <div className="flex items-center gap-3">
-            {/* Save as Draft Button - Vertical Ticket Style */}
-            {showDraftButton && (
-              <button
-                onClick={onSaveAsDraft}
-                disabled={isDraftSaving || !isDraftValid()}
-                className={`group relative flex flex-col items-center justify-center w-16 h-32 rounded-full transition shadow-lg font-medium ${
-                  isDraftValid() && !isDraftSaving
-                    ? 'bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white hover:shadow-xl'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                {isDraftSaving ? (
-                  <>
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
-                    <span className="text-xs font-medium transform -rotate-90 whitespace-nowrap">Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
-                    <span className="text-xs font-medium transform -rotate-90 whitespace-nowrap">Save as Draft</span>
-                  </>
-                )}
-                
-                {/* Tooltip */}
-                <div className="absolute right-full top-1/2 mr-3 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap transform -translate-y-1/2">
-                  {isDraftValid() ? 'Save your progress as a draft' : 'Fill required fields to save as draft'}
-                  <div className="absolute left-full top-1/2 w-0 h-0 border-l-4 border-l-gray-900 border-t-4 border-t-transparent border-b-4 border-b-transparent transform -translate-y-1/2"></div>
-                </div>
-              </button>
-            )}
-
             {/* Next Button */}
             <button
               onClick={() => {

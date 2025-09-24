@@ -25,6 +25,8 @@ if (!i18n.isInitialized) {
     resources: {
       en: {
         common: {
+          "saving": "Saving...",
+          "saveAsDraft": "Save as Draft",
           "editProject": "Edit Project",
           "createNewProject": "Create New Project",
           "showing": "Showing",
@@ -270,6 +272,8 @@ if (!i18n.isInitialized) {
       },
       fr: {
         common: {
+          "saving": "Enregistrement...",
+          "saveAsDraft": "Enregistrer comme Brouillon",
           "editProject": "Modifier le Projet",
           "createNewProject": "Créer un nouveau projet",
           "manageAndTrackYourProjects": "Gérer et suivre vos projets",
@@ -516,6 +520,8 @@ if (!i18n.isInitialized) {
       },
       ar: {
         common: {
+          "saving": "حفظ...",
+          "saveAsDraft": "حفظ كمسودة",
           "editProject": "تعديل المشروع",
           "createNewProject": "إنشاء مشروع جديد",
           "manageAndTrackYourProjects": "إدارة وتتبع مشاريعك",

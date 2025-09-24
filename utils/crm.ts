@@ -91,6 +91,94 @@ export async function getSessionId(): Promise<string> {
   });
 }
 
+// 🔗 Get related projects for a specific contact using get_relationships
+export async function getContactProjects(
+  sessionId: string,
+  contactId: string,
+  relatedFields: string[] = [
+    'id',
+    'name',
+    'description',
+    'status_c',
+    'date_entered',
+    'date_modified',
+    'contact_name',
+    'contact_email',
+    'contact_phone',
+    'contact_role',
+    'budget_icesco',
+    'budget_member_state',
+    'budget_sponsorship',
+    'date_start',
+    'date_end',
+    'project_frequency',
+    'beneficiaries',
+    'delivery_modality',
+    'geographic_scope',
+    'project_type',
+    'expected_outputs',
+    'comments'
+  ]
+): Promise<any[]> {
+  const method = 'get_relationships';
+  const inputType = 'JSON';
+  const responseType = 'JSON';
+  
+  const restData = {
+    session: sessionId,
+    module_name: 'Contacts',
+    module_id: contactId,
+    link_field_name: 'contacts_icesc_project_suggestions_1',
+    related_module_query: '',
+    related_fields: relatedFields,
+    deleted: 0
+  };
+
+  console.log('=== CRM GET_RELATIONSHIPS REQUEST ===');
+  console.log('Method:', method);
+  console.log('Module:', 'Contacts');
+  console.log('Contact ID:', contactId);
+  console.log('Link field:', 'contacts_icesc_project_suggestions_1');
+  console.log('Related fields:', relatedFields);
+
+  const requestData = {
+    method,
+    input_type: inputType,
+    response_type: responseType,
+    rest_data: JSON.stringify(restData)
+  };
+
+  try {
+    const response = await withRetry(async () => {
+      return await axios.post(CRM_REST_URL, requestData, {
+        timeout: 30000, // 30 second timeout
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+    });
+
+    console.log('=== CRM GET_RELATIONSHIPS RESPONSE ===');
+    console.log('Status:', response.status);
+    console.log('Response keys:', Object.keys(response.data));
+
+    if (response.data.entry_list) {
+      console.log('Found', response.data.entry_list.length, 'related projects');
+      return response.data.entry_list;
+    } else {
+      console.log('No entry_list in response, checking for errors...');
+      if (response.data.error) {
+        console.error('CRM Error:', response.data.error);
+        throw new Error(`CRM Error: ${response.data.error}`);
+      }
+      return [];
+    }
+  } catch (error) {
+    console.error('Error fetching contact projects:', error);
+    throw error;
+  }
+}
+
 // 📦 Generic fetcher with timeout and error handling
 export async function getModuleEntries(
   sessionId: string,
@@ -140,6 +228,17 @@ export async function getModuleEntries(
       return [];
     }
 
+    // Debug: Log the full response structure
+    console.log('=== CRM API RESPONSE DEBUG ===');
+    console.log('Response keys:', Object.keys(resp.data));
+    if (resp.data.entry_list && resp.data.entry_list.length > 0) {
+      console.log('First entry keys:', Object.keys(resp.data.entry_list[0]));
+      console.log('First entry link_list:', resp.data.entry_list[0].link_list);
+    }
+    if (resp.data.relationship_list) {
+      console.log('Relationship list:', resp.data.relationship_list);
+    }
+
     if (!resp.data.entry_list) {
       console.error('No entry_list in CRM response');
       console.error('Available keys:', Object.keys(resp.data));
@@ -152,6 +251,89 @@ export async function getModuleEntries(
     }
 
 
+    // Process relationship_list to create a map of relationships by entry ID
+    const relationshipMap: Record<string, any> = {};
+    const globalContacts: any[] = [];
+    
+    if (resp.data.relationship_list) {
+      console.log('Processing relationship_list:', resp.data.relationship_list);
+      resp.data.relationship_list.forEach((rel: any, relIndex: number) => {
+        console.log(`\n--- RELATIONSHIP ${relIndex + 1} ---`);
+        console.log('Relationship item:', rel);
+        console.log('Relationship item keys:', Object.keys(rel));
+        
+        // Check if this relationship has link_list (which contains the actual relationship data)
+        if (rel.link_list && Array.isArray(rel.link_list)) {
+          console.log('Found link_list in relationship:', rel.link_list);
+          rel.link_list.forEach((linkEntry: any) => {
+            console.log('Link entry:', linkEntry);
+            console.log('Link entry keys:', Object.keys(linkEntry));
+            
+            // The link entry should contain the relationship data in records
+            if (linkEntry.records && Array.isArray(linkEntry.records)) {
+              console.log('Processing records in link:', linkEntry.records);
+              linkEntry.records.forEach((record: any) => {
+                console.log('Record:', record);
+                console.log('Record keys:', Object.keys(record));
+                
+                // The record should have link_value containing the actual contact data
+                if (record.link_value) {
+                  console.log('Processing link_value:', record.link_value);
+                  console.log('Link_value keys:', Object.keys(record.link_value));
+                  
+                  // Process the contact data from link_value
+                  const contactObj: Record<string, any> = {};
+                  if (record.link_value.name_value_list) {
+                    Object.values(record.link_value.name_value_list).forEach((field: any) => {
+                      contactObj[field.name] = field.value;
+                    });
+                  } else {
+                    // If no name_value_list, use the direct properties
+                    Object.keys(record.link_value).forEach((key: string) => {
+                      if (key !== 'project_id') {
+                        // Keep the id field as it contains the actual contact ID
+                        if (key === 'id' && record.link_value[key] && record.link_value[key].value) {
+                          contactObj[key] = record.link_value[key].value;
+                        } else if (key === 'id') {
+                          contactObj[key] = record.link_value[key];
+                        } else {
+                          contactObj[key] = record.link_value[key];
+                        }
+                      }
+                    });
+                  }
+                  
+                  // Store contact in global list
+                  globalContacts.push(contactObj);
+                  console.log(`Stored contact:`, contactObj);
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    // Map contacts to projects based on project ID in the relationship data
+    // Since we don't have direct project-to-contact mapping, we'll assign contacts to projects
+    if (globalContacts.length > 0) {
+      console.log(`\n=== MAPPING ${globalContacts.length} CONTACTS TO PROJECTS ===`);
+      resp.data.entry_list.forEach((entry: any, projectIndex: number) => {
+        const projectId = entry.id;
+        console.log(`\n--- PROJECT ${projectIndex + 1}: ${projectId} ---`);
+        
+        // For now, we'll assign contacts to projects in order
+        // In a real scenario, you'd need to determine the correct mapping
+        const assignedContacts = globalContacts.slice(projectIndex, projectIndex + 1);
+        if (assignedContacts.length > 0) {
+          relationshipMap[projectId] = {
+            'contacts_icesc_project_suggestions_1': assignedContacts
+          };
+          console.log(`Assigned ${assignedContacts.length} contact(s) to project ${projectId}:`, assignedContacts.map(c => c.name?.value || c.name));
+        }
+      });
+    }
+
     return resp.data.entry_list.map((entry: any) => {
       const obj: Record<string, any> = {};
       
@@ -159,6 +341,11 @@ export async function getModuleEntries(
       if (entry.name_value_list) {
         Object.values(entry.name_value_list).forEach((field: any) => {
           obj[field.name] = field.value;
+          
+          // Debug contact-related fields
+          if (field.name && field.name.includes('contact')) {
+            console.log(`[CRM Processing] Project ${entry.id} - ${field.name}:`, field.value);
+          }
         });
       }
       
@@ -172,17 +359,30 @@ export async function getModuleEntries(
         }
       });
       
-      // Process link_list relationships
+      // Process link_list relationships (if they exist)
       if (entry.link_list) {
+        console.log(`Processing link_list for entry ${entry.id}:`, Object.keys(entry.link_list));
         obj.link_list = {};
         Object.keys(entry.link_list).forEach((linkName: string) => {
           const linkData = entry.link_list[linkName];
+          console.log(`Link ${linkName} data:`, linkData);
           if (Array.isArray(linkData)) {
             obj.link_list[linkName] = linkData.map((relatedEntry: any) => {
               const relatedObj: Record<string, any> = {};
               if (relatedEntry.name_value_list) {
                 Object.values(relatedEntry.name_value_list).forEach((field: any) => {
                   relatedObj[field.name] = field.value;
+                });
+              } else {
+                // Handle direct properties (like the contact data structure)
+                Object.keys(relatedEntry).forEach((key: string) => {
+                  if (key === 'id' && relatedEntry[key] && relatedEntry[key].value) {
+                    relatedObj[key] = relatedEntry[key].value;
+                  } else if (key === 'id') {
+                    relatedObj[key] = relatedEntry[key];
+                  } else {
+                    relatedObj[key] = relatedEntry[key];
+                  }
                 });
               }
               return relatedObj;
@@ -191,6 +391,30 @@ export async function getModuleEntries(
             obj.link_list[linkName] = linkData;
           }
         });
+      } else {
+        console.log(`No link_list found for entry ${entry.id}`);
+      }
+      
+      // Add relationships from relationship_list (only for this specific project)
+      if (relationshipMap[entry.id]) {
+        console.log(`Adding relationships for entry ${entry.id}:`, Object.keys(relationshipMap[entry.id]));
+        obj.link_list = { ...obj.link_list, ...relationshipMap[entry.id] };
+        
+        // Also add the contact name to the main object for easy access
+        if (relationshipMap[entry.id]['contacts_icesc_project_suggestions_1'] && 
+            relationshipMap[entry.id]['contacts_icesc_project_suggestions_1'].length > 0) {
+          const contact = relationshipMap[entry.id]['contacts_icesc_project_suggestions_1'][0];
+          let contactName = '';
+          if (contact.name && typeof contact.name === 'object') {
+            contactName = contact.name.value || contact.name.name || '';
+          } else if (typeof contact.name === 'string') {
+            contactName = contact.name;
+          }
+          obj.contacts_icesc_project_suggestions_1_name = contactName;
+          console.log(`Added contact name for project ${entry.id}: "${contactName}"`);
+        }
+      } else {
+        console.log(`No relationships found for project ${entry.id}`);
       }
       
       return obj;

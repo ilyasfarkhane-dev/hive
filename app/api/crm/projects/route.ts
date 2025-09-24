@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionId, getModuleEntries } from '@/utils/crm';
+import { getSessionId, getModuleEntries, getContactProjects } from '@/utils/crm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,6 +8,13 @@ export async function GET(request: NextRequest) {
     console.log('CRM Admin User:', process.env.CRM_ADMIN_USER || 'NOT_SET');
     console.log('CRM Admin Pass:', process.env.CRM_ADMIN_PASS ? 'SET' : 'NOT_SET');
     console.log('CRM Base URL:', process.env.CRM_BASE_URL || 'NOT_SET');
+    
+    // Get parameters from query string
+    const { searchParams } = new URL(request.url);
+    const contactId = searchParams.get('contact_id');
+    const projectId = searchParams.get('project_id');
+    console.log('Contact ID from query params:', contactId);
+    console.log('Project ID from query params:', projectId);
     
     // Get session ID with timeout and retry logic
     let sessionId: string;
@@ -55,6 +62,23 @@ export async function GET(request: NextRequest) {
       console.log('Session ID length:', sessionId?.length);
       console.log('Module: icesc_project_suggestions');
       
+      // Fallback to the working approach: fetch all projects and filter by contact
+      // The get_relationships method is causing connection timeouts
+      console.log('CRM get_relationships method is causing timeouts, falling back to get_entries + filtering');
+      console.log('Contact ID for filtering:', contactId);
+      
+      if (!contactId && !projectId) {
+        console.log('No contact ID or project ID provided, returning empty array for security');
+        return NextResponse.json({
+          success: true,
+          count: 0,
+          contact_id: null,
+          project_id: null,
+          projects: [],
+          message: 'No contact ID or project ID provided'
+        });
+      }
+      
       projectEntries = await getModuleEntries(
         sessionId,
         'icesc_project_suggestions',
@@ -72,7 +96,6 @@ export async function GET(request: NextRequest) {
           'service',
           'service_id',
           'subservices',
-          'subservices.name',
           'subservices_name',
           'subservice',
           'subservice_name',
@@ -88,13 +111,11 @@ export async function GET(request: NextRequest) {
           'contact_email',
           'contact_phone',
           'contact_role',
-          'contact_id',
           'budget_icesco',
           'budget_member_state',
           'budget_sponsorship',
           'date_start',
           'date_end',
-          'frequency',
           'frequency_duration',
           'project_frequency',
           'beneficiaries',
@@ -105,14 +126,9 @@ export async function GET(request: NextRequest) {
           'partner3',
           'partner4',
           'partner5',
-          'institutions',
           'delivery_modality',
           'geographic_scope',
-          'convening_method',
           'project_type',
-          'convening_method_c',
-          'project_type_c',
-          'project_type_other',
           'milestones1',
           'milestones2',
           'milestones3',
@@ -132,9 +148,14 @@ export async function GET(request: NextRequest) {
           'modified_user_id',
           'modified_by_name'
         ],
-        '', // No specific query
+        '', // No query filter
         100, // Max 100 projects
-        [] // We'll fetch relationships separately using get_relationships // Include subservice relationship
+        [
+          {
+            name: 'contacts_icesc_project_suggestions_1',
+            value: ['id', 'name', 'email', 'phone']
+          }
+        ] // Include contact relationship data
       );
     } catch (fetchError) {
       console.error('Failed to fetch project entries:', fetchError);
@@ -164,6 +185,71 @@ export async function GET(request: NextRequest) {
       name: projectEntries[0].name,
       status: projectEntries[0].status
     } : 'No projects found');
+    
+        // LOG ALL PROJECTS WITH ALL RELATIONSHIP DATA
+        console.log('=== COMPREHENSIVE PROJECT DATA LOG ===');
+        projectEntries.forEach((entry: any, index: number) => {
+          console.log(`\n--- PROJECT ${index + 1}: ${entry.id} ---`);
+          console.log('Project Name:', entry.name);
+          console.log('Project Status:', entry.status_c);
+          console.log('Created By:', entry.created_by);
+          console.log('Created By Name:', entry.created_by_name);
+          
+          // Log relationship data instead of form fields
+          console.log('--- RELATIONSHIP DATA ---');
+          if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
+            entry.link_list.contacts_icesc_project_suggestions_1.forEach((contact: any, contactIndex: number) => {
+              console.log(`  Contact ${contactIndex + 1}:`);
+              console.log(`    ID: ${contact.id?.value || contact.id}`);
+              console.log(`    Name: ${contact.name?.value || contact.name}`);
+              console.log(`    Email: ${contact.email?.value || contact.email}`);
+            });
+          } else {
+            console.log('  No relationship data found');
+          }
+      
+      // Log all available fields
+      console.log('All Project Fields:');
+      Object.keys(entry).forEach(key => {
+        if (key !== 'name_value_list' && key !== 'link_list') {
+          console.log(`  ${key}:`, entry[key]);
+        }
+      });
+      
+      // Log name_value_list if it exists
+      if (entry.name_value_list) {
+        console.log('Name Value List:');
+        Object.values(entry.name_value_list).forEach((field: any) => {
+          console.log(`  ${field.name}:`, field.value);
+        });
+      }
+      
+      // Log link_list if it exists
+      if (entry.link_list) {
+        console.log('Link List:');
+        Object.keys(entry.link_list).forEach(linkName => {
+          console.log(`  ${linkName}:`, entry.link_list[linkName]);
+        });
+      } else {
+        console.log('No link_list found for this project');
+      }
+    });
+    
+    // LOG RELATIONSHIP DATA
+    console.log('\n=== RELATIONSHIP DATA LOG ===');
+    if (projectEntries.length > 0 && projectEntries[0].link_list && projectEntries[0].link_list.contacts_icesc_project_suggestions_1) {
+      const contactData = projectEntries[0].link_list.contacts_icesc_project_suggestions_1;
+      console.log('Relationship Data Found:');
+      contactData.forEach((contact: any, index: number) => {
+        console.log(`  Contact ${index + 1}:`);
+        console.log(`    ID: ${contact.id}`);
+        console.log(`    Name: ${contact.name?.value || contact.name}`);
+        console.log(`    Email: ${contact.email?.value || contact.email}`);
+        console.log(`    Phone: ${contact.phone?.value || contact.phone}`);
+      });
+    } else {
+      console.log('No relationship data found in projects');
+    }
     
     // Fetch subservice relationships for each project with retry logic
     const projectsWithSubservices = await Promise.allSettled(
@@ -322,8 +408,82 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Filter projects by contact ID or fetch specific project
+    let filteredProjects = processedProjects;
+    console.log('🔍 Debug - contactId:', contactId, 'projectId:', projectId);
+    
+    if (contactId) {
+      console.log(`Filtering ${processedProjects.length} projects by contact ID: ${contactId}`);
+      
+      // Filter projects based on the contact ID in relationships
+      filteredProjects = processedProjects.filter((entry: any) => {
+        console.log(`\n--- CHECKING PROJECT: ${entry.id} ---`);
+        console.log(`Project Name: "${entry.name}"`);
+        console.log(`Created By: "${entry.created_by}"`);
+        console.log(`Contact Name: "${entry.contacts_icesc_project_suggestions_1_name}"`);
+        
+        // Check if the project was created by the contact
+        if (entry.created_by === contactId) {
+          console.log(`✅ CREATED BY MATCH: Project ${entry.id} was created by contact ${contactId}`);
+          return true;
+        }
+        
+        // Check if the contact ID appears in the relationship data
+        if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
+          const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
+          for (const contact of contactData) {
+            const contactIdFromRel = contact.id?.value || contact.id;
+            const contactName = contact.name?.value || contact.name;
+            
+            console.log(`  - Checking relationship contact: ${contactName} (ID: ${contactIdFromRel})`);
+            
+            if (contactIdFromRel === contactId) {
+              console.log(`✅ RELATIONSHIP MATCH: Project ${entry.id} has relationship with contact ${contactId}`);
+              return true;
+            }
+          }
+        }
+        
+        console.log(`❌ NO MATCH: Project ${entry.id} does not belong to contact ${contactId}`);
+        return false;
+      });
+      
+      console.log(`Filtered to ${filteredProjects.length} projects for contact ${contactId}`);
+      
+      // If no projects found, return empty array (security: don't show other users' projects)
+      if (filteredProjects.length === 0) {
+        console.log('⚠️ No projects found for contact ID, returning empty array for security');
+        return NextResponse.json({
+          success: true,
+          count: 0,
+          contact_id: contactId,
+          projects: [],
+          message: 'No projects found for this contact'
+        });
+      }
+    } else if (projectId) {
+      // If project ID provided, fetch specific project
+      console.log(`🔍 Fetching specific project: ${projectId}`);
+      console.log(`📊 Available projects: ${processedProjects.length}`);
+      console.log(`📋 Project IDs: ${processedProjects.map(p => p.id).join(', ')}`);
+      
+      // Find the specific project by ID
+      const specificProject = processedProjects.find((p: any) => p.id === projectId);
+      if (specificProject) {
+        filteredProjects = [specificProject];
+        console.log(`✅ Found specific project: ${specificProject.name}`);
+      } else {
+        console.log(`❌ Project ${projectId} not found in ${processedProjects.length} available projects`);
+        filteredProjects = [];
+      }
+    } else {
+      console.log('No contact ID or project ID provided, returning empty array for security');
+      console.log('Debug - contactId:', contactId, 'projectId:', projectId);
+      filteredProjects = [];
+    }
+
     // Transform the data (subservice data is already fetched above)
-    const transformedProjects = processedProjects.map((entry: any) => {
+    const transformedProjects = filteredProjects.map((entry: any) => {
       
       return {
         id: entry.id || '',
@@ -353,12 +513,39 @@ export async function GET(request: NextRequest) {
         date_entered: entry.date_entered || '',
         date_modified: entry.date_modified || '',
         
-        // Contact information
+        // Contact information - include both form fields and relationship data
+        contact_id: (() => {
+          // Check for contact relationship data in link_list first
+          if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
+            const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
+            if (contactData.length > 0) {
+              const contactRecord = contactData[0];
+              // The contact data structure has id as { name: 'id', value: 'actual-id' }
+              if (contactRecord.id && contactRecord.id.value) {
+                return contactRecord.id.value;
+              } else if (contactRecord.id) {
+                return contactRecord.id;
+              }
+            }
+          }
+          
+          // Fallback to other contact fields
+          const hasValidContactRelationship = entry.contacts_icesc_project_suggestions_1 && 
+                                            entry.contacts_icesc_project_suggestions_1.trim() !== '';
+          return hasValidContactRelationship ? 
+                 entry.contacts_icesc_project_suggestions_1 : 
+                 entry.created_by || '';
+        })(),
+        
+        // Contact form fields for display
         contact_name: entry.contact_name || '',
         contact_email: entry.contact_email || '',
         contact_phone: entry.contact_phone || '',
         contact_role: entry.contact_role || '',
-        contact_id: entry.contact_id || '',
+        
+        // Account information
+        account_id: entry.accounts_icesc_project_suggestions_1 || '',
+        account_name: entry.accounts_icesc_project_suggestions_1_name || '',
         
         // Budget
         budget_icesco: parseFloat(entry.budget_icesco) || 0,
@@ -443,16 +630,27 @@ export async function GET(request: NextRequest) {
     const result = {
       success: true,
       projects: transformedProjects,
-      count: transformedProjects.length
+      count: transformedProjects.length,
+      message: contactId ? `Found ${transformedProjects.length} projects for contact ${contactId}` : 'No contact ID provided',
+      contact_id: contactId,
+      export_info: {
+        export_date: new Date().toISOString(),
+        total_projects: transformedProjects.length,
+        includes_relationships: true,
+        includes_subservices: true,
+        filtered_by_contact: !!contactId
+      }
     };
     
     console.log('=== CRM PROJECTS API RESULT ===');
     console.log('Success:', result.success);
     console.log('Count:', result.count);
+    console.log('Contact ID used for filtering:', contactId);
     console.log('Projects sample:', result.projects.slice(0, 2).map(p => ({
       id: p.id,
       name: p.name,
       status: p.status,
+      contact_id: p.contact_id,
       sub_service: p.sub_service,
       sub_service_id: p.sub_service_id,
       subservices: p.sub_service || [],
@@ -465,17 +663,7 @@ export async function GET(request: NextRequest) {
     console.log('=== RAW CRM DATA SAMPLE ===');
     if (projectEntries.length > 0) {
       const rawEntry = projectEntries[0];
-      console.log('Raw entry keys:', Object.keys(rawEntry));
-      console.log('Full raw entry structure:', JSON.stringify(rawEntry, null, 2));
-      console.log('Raw entry link_list:', rawEntry.link_list);
-      
-      // Debug beneficiaries field specifically
-      console.log('=== BENEFICIARIES FIELD DEBUG ===');
-      console.log('beneficiaries field:', rawEntry.beneficiaries);
-      console.log('beneficiaries type:', typeof rawEntry.beneficiaries);
-      console.log('beneficiaries_c field:', rawEntry.beneficiaries_c);
-      console.log('beneficiaries_c type:', typeof rawEntry.beneficiaries_c);
-      console.log('================================');
+     
       
       if (rawEntry.link_list) {
         console.log('Available link_list keys:', Object.keys(rawEntry.link_list));

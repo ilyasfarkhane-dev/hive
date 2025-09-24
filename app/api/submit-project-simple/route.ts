@@ -70,7 +70,190 @@ export async function POST(request: NextRequest) {
 
     // Use proper CRM field mapping
     console.log('=== DEBUG: Creating CRM field mapping ===');
+    console.log('=== DEBUG: Account Information ===');
+    console.log('Account ID from projectData:', projectData.account_id);
+    console.log('Account name from projectData:', projectData.account_name);
+    console.log('Account ID type:', typeof projectData.account_id);
+    console.log('Account name type:', typeof projectData.account_name);
+    console.log('Account ID length:', projectData.account_id?.length);
+    console.log('Account name length:', projectData.account_name?.length);
+    console.log('Full projectData object:', JSON.stringify(projectData, null, 2));
+    console.log('================================');
     const crmData = mapProjectDataToCRM(projectData);
+    console.log('=== DEBUG: CRM Data after mapping ===');
+    console.log('CRM data fields:', crmData.map(field => ({ name: field.name, value: field.value })));
+    console.log('Account fields in CRM data:', crmData.filter(field => 
+      field.name.includes('account') || field.name.includes('icesc_project_suggestions_1')
+    ));
+    console.log('=====================================');
+    
+    // Try to get account ID if we have account name but no ID
+    if (projectData.account_name && !projectData.account_id) {
+      console.log('=== DEBUG: Trying to get account ID by name ===');
+      console.log('Searching for account name:', projectData.account_name);
+      console.log('Account name length:', projectData.account_name.length);
+      console.log('Account name type:', typeof projectData.account_name);
+      
+      // Try with retries
+      const maxRetries = 2;
+      let accountFound = false;
+      
+      for (let retry = 0; retry < maxRetries && !accountFound; retry++) {
+        if (retry > 0) {
+          console.log(`Retry attempt ${retry + 1}/${maxRetries} for account search...`);
+          // Wait a bit before retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        try {
+          // Try multiple search approaches
+          const searchQueries = [
+            `name='${projectData.account_name.replace(/'/g, "\\'")}'`, // Exact match
+            `name LIKE '%${projectData.account_name.replace(/'/g, "\\'")}%'`, // Partial match
+            `name LIKE '${projectData.account_name.replace(/'/g, "\\'")}%'`, // Starts with
+          ];
+        
+        for (let i = 0; i < searchQueries.length && !accountFound; i++) {
+          console.log(`Trying search query ${i + 1}:`, searchQueries[i]);
+          
+          try {
+            const accountResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                method: 'get_entry_list',
+                input_type: 'JSON',
+                response_type: 'JSON',
+                rest_data: JSON.stringify({
+                  session: sessionId,
+                  module_name: 'Accounts',
+                  query: searchQueries[i],
+                  select_fields: ['id', 'name'],
+                  max_results: 20
+                }),
+              }),
+              // Add timeout and retry configuration
+              signal: AbortSignal.timeout(15000), // 15 second timeout
+            });
+          
+            const accountData = await accountResponse.json();
+            console.log(`Account search response ${i + 1}:`, accountData);
+            
+            if (accountData.entry_list && accountData.entry_list.length > 0) {
+              console.log(`Found ${accountData.entry_list.length} accounts with query ${i + 1}`);
+              
+              // Find exact match first
+              let exactMatch = accountData.entry_list.find((account: any) => {
+                const accountName = account.name_value_list?.name?.value || account.name_value_list?.name || '';
+                console.log(`Comparing: "${accountName}" === "${projectData.account_name}"`);
+                return accountName === projectData.account_name;
+              });
+              
+              if (exactMatch) {
+                projectData.account_id = exactMatch.id;
+                console.log('✅ Found exact account ID:', projectData.account_id);
+                accountFound = true;
+              } else {
+                // Try case-insensitive match
+                let caseInsensitiveMatch = accountData.entry_list.find((account: any) => {
+                  const accountName = account.name_value_list?.name?.value || account.name_value_list?.name || '';
+                  return accountName.toLowerCase() === projectData.account_name.toLowerCase();
+                });
+                
+                if (caseInsensitiveMatch) {
+                  projectData.account_id = caseInsensitiveMatch.id;
+                  console.log('✅ Found case-insensitive account ID:', projectData.account_id);
+                  accountFound = true;
+                } else {
+                  console.log('No exact match found, trying next query...');
+                }
+              }
+            } else {
+              console.log(`No results with query ${i + 1}`);
+            }
+          } catch (fetchError: any) {
+            console.error(`Error with search query ${i + 1}:`, fetchError);
+            if (fetchError?.name === 'TimeoutError' || fetchError?.code === 'UND_ERR_CONNECT_TIMEOUT') {
+              console.log(`Timeout with query ${i + 1}, trying next query...`);
+            } else {
+              console.log(`Other error with query ${i + 1}, trying next query...`);
+            }
+          }
+        }
+        
+          if (!accountFound) {
+            console.log('❌ No account found with any search method for name:', projectData.account_name);
+            console.log('⚠️ Will proceed without account ID - CRM may handle relationship by name');
+          }
+        } catch (error) {
+          console.error('Error searching for account:', error);
+        }
+      }
+    }
+
+    // Manually add account fields if they exist
+    if (projectData.account_name || projectData.account_id) {
+      console.log('=== DEBUG: Adding account fields manually ===');
+      console.log('Adding account name:', projectData.account_name);
+      console.log('Adding account ID:', projectData.account_id);
+      console.log('=== DEBUG: Full projectData for account fields ===');
+      console.log('projectData.account_name:', projectData.account_name);
+      console.log('projectData.account_id:', projectData.account_id);
+      console.log('typeof account_name:', typeof projectData.account_name);
+      console.log('account_name length:', projectData.account_name?.length);
+      
+      // Add account name field
+      if (projectData.account_name) {
+        crmData.push({
+          name: 'accounts_icesc_project_suggestions_1_name',
+          value: projectData.account_name
+        });
+        console.log('Added accounts_icesc_project_suggestions_1_name:', projectData.account_name);
+        
+        // Also try to clear any default value by setting it to empty first
+        crmData.push({
+          name: 'accounts_icesc_project_suggestions_1_name',
+          value: '' // Clear the field first
+        });
+        console.log('Cleared accounts_icesc_project_suggestions_1_name field');
+        
+        // Then set the correct value
+        crmData.push({
+          name: 'accounts_icesc_project_suggestions_1_name',
+          value: projectData.account_name
+        });
+        console.log('Set accounts_icesc_project_suggestions_1_name to:', projectData.account_name);
+      }
+      
+      // Add account ID field (even if empty, we need to set the relationship)
+      crmData.push({
+        name: 'accounts_icesc_project_suggestions_1',
+        value: projectData.account_id || ''
+      });
+      console.log('Added accounts_icesc_project_suggestions_1:', projectData.account_id || '');
+      
+      // Also try to add the account name to other possible fields
+      if (projectData.account_name) {
+        const possibleAccountFields = [
+          'account_name',
+          'account_name_c',
+          'accounts_name',
+          'ms_accounts_icesc_project_suggestions_1_name'
+        ];
+        
+        possibleAccountFields.forEach(fieldName => {
+          crmData.push({
+            name: fieldName,
+            value: projectData.account_name
+          });
+          console.log(`Added ${fieldName}:`, projectData.account_name);
+        });
+      }
+      
+      console.log('Account fields added to CRM data');
+    }
     
     // Add strategic relationship information to comments
     const strategicInfo = {
@@ -388,31 +571,54 @@ export async function POST(request: NextRequest) {
           console.log('✅ Contact ID provided:', contactId);
         }
         
-        // Get a real account ID - use the same method as submit-suggestion
-        const accountResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            method: 'get_entry_list',
-            input_type: 'JSON',
-            response_type: 'JSON',
-            rest_data: JSON.stringify({
-              session: sessionId,
-              module_name: 'Accounts',
-              select_fields: ['id', 'name'],
-              max_results: 1
-            }),
-          }),
-        });
+        // Get account ID from localStorage (passed via projectData)
+        let accountId = projectData.account_id;
+        console.log('Using account_id from localStorage (projectData):', accountId);
+        console.log('Account name from projectData:', projectData.account_name);
         
-        const accountData = await accountResponse.json();
-        console.log('Account data response:', accountData);
+        // If no account ID from localStorage, but we have account name, search for it
+        if (!accountId && projectData.account_name) {
+          console.log('No account ID from localStorage, but have account name. Searching for account by name...');
+          try {
+            const accountResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                method: 'get_entry_list',
+                input_type: 'JSON',
+                response_type: 'JSON',
+                rest_data: JSON.stringify({
+                  session: sessionId,
+                  module_name: 'Accounts',
+                  query: `name='${projectData.account_name.replace(/'/g, "\\'")}'`,
+                  select_fields: ['id', 'name'],
+                  max_results: 1
+                }),
+              }),
+            });
+            
+            const accountData = await accountResponse.json();
+            console.log('Account search by name response:', accountData);
+            
+            if (accountData.entry_list && accountData.entry_list.length > 0) {
+              accountId = accountData.entry_list[0].id;
+              console.log('✅ Found account ID by name:', accountId);
+            } else {
+              console.log('❌ No account found with name:', projectData.account_name);
+            }
+          } catch (error) {
+            console.error('Error searching for account by name:', error);
+          }
+        }
         
-        const accountId = accountData.entry_list && accountData.entry_list.length > 0 
-          ? accountData.entry_list[0].id 
-          : null;
+        // If still no account ID, skip the relationship (don't use random fallback)
+        if (!accountId) {
+          console.log('⚠️ No account ID available, skipping account relationship to avoid using wrong account');
+        }
         
         console.log('Relationship data:', { contactId, subserviceId, accountId });
+        console.log('Account name being used:', projectData.account_name);
+        console.log('Account ID being used for relationship:', accountId);
         
         // Set subservice relationship
         if (subserviceId) {
@@ -432,7 +638,16 @@ export async function POST(request: NextRequest) {
               }),
             }),
           });
-          const subserviceResult = await subserviceResponse.json();
+          const subserviceResponseText = await subserviceResponse.text();
+          console.log('Subservice relationship response:', subserviceResponseText);
+          
+          let subserviceResult;
+          if (subserviceResponseText.trim()) {
+            subserviceResult = JSON.parse(subserviceResponseText);
+          } else {
+            console.log('Empty response for subservice relationship');
+            subserviceResult = { error: 'Empty response' };
+          }
           console.log('Subservice relationship result:', JSON.stringify(subserviceResult, null, 2));
           if (subserviceResult.id) {
             console.log('✅ Subservice relationship set successfully');
@@ -459,7 +674,16 @@ export async function POST(request: NextRequest) {
               }),
             }),
           });
-          const contactResult = await contactResponse.json();
+          const contactResponseText = await contactResponse.text();
+          console.log('Contact relationship response:', contactResponseText);
+          
+          let contactResult;
+          if (contactResponseText.trim()) {
+            contactResult = JSON.parse(contactResponseText);
+          } else {
+            console.log('Empty response for contact relationship');
+            contactResult = { error: 'Empty response' };
+          }
           console.log('Contact relationship result:', JSON.stringify(contactResult, null, 2));
           if (contactResult.id) {
             console.log('✅ Contact relationship set successfully');
@@ -468,8 +692,8 @@ export async function POST(request: NextRequest) {
           }
         }
         
-        // Set account relationship - try different field names
-        if (accountId) {
+        // Set account relationship - try different field names (only if we have a valid account ID)
+        if (accountId && accountId !== '') {
           console.log('Setting account relationship...');
           
           // Try different possible account link field names
@@ -489,6 +713,8 @@ export async function POST(request: NextRequest) {
             
             try {
               console.log(`Trying account relationship using field: ${accountLinkField}`);
+              console.log('Setting account relationship with account ID:', accountId);
+              console.log('Account name for relationship:', projectData.account_name);
               const accountResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -506,7 +732,16 @@ export async function POST(request: NextRequest) {
                 }),
               });
               
-              const accountResult = await accountResponse.json();
+              const accountResponseText = await accountResponse.text();
+              console.log(`Account relationship response for ${accountLinkField}:`, accountResponseText);
+              
+              let accountResult;
+              if (accountResponseText.trim()) {
+                accountResult = JSON.parse(accountResponseText);
+              } else {
+                console.log(`Empty response for account relationship field: ${accountLinkField}`);
+                continue;
+              }
               console.log(`Account relationship result for ${accountLinkField}:`, JSON.stringify(accountResult, null, 2));
             if (accountResult.id) {
               console.log(`✅ Account relationship set successfully with field: ${accountLinkField}`);

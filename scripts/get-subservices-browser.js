@@ -2,7 +2,7 @@
 // Run this in the browser console after logging in
 
 // CRM Configuration
-const CRM_BASE_URL = 'http://3.145.21.11';
+const CRM_BASE_URL = 'https://crm.icesco.org';
 
 // Function to get session ID from localStorage
 function getSessionId() {
@@ -342,3 +342,4 @@ console.log('4. Generate TypeScript data file');
 console.log('5. Download the files automatically');
 console.log('');
 console.log('Ready to export! Run: exportSubservices()');
+

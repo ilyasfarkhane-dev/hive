@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext';
 import { AuthProvider } from '@/context/AuthContext';
 import AuthWrapper from '@/context/AuthWrapper';
 import { I18nProvider } from '@/context/I18nProvider';
-import ChatBot from '@/components/ChatBot';
 
 
 
@@ -29,7 +28,7 @@ export default function RootLayout({
           <AuthProvider>
             <AuthWrapper>
               {children}
-              <ChatBot />
+           
             </AuthWrapper>
           </AuthProvider>
         </I18nProvider>

@@ -3,9 +3,9 @@ import CRMService from '@/services/crmService';
 
 // CRM Configuration from environment variables
 const CRM_CONFIG = {
-  baseUrl: process.env.CRM_BASE_URL || 'http://3.145.21.11',
-  username: process.env.CRM_USERNAME || 'your-username',
-  password: process.env.CRM_PASSWORD || 'your-password',
+  baseUrl: process.env.CRM_BASE_URL || 'https://crm.icesco.org',
+  username: process.env.CRM_USERNAME || 'portal',
+  password: process.env.CRM_PASSWORD || 'Portal@2025',
   application: process.env.CRM_APPLICATION || 'ICESCO Portal',
 };
 
@@ -13,10 +13,20 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password, language = 'en' } = await request.json();
 
+    console.log('=== LOGIN DEBUG ===');
+    console.log('CRM Config:', {
+      baseUrl: CRM_CONFIG.baseUrl,
+      username: CRM_CONFIG.username,
+      application: CRM_CONFIG.application,
+      password: '***' // Don't log password
+    });
+    console.log('User credentials:', { email, password: '***' });
+
     // CRM authentication 
     const crmService = new CRMService(CRM_CONFIG);
     
     // First authenticate with admin credentials from .env
+    console.log('Authenticating with CRM...');
     await crmService.authenticate();
     
     // Search for the contact in CRM using provided credentials
@@ -184,12 +194,15 @@ export async function POST(request: NextRequest) {
       error.message.includes('timeout') ||
       error.message.includes('ECONNREFUSED') ||
       error.message.includes('ENOTFOUND') ||
-      error.message.includes('fetch failed')
+      error.message.includes('fetch failed') ||
+      error.message.includes('Connect Timeout Error') ||
+      error.message.includes('UND_ERR_CONNECT_TIMEOUT')
     )) {
+      console.error('CRM Connection Error:', error.message);
       return NextResponse.json(
         { 
           success: false, 
-          message: "Unable to connect to authentication server. Please try again later." 
+          message: "Unable to connect to ICESCO CRM server. Please check your internet connection and try again." 
         },
         { status: 503 } // Service Unavailable
       );

@@ -267,7 +267,7 @@ export async function GET(request: NextRequest) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
           
-            const subserviceResponse = await fetch('http://3.145.21.11/service/v4_1/rest.php', {
+            const subserviceResponse = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',

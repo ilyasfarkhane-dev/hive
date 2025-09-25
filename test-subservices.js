@@ -12,7 +12,7 @@ async function testSubservices() {
     });
 
     const loginResp = await axios.post(
-      "http://3.145.21.11/service/v4_1/rest.php",
+      "https://crm.icesco.org/service/v4_1/rest.php",
       new URLSearchParams({
         method: "login",
         input_type: "JSON",
@@ -44,7 +44,7 @@ async function testSubservices() {
     });
 
     const subserviceResp = await axios.post(
-      "http://3.145.21.11/service/v4_1/rest.php",
+      "https://crm.icesco.org/service/v4_1/rest.php",
       new URLSearchParams({
         method: "get_entry_list",
         input_type: "JSON",

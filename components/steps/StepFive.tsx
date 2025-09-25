@@ -295,6 +295,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
         formValues.budget.icesco,
         formValues.budget.member_state,
         formValues.budget.sponsorship,
+        formValues.startDate,
+        formValues.endDate,
         formValues.projectFrequency,
         formValues.partners.length > 0,
         formValues.conveningMethod,
@@ -333,6 +335,8 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
       formValues.budget.icesco,
       formValues.budget.member_state,
       formValues.budget.sponsorship,
+      formValues.startDate,
+      formValues.endDate,
       formValues.projectFrequency,
       formValues.partners.length > 0,
       formValues.conveningMethod,
@@ -444,7 +448,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
 
               <div className="mb-6">
                 <label className="block mb-2 font-medium text-gray-900">
-                  {t('problemStatement')}
+                  {t('problemStatement')} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="rationale"
@@ -511,7 +515,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
               {showOtherInput && (
                 <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
                   <label className="block text-sm font-medium text-teal-800 mb-2">
-                    {t('otherBeneficiaryPlaceholder')}
+                    {t('otherBeneficiaryPlaceholder')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -543,11 +547,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="block mb-1 font-medium text-gray-900">
-                {t('startDate')} <span className="text-gray-400 text-sm">{t('optional')}</span>
+                {t('startDate')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 id="date_start"
+                required
                 className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out"
                 value={formValues.startDate}
                 onChange={(e) =>
@@ -558,11 +563,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
 
             <div>
               <label className="block mb-1 font-medium text-gray-900">
-                {t('endDate')} <span className="text-gray-400 text-sm">{t('optional')}</span>
+                {t('endDate')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 id="date_end"
+                required
                 className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out"
                 value={formValues.endDate}
                 onChange={(e) =>
@@ -620,16 +626,21 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
                 <option value="Continuous">{t('frequencyContinuous')}</option>
               </select>
               {formValues.projectFrequency === "Continuous" && (
-                <input
-                  type="text"
-                  id="frequency_duration"
-                  placeholder={t('frequencyDurationPlaceholder')}
-                  className={`w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out mt-2 ${formValues.freqError ? "border-red-500" : ""
-                    }`}
-                  value={formValues.frequencyDuration}
-                  onChange={(e) => setFormValues({ ...formValues, frequencyDuration: e.target.value })}
-                  required
-                />
+                <div className="mt-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('frequencyDurationPlaceholder')} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="frequency_duration"
+                    placeholder={t('frequencyDurationPlaceholder')}
+                    className={`w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition duration-300 ease-in-out ${formValues.freqError ? "border-red-500" : ""
+                      }`}
+                    value={formValues.frequencyDuration}
+                    onChange={(e) => setFormValues({ ...formValues, frequencyDuration: e.target.value })}
+                    required
+                  />
+                </div>
               )}
               {formValues.freqError && <p className="text-red-500 text-sm mt-1">{formValues.freqError}</p>}
             </div>
@@ -741,20 +752,25 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
             </select>
 
             {formValues.conveningMethod === "Other" && (
-              <input
-                type="text"
-                id="convening_method_other"
-                required
-                placeholder={t('projectTypeOtherPlaceholder')}
-                className="mt-3 w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition"
-                value={formValues.conveningMethodOther}
-                onChange={(e) =>
-                  setFormValues({
-                    ...formValues,
-                    conveningMethodOther: e.target.value,
-                  })
-                }
-              />
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('projectTypeOtherPlaceholder')} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="convening_method_other"
+                  required
+                  placeholder={t('projectTypeOtherPlaceholder')}
+                  className="w-full px-5 py-3 border border-gray-300 rounded-2xl focus:border-teal-500 focus:ring-2 focus:ring-teal-100 shadow-sm transition"
+                  value={formValues.conveningMethodOther}
+                  onChange={(e) =>
+                    setFormValues({
+                      ...formValues,
+                      conveningMethodOther: e.target.value,
+                    })
+                  }
+                />
+              </div>
             )}
           </div>
 

@@ -82,7 +82,7 @@ export const getAllSubserviceNames = (): string[];
 ## CRM Configuration
 
 The scripts use the following CRM configuration:
-- **Base URL**: `http://3.145.21.11`
+- **Base URL**: `https://crm.icesco.org`
 - **Admin User**: `portal`
 - **Admin Password**: `Portal@2024`
 

@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Config SugarCRM ---
-const CRM_REST_URL = "http://3.145.21.11/service/v4_1/rest.php";
+const CRM_REST_URL = "https://crm.icesco.org/service/v4_1/rest.php";
 const USERNAME = "portal";
 const PASSWORD = "Portal@2025";
 

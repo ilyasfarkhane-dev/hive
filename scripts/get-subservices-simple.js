@@ -14,7 +14,7 @@ async function getSubservices() {
     
     // Fetch subservices
     console.log('📋 Fetching subservices...');
-    const response = await fetch('http://3.145.21.11/service/v4_1/rest.php', {
+    const response = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -123,3 +123,4 @@ export const getSubserviceByCode = (code: string) => subservices.find(s => s.cod
 // Run it
 console.log('🚀 Starting subservices export...');
 getSubservices();
+

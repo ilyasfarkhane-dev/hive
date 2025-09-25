@@ -3,7 +3,7 @@ const path = require('path');
 
 // Your session_id
 const SESSION_ID = 'pstf9133flgmnuvedcbn324o1s';
-const CRM_BASE_URL = 'http://3.145.21.11';
+const CRM_BASE_URL = 'https://crm.icesco.org';
 
 async function fetchSubservicesWithServiceRelation() {
   try {
@@ -239,3 +239,4 @@ async function main() {
 
 // Run the script
 main();
+

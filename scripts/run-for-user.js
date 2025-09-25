@@ -3,7 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 // CRM Configuration
-const CRM_BASE_URL = 'http://3.145.21.11';
+const CRM_BASE_URL = 'https://crm.icesco.org';
 const CRM_ADMIN_USER = 'portal';
 const CRM_ADMIN_PASS = 'Portal@2025';
 

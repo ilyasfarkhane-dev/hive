@@ -1,7 +1,7 @@
 import axios from "axios";
 import md5 from "md5";
 
-const CRM_REST_URL = "http://3.145.21.11/service/v4_1/rest.php";
+const CRM_REST_URL = "https://crm.icesco.org/service/v4_1/rest.php";
 
 // Retry configuration
 const MAX_RETRIES = 3;

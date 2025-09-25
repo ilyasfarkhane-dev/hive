@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 // CRM Configuration
-const CRM_BASE_URL = 'http://3.145.21.11';
+const CRM_BASE_URL = 'https://crm.icesco.org';
 const CRM_USER = 'portal';
 const CRM_PASS = 'Portal@2025';
 const CRM_URL = `${CRM_BASE_URL}/service/v4_1/rest.php`;

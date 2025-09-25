@@ -15,7 +15,7 @@ async function fetchServiceSubservices() {
     console.log('Relationship: ms_service_ms_subservice_1 (Services -> Subservices, One to Many)');
     
     // Fetch subservices with service relationships
-    const response = await fetch('http://3.145.21.11/service/v4_1/rest.php', {
+    const response = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -193,3 +193,4 @@ console.log('Make sure you are logged in to the application first.');
 console.log('');
 console.log('Running export...');
 fetchServiceSubservices();
+

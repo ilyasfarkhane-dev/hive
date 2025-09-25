@@ -3,7 +3,7 @@ import CRMService, { ProjectSubmissionData } from '@/services/crmService';
 
 // CRM Configuration - should be moved to environment variables
 const CRM_CONFIG = {
-  baseUrl: process.env.CRM_BASE_URL || 'http://3.145.21.11',
+  baseUrl: process.env.CRM_BASE_URL || 'https://crm.icesco.org',
   username: process.env.CRM_USERNAME || 'your-username',
   password: process.env.CRM_PASSWORD || 'your-password',
   application: process.env.CRM_APPLICATION || 'ICESCO Portal',

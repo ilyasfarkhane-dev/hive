@@ -1430,7 +1430,7 @@ const ProjectDetailsPage = () => {
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('titreprojet')}</label>
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('titreprojet')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
                       <input
                         type="text"
@@ -1446,7 +1446,7 @@ const ProjectDetailsPage = () => {
                 
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('brief')}</label>
+                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('brief')} <span className="text-red-500">*</span></label>
                   {isEditing ? (
                     <textarea
                       value={editedProject?.description || editedProject?.brief || ''}
@@ -1480,7 +1480,7 @@ const ProjectDetailsPage = () => {
               </div>
               <div className="p-8 space-y-8">
                 <div className="space-y-3">
-                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('problemStatementPlaceholder')}</label>
+                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('problemStatementPlaceholder')} <span className="text-red-500">*</span></label>
                   <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                     {isEditing ? (
                       <textarea
@@ -1499,7 +1499,7 @@ const ProjectDetailsPage = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('beneficiaries')}</label>
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('beneficiaries')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
                       <div className="space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1538,7 +1538,7 @@ const ProjectDetailsPage = () => {
                         {showOtherBeneficiaryInput && (
                           <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
                             <label className="block text-sm font-medium text-teal-800 mb-2">
-                              {t('otherBeneficiaryPlaceholder')}
+                              {t('otherBeneficiaryPlaceholder')} <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
@@ -1569,15 +1569,7 @@ const ProjectDetailsPage = () => {
                       </div>
                     )}
                   </div>
-                  
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('expectedImpact')}</label>
-                    <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                      <p className="text-green-800 text-sm">
-                        {t('impactDescription')}
-                      </p>
-                    </div>
-                  </div>
+                 
                 </div>
               </div>
             </motion.div>
@@ -1609,10 +1601,11 @@ const ProjectDetailsPage = () => {
                     </div>
                     <div className="space-y-4">
                       <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
-                        <span className="text-sm font-medium text-gray-600">{t('startDate')}</span>
+                        <span className="text-sm font-medium text-gray-600">{t('startDate')} <span className="text-red-500">*</span></span>
                         {isEditing ? (
                           <input
                             type="date"
+                            required
                             value={editedProject?.start_date || ''}
                             onChange={(e) => handleFieldChange('start_date', e.target.value)}
                             className="px-2 py-1 border border-gray-300 rounded text-sm font-semibold text-gray-900"
@@ -1622,10 +1615,11 @@ const ProjectDetailsPage = () => {
                         )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
-                        <span className="text-sm font-medium text-gray-600">{t('endDate')}</span>
+                        <span className="text-sm font-medium text-gray-600">{t('endDate')} <span className="text-red-500">*</span></span>
                         {isEditing ? (
                           <input
                             type="date"
+                            required
                             value={editedProject?.end_date || ''}
                             onChange={(e) => handleFieldChange('end_date', e.target.value)}
                             className="px-2 py-1 border border-gray-300 rounded text-sm font-semibold text-gray-900"
@@ -1635,7 +1629,7 @@ const ProjectDetailsPage = () => {
                         )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-gray-50 rounded-xl">
-                        <span className="text-sm font-medium text-gray-600">{t('frequency')}</span>
+                        <span className="text-sm font-medium text-gray-600">{t('frequency')} <span className="text-red-500">*</span></span>
                         {isEditing ? (
                           <div className="flex items-center gap-2">
                             <select
@@ -1648,13 +1642,18 @@ const ProjectDetailsPage = () => {
                               <option value="Continuous">{t('frequencyContinuous')}</option>
                             </select>
                             {editedProject?.project_frequency === "Continuous" && (
-                              <input
-                                type="text"
-                                placeholder={t('frequencyDurationPlaceholder')}
-                                value={editedProject?.frequency_duration || ''}
-                                onChange={(e) => handleFieldChange('frequency_duration', e.target.value)}
-                                className="px-2 py-1 border border-gray-300 rounded text-sm w-32"
-                              />
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs font-medium text-gray-700">
+                                  {t('frequencyDurationPlaceholder')} <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder={t('frequencyDurationPlaceholder')}
+                                  value={editedProject?.frequency_duration || ''}
+                                  onChange={(e) => handleFieldChange('frequency_duration', e.target.value)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm w-32"
+                                />
+                              </div>
                             )}
                           </div>
                         ) : (
@@ -1686,7 +1685,7 @@ const ProjectDetailsPage = () => {
                     </div>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center py-3 px-4 bg-blue-50 rounded-xl border border-blue-200">
-                        <span className="text-sm font-medium text-blue-700">{t('budgetLabel_icesco')}</span>
+                        <span className="text-sm font-medium text-blue-700">{t('budgetLabel_icesco')} <span className="text-red-500">*</span></span>
                         {isEditing ? (
                           <input
                             type="number"
@@ -1709,7 +1708,7 @@ const ProjectDetailsPage = () => {
                         )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-green-50 rounded-xl border border-green-200">
-                        <span className="text-sm font-medium text-green-700">{t('memberState')}</span>
+                        <span className="text-sm font-medium text-green-700">{t('memberState')} <span className="text-red-500">*</span></span>
                         {isEditing ? (
                           <input
                             type="number"
@@ -1732,7 +1731,7 @@ const ProjectDetailsPage = () => {
                         )}
                       </div>
                       <div className="flex justify-between items-center py-3 px-4 bg-purple-50 rounded-xl border border-purple-200">
-                        <span className="text-sm font-medium text-purple-700">{t('sponsorship')}</span>
+                        <span className="text-sm font-medium text-purple-700">{t('sponsorship')} <span className="text-red-500">*</span></span>
                         {isEditing ? (
                           <input
                             type="number"
@@ -1780,7 +1779,7 @@ const ProjectDetailsPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('deliveryModality')}</label>
+                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('deliveryModality')} <span className="text-red-500">*</span></label>
                       {isEditing ? (
                         <div className="space-y-2">
                           {[
@@ -1815,7 +1814,7 @@ const ProjectDetailsPage = () => {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('geographicScope')}</label>
+                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('geographicScope')} <span className="text-red-500">*</span></label>
                       {isEditing ? (
                         <div className="space-y-2">
                           {[
@@ -1852,7 +1851,7 @@ const ProjectDetailsPage = () => {
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('conveningMethod')}</label>
+                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('conveningMethod')} <span className="text-red-500">*</span></label>
                       {isEditing ? (
                         <div className="space-y-2">
                           <select
@@ -1869,13 +1868,18 @@ const ProjectDetailsPage = () => {
                             <option value="Other">{t('other')}</option>
                           </select>
                           {(editedProject?.convening_method === "Other" || ('project_type' in (editedProject || {}) ? (editedProject as any).project_type === "Other" : false)) && (
-                            <input
-                              type="text"
-                              placeholder={t('projectTypeOtherPlaceholder')}
-                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                              value={editedProject?.convening_method_other || ('project_type_other' in (editedProject || {}) ? (editedProject as any).project_type_other : '') || ''}
-                              onChange={(e) => handleFieldChange('convening_method_other', e.target.value)}
-                            />
+                            <div className="mt-3">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {t('projectTypeOtherPlaceholder')} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder={t('projectTypeOtherPlaceholder')}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                                value={editedProject?.convening_method_other || ('project_type_other' in (editedProject || {}) ? (editedProject as any).project_type_other : '') || ''}
+                                onChange={(e) => handleFieldChange('convening_method_other', e.target.value)}
+                              />
+                            </div>
                           )}
                         </div>
                       ) : (
@@ -2010,7 +2014,7 @@ const ProjectDetailsPage = () => {
                         {showOtherBeneficiaryInput && (
                           <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
                             <label className="block text-sm font-medium text-teal-800 mb-2">
-                              {t('otherBeneficiaryPlaceholder')}
+                              {t('otherBeneficiaryPlaceholder')} <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
@@ -2216,7 +2220,7 @@ const ProjectDetailsPage = () => {
               <div className="p-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('name')}</label>
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('name')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
                       <input
                         type="text"
@@ -2238,7 +2242,7 @@ const ProjectDetailsPage = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('email')}</label>
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('email')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
                       <input
                         type="email"
@@ -2260,7 +2264,7 @@ const ProjectDetailsPage = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('phone')}</label>
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('phone')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
                       <input
                         type="tel"
@@ -2282,7 +2286,7 @@ const ProjectDetailsPage = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('role')}</label>
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('role')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
                       <input
                         type="text"

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionId, getModuleEntries } from '@/utils/crm';
 import { mapProjectDataToCRM, validateProjectData } from '@/utils/crmFieldMapping';
 
-const CRM_BASE_URL = 'http://3.145.21.11';
+const CRM_BASE_URL = 'https://crm.icesco.org';
 
 // Function to get a fresh session ID
 async function getFreshSessionId(): Promise<string> {

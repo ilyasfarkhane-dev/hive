@@ -165,7 +165,7 @@ class CRMService {
               rest_data: JSON.stringify(method.authData),
         }),
         // Add longer timeout for slow CRM server
-        signal: AbortSignal.timeout(60000), // 60 second timeout
+        signal: AbortSignal.timeout(30000), // 30 second timeout
       });
 
       
@@ -346,7 +346,7 @@ class CRMService {
               rest_data: JSON.stringify(submissionData),
             }),
             // Add longer timeout for slow CRM server
-            signal: AbortSignal.timeout(60000), // 60 second timeout
+            signal: AbortSignal.timeout(30000), // 30 second timeout
           });
           
           console.log(`Attempt ${attempt} successful - Response status: ${response.status}`);
@@ -992,7 +992,7 @@ class CRMService {
               rest_data: JSON.stringify(updateData),
             }),
             // Add longer timeout for slow CRM server
-            signal: AbortSignal.timeout(60000), // 60 second timeout
+            signal: AbortSignal.timeout(30000), // 30 second timeout
           });
           
           console.log(`Attempt ${attempt} successful - Response status: ${response.status}`);

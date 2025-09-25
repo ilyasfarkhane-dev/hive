@@ -10,7 +10,7 @@ if (typeof fetch === 'undefined') {
 }
 
 // CRM Configuration
-const CRM_BASE_URL = 'http://3.145.21.11';
+const CRM_BASE_URL = 'https://crm.icesco.org';
 
 // Function to get session ID from command line argument or prompt
 function getSessionId() {

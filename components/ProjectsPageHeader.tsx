@@ -17,6 +17,7 @@ interface Breadcrumb {
 interface ProjectsPageHeaderProps {
   className?: string;
   breadcrumbs?: Breadcrumb[];
+  
 }
 
 // Background component
@@ -57,7 +58,7 @@ const HeaderControls = ({ onMenuStateChange }: { onMenuStateChange: (isOpen: boo
   }, [isMenuOpen, onMenuStateChange]);
   
   return (
-    <div className="absolute top-6 right-6 flex items-center gap-3 z-30">
+    <div className="absolute top-6 right-6 flex items-center gap-3 z-50">
       <LanguageSwitcher showLabels={false} />
       <BurgerMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />
     </div>
@@ -109,18 +110,19 @@ const PageContent = ({ breadcrumbs }: { breadcrumbs: Breadcrumb[] }) => {
   const { t } = useTranslation("common");
 
   return (
-    <div className="relative z-20 flex flex-col justify-center h-full px-6 sm:px-8 md:px-12 lg:px-16 xl:px-24">
+    <div className="relative z-20 flex flex-col justify-center h-full px-6 sm:px-8 md:px-12 lg:px-16 xl:px-24 py-4 sm:py-6 md:py-14 min-h-0">
       {/* Breadcrumbs */}
-      <div className="mb-4">
+      <div className="mb-2 sm:mb-4 flex-shrink-0">
         <Breadcrumbs breadcrumbs={breadcrumbs} />
       </div>
 
       {/* Page Title */}
-      <div>
-        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">
+      <div className="w-full min-w-0 flex-1 flex flex-col justify-center">
+        <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-white mb-1 sm:mb-2 break-words leading-tight line-clamp-2" 
+            title={breadcrumbs[breadcrumbs.length - 1]?.label || t("projects")}>
           {breadcrumbs[breadcrumbs.length - 1]?.label || t("projects")}
         </h1>
-        <p className="text-white/90 text-lg md:text-xl">
+        <p className="text-white/90 text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl break-words leading-relaxed line-clamp-2">
           {t("manageAndTrackYourProjects")}
         </p>
       </div>
@@ -164,7 +166,7 @@ const ProjectsPageHeader: React.FC<ProjectsPageHeaderProps> = ({
   return (
     <header
       ref={containerRef}
-      className={`projects-page-header bg-gradient-to-br from-[#0e7378] to-[#1B3B36] h-[30vh] relative overflow-hidden ${className}`}
+      className={`projects-page-header bg-gradient-to-br from-[#0e7378] to-[#1B3B36] min-h-[25vh] max-h-[35vh] relative overflow-hidden flex flex-col ${className}`}
       style={{ direction: 'ltr' }}
     >
       {/* Background */}

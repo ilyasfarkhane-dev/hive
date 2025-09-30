@@ -177,7 +177,7 @@ const HeaderControls = ({ onMenuStateChange }: { onMenuStateChange: (isOpen: boo
   }, [isMenuOpen, onMenuStateChange])
   
   return (
-    <div className="absolute top-6 right-6 flex items-center gap-3 z-30">
+    <div className="absolute top-6 right-6 flex items-center gap-3 z-50">
       {/* Language Switcher - Only visible when menu is closed */}
       {!isMenuOpen && <LanguageSwitcher showLabels={false} />}
       <BurgerMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />

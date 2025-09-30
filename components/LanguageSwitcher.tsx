@@ -66,7 +66,7 @@ const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ showLabels = false 
 
   // Modern dropdown for header use
   return (
-    <div className="relative language-switcher z-[100]" ref={dropdownRef}>
+    <div className="relative language-switcher z-[200]" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 hover:border-white/30 transition-all duration-300 shadow-lg hover:shadow-xl"
@@ -87,7 +87,7 @@ const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ showLabels = false 
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 overflow-hidden z-[110] language-dropdown">
+        <div className="absolute top-full right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/20 overflow-hidden z-[250] language-dropdown">
           {languages.map((lang, index) => (
             <button
               key={lang.code}

@@ -2604,30 +2604,30 @@ useEffect(() => {
       onClick={handleSaveAsDraft}
       disabled={isDraftSaving}
       className="group relative bg-teal-600 hover:bg-teal-700 text-white 
-                 w-10 sm:w-12 md:w-12 h-32 sm:h-36 md:h-40 
+                 w-10 sm:w-12 md:w-14 h-28 sm:h-32 md:h-[250px]
                  shadow-xl hover:shadow-2xl transition-all duration-300 
                  font-semibold flex flex-col items-center justify-center rounded-l-xl 
                  disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      <div className="flex flex-col items-center justify-center space-y-4">
-  {isDraftSaving ? (
-    <>
-      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-      <span className="text-[0.95rem] font-medium -rotate-90 whitespace-nowrap">
-        {t('saving')}...
-      </span>
-    </>
-  ) : (
-    <>
-  
-      <span className="text-[0.95rem] font-medium -rotate-90 whitespace-nowrap">
-        {t('saveAsDraft')}
-      </span>
-    </>
-  )}
-</div>
-
-
+      <div className="flex flex-col items-center justify-center space-y-2 sm:space-y-3 md:space-y-4">
+        {isDraftSaving ? (
+          <>
+            <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-[0.75rem] sm:text-[0.85rem] md:text-[0.95rem] font-medium -rotate-90 whitespace-nowrap">
+              {t('saving')}...
+            </span>
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            <span className="text-[0.75rem] sm:text-[0.85rem] md:text-[0.95rem] font-medium -rotate-90 whitespace-nowrap">
+              {t('saveAsDraft')}
+            </span>
+          </>
+        )}
+      </div>
     </motion.button>
   </div>
 )}

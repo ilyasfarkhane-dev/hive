@@ -1212,7 +1212,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
             <button
               onClick={onSaveAsDraft}
               disabled={isDraftSaving || !isDraftValid()}
-              className={`flex items-center px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${
+              className={`flex items-center px-4 sm:px-6 md:px-8 py-3 rounded-xl transition-all duration-200 font-medium shadow-lg ${
                 isDraftValid() && !isDraftSaving
                   ? 'bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white hover:shadow-xl transform hover:-translate-y-0.5'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -1220,15 +1220,15 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
             >
               {isDraftSaving ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  <span className="font-medium">Saving...</span>
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <span className="font-medium text-sm sm:text-base">Saving...</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
-                  <span className="font-medium">Save as Draft</span>
+                  <span className="font-medium text-sm sm:text-base whitespace-nowrap">Save as Draft</span>
                 </>
               )}
             </button>

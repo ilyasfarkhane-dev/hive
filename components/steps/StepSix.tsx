@@ -659,19 +659,19 @@ const Step6: React.FC<Step6Props> = ({
               <button
                 onClick={onSaveAsDraft}
                 disabled={isDraftSaving}
-                className="group relative flex flex-col items-center justify-center w-16 h-24 rounded-full bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white transition shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl"
+                className="group relative flex flex-col items-center justify-center w-14 sm:w-16 md:w-18 h-20 sm:h-24 md:h-28 rounded-full bg-gradient-to-b from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white transition shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl"
               >
                 {isDraftSaving ? (
                   <>
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mb-3"></div>
-                    <span className="text-xs font-medium transform -rotate-90 whitespace-nowrap">Saving...</span>
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 border-2 border-white border-t-transparent rounded-full animate-spin mb-2 sm:mb-3"></div>
+                    <span className="text-[10px] sm:text-xs font-medium transform -rotate-90 whitespace-nowrap">Saving...</span>
                   </>
                 ) : (
                   <>
-                    <svg className="w-6 h-6 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 mb-2 sm:mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                     </svg>
-                    <span className="text-xs font-medium transform -rotate-90 whitespace-nowrap">Save as Draft</span>
+                    <span className="text-[10px] sm:text-xs font-medium transform -rotate-90 whitespace-nowrap">Save as Draft</span>
                   </>
                 )}
                 

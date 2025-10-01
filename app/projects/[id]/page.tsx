@@ -420,26 +420,39 @@ const ProjectDetailsPage = () => {
 
   // Helper function to translate delivery modality values
   const translateModality = (modality: string) => {
+    if (!modality) return modality;
+    
+    // Normalize to handle case-insensitive matching
+    const normalizedModality = modality.charAt(0).toUpperCase() + modality.slice(1).toLowerCase();
+    
     const modalityMap: Record<string, string> = {
       'Physical': t('modalityPhysical'),
       'Virtual': t('modalityVirtual'),
-      'Hybrid': t('modalityHybrid'),
-      // Add more mappings as needed
+      'Hybrid': t('hybrid'),
+      'Online': t('online'),
+      'Offline': t('offline'),
+      'In-person': t('inPerson'),
     };
     
-    return modalityMap[modality] || modality;
+    return modalityMap[normalizedModality] || modality;
   };
 
   // Helper function to translate geographic scope values
   const translateScope = (scope: string) => {
+    if (!scope) return scope;
+    
+    // Normalize to handle case-insensitive matching
+    const normalizedScope = scope.charAt(0).toUpperCase() + scope.slice(1).toLowerCase();
+    
     const scopeMap: Record<string, string> = {
+      'Local': t('local'),
       'National': t('scopeNational'),
       'Regional': t('scopeRegional'),
       'International': t('scopeInternational'),
-      // Add more mappings as needed
+      'Global': t('global'),
     };
     
-    return scopeMap[scope] || scope;
+    return scopeMap[normalizedScope] || scope;
   };
 
   // Helper function to translate convening method values
@@ -1497,80 +1510,7 @@ const ProjectDetailsPage = () => {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('beneficiaries')} <span className="text-red-500">*</span></label>
-                    {isEditing ? (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {[
-                            { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: String(t('beneficiaryStudents')) },
-                            { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: String(t('beneficiaryTeachers')) },
-                            { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: String(t('beneficiaryYouth')) },
-                            { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: String(t('beneficiaryPublic')) },
-                            { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: String(t('beneficiaryPolicymakers')) },
-                            { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: String(t('beneficiaryOther')) },
-                          ].map((benef) => (
-                            <label
-                              key={benef.value}
-                              className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
-                                editedProject?.beneficiaries?.includes(benef.value)
-                                  ? 'border-teal-500 bg-teal-50 shadow-sm'
-                                  : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                className="mt-1 accent-teal-500 w-4 h-4"
-                                value={benef.value}
-                                checked={editedProject?.beneficiaries?.includes(benef.value) || false}
-                                onChange={(e) => handleBeneficiaryChange(benef.value, e.target.checked)}
-                              />
-                              <div className="flex-1">
-                                <span className="font-medium text-gray-900 text-sm">{benef.label}</span>
-                                <p className="text-gray-500 text-xs mt-1 leading-relaxed">{benef.desc}</p>
-                              </div>
-                            </label>
-                          ))}
-                        </div>
-
-                        {/* Show input only when "Other" is selected */}
-                        {showOtherBeneficiaryInput && (
-                          <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
-                            <label className="block text-sm font-medium text-teal-800 mb-2">
-                              {t('otherBeneficiaryPlaceholder')} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              className="w-full px-4 py-3 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                              placeholder={t('otherBeneficiaryPlaceholder')}
-                              value={editedProject?.other_beneficiary || ''}
-                              onChange={(e) => handleOtherBeneficiaryChange(e.target.value)}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {Array.isArray(project.beneficiaries) ? (
-                          project.beneficiaries.map((beneficiary, index) => (
-                            <span key={index} className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium">
-                              {translateBeneficiary(beneficiary)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-gray-500 italic">{t('notSpecified')}</span>
-                        )}
-                        {project.other_beneficiary && (
-                          <span className="px-3 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium">
-                            {project.other_beneficiary}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                 
-                </div>
+             
               </div>
             </motion.div>
 

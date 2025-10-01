@@ -296,13 +296,24 @@ const ProjectsPage = () => {
 
   // Helper function to translate delivery modality values
   const getTranslatedDeliveryModality = (modality: string) => {
-    switch (modality) {
+    if (!modality) return modality;
+    
+    // Normalize to handle case-insensitive matching
+    const normalizedModality = modality.charAt(0).toUpperCase() + modality.slice(1).toLowerCase();
+    
+    switch (normalizedModality) {
       case 'Physical':
         return t('modalityPhysical');
       case 'Virtual':
         return t('modalityVirtual');
       case 'Hybrid':
-        return t('modalityHybrid');
+        return t('hybrid');
+      case 'Online':
+        return t('online');
+      case 'Offline':
+        return t('offline');
+      case 'In-person':
+        return t('inPerson');
       default:
         return modality; // Return as-is if no translation found
     }
@@ -310,13 +321,22 @@ const ProjectsPage = () => {
 
   // Helper function to translate geographic scope values
   const getTranslatedGeographicScope = (scope: string) => {
-    switch (scope) {
+    if (!scope) return scope;
+    
+    // Normalize to handle case-insensitive matching
+    const normalizedScope = scope.charAt(0).toUpperCase() + scope.slice(1).toLowerCase();
+    
+    switch (normalizedScope) {
+      case 'Local':
+        return t('local');
       case 'National':
         return t('scopeNational');
       case 'Regional':
         return t('scopeRegional');
       case 'International':
         return t('scopeInternational');
+      case 'Global':
+        return t('global');
       default:
         return scope; // Return as-is if no translation found
     }

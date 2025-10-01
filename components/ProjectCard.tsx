@@ -131,24 +131,38 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({
   };
 
   const getTranslatedDeliveryModality = (modality: string) => {
+    if (!modality) return modality;
+    
+    // Normalize to handle case-insensitive matching
+    const normalizedModality = modality.charAt(0).toUpperCase() + modality.slice(1).toLowerCase();
+    
     const modalityMap: { [key: string]: string } = {
       'Online': t('online') || 'Online',
       'Offline': t('offline') || 'Offline',
       'Hybrid': t('hybrid') || 'Hybrid',
-      'In-Person': t('inPerson') || 'In-Person'
+      'In-person': t('inPerson') || 'In-Person',
+      'Physical': t('modalityPhysical') || 'Physical',
+      'Virtual': t('modalityVirtual') || 'Virtual'
     };
-    return modalityMap[modality] || modality;
+    
+    return modalityMap[normalizedModality] || modality;
   };
 
   const getTranslatedGeographicScope = (scope: string) => {
+    if (!scope) return scope;
+    
+    // Normalize to handle case-insensitive matching
+    const normalizedScope = scope.charAt(0).toUpperCase() + scope.slice(1).toLowerCase();
+    
     const scopeMap: { [key: string]: string } = {
       'Local': t('local') || 'Local',
-      'National': t('national') || 'National',
-      'Regional': t('regional') || 'Regional',
-      'International': t('international') || 'International',
+      'National': t('scopeNational') || 'National',
+      'Regional': t('scopeRegional') || 'Regional',
+      'International': t('scopeInternational') || 'International',
       'Global': t('global') || 'Global'
     };
-    return scopeMap[scope] || scope;
+    
+    return scopeMap[normalizedScope] || scope;
   };
 
   const formatDate = (dateString: string) => {

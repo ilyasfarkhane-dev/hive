@@ -3,6 +3,66 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { sanitizeFileName } from '@/utils/fileUtils';
 
+// Dynamic fuzzy matching function for file names
+function createDynamicMatcher(coreFileName: string, candidateFile: string): boolean {
+  if (!coreFileName || !candidateFile) return false;
+  
+  // Normalize both strings for comparison
+  const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalizedCore = normalize(coreFileName);
+  const normalizedCandidate = normalize(candidateFile);
+  
+  // If normalized strings are identical, it's a perfect match
+  if (normalizedCore === normalizedCandidate) return true;
+  
+  // Check if core filename is contained in candidate (simple substring match)
+  if (normalizedCandidate.includes(normalizedCore)) return true;
+  
+  // Check if candidate is contained in core filename (reverse substring match)
+  if (normalizedCore.includes(normalizedCandidate)) return true;
+  
+  // Fuzzy matching: calculate similarity ratio
+  const similarity = calculateSimilarity(normalizedCore, normalizedCandidate);
+  
+  // Consider it a match if similarity is above 70%
+  return similarity > 0.7;
+}
+
+// Calculate similarity between two strings using Levenshtein distance
+function calculateSimilarity(str1: string, str2: string): number {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const distance = levenshteinDistance(longer, shorter);
+  return (longer.length - distance) / longer.length;
+}
+
+// Calculate Levenshtein distance between two strings
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+  
+  for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+  for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+  
+  for (let j = 1; j <= str2.length; j++) {
+    for (let i = 1; i <= str1.length; i++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        matrix[j][i] = matrix[j - 1][i - 1];
+      } else {
+        matrix[j][i] = Math.min(
+          matrix[j - 1][i - 1] + 1, // substitution
+          matrix[j][i - 1] + 1,     // insertion
+          matrix[j - 1][i] + 1      // deletion
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -116,30 +176,21 @@ export async function GET(request: NextRequest) {
          const sanitizedFileName = sanitizeFileName(fileName || '');
          console.log('🔍 Download API - Sanitized filename:', sanitizedFileName);
          
-         const matchingFiles = availableFiles.filter((file: string) => {
-           // Check by timestamp (first part before underscore)
-           const timestamp = fileName?.split('_')[0] || '';
-           // Check by sanitized filename
-           const sanitizedOriginalName = fileName?.split('_').slice(1).join('_') || '';
-           const sanitizedOriginalNameClean = sanitizeFileName(sanitizedOriginalName);
-           
-           // Extract the core filename (without email prefix and timestamp)
-           const coreFileName = fileName?.replace(/^[^_]*_\d+_/, '').replace(/[^a-z0-9_.-]/gi, '_') || '';
-           
-           // More comprehensive matching
-           return file.includes(timestamp) || 
-                  file.includes(sanitizedOriginalNameClean) ||
-                  file.includes(sanitizedFileName) ||
-                  // Try to match by removing email prefixes and special characters
-                  file.includes(sanitizeFileName(fileName?.replace(/^[^_]*_/, '') || '')) ||
-                  // Try to match by filename without timestamp
-                  file.includes(fileName?.split('_').slice(1).join('_').replace(/[^a-z0-9_.-]/gi, '_') || '') ||
-                  // Match by core filename (most important for your case)
-                  file.includes(coreFileName) ||
-                  // Match files that contain the same document name
-                  (coreFileName.includes('ILYAS_FARKHANE') && file.includes('ILYAS_FARKHANE')) ||
-                  (coreFileName.includes('pdf') && file.includes('pdf'));
-         });
+        const matchingFiles = availableFiles.filter((file: string) => {
+          // Extract the core filename (without email prefix and timestamp)
+          const coreFileName = fileName?.replace(/^[^_]*_\d+_/, '').replace(/[^a-z0-9_.-]/gi, '_') || '';
+          
+          console.log('🔍 Download API - Matching logic:', {
+            fileName: fileName,
+            coreFileName: coreFileName,
+            file: file,
+            coreFileNameInFile: file.includes(coreFileName),
+            exactCoreMatch: file === coreFileName
+          });
+          
+          // Dynamic fuzzy matching algorithm
+          return createDynamicMatcher(coreFileName, file);
+        });
          console.log('🔍 Download API - Potentially matching files:', matchingFiles);
          
          // If we found matching files, try the first one
@@ -164,49 +215,8 @@ export async function GET(request: NextRequest) {
              console.error('❌ Download API - Fallback file also failed:', fallbackError);
            }
          } else {
-           // If no exact matches, try to find any file with similar timestamp or name
-           console.log('🔍 Download API - No exact matches found, trying broader search...');
-           
-           const timestamp = fileName?.split('_')[0] || '';
-           const broaderMatches = availableFiles.filter((file: string) => {
-             // Match by timestamp (first 10 digits)
-             const timestampMatch = file.startsWith(timestamp.substring(0, 10));
-             
-             // Match by document name (like ILYAS_FARKHANE)
-             const documentNameMatch = fileName?.includes('ILYAS_FARKHANE') && file.includes('ILYAS_FARKHANE');
-             
-             // Match by file type and similar structure
-             const fileTypeMatch = fileName?.includes('pdf') && file.includes('pdf') && file.includes('__2__');
-             
-             // Match by sanitized core name
-             const coreNameMatch = file.includes(sanitizeFileName(fileName?.replace(/^[^_]*_\d+_/, '') || ''));
-             
-             return timestampMatch || documentNameMatch || fileTypeMatch || coreNameMatch;
-           });
-           
-           console.log('🔍 Download API - Broader matches found:', broaderMatches);
-           
-           if (broaderMatches.length > 0) {
-             const broaderPath = join(uploadsDir, broaderMatches[0]);
-             console.log('🔄 Download API - Trying broader match file:', broaderPath);
-             
-             try {
-               const broaderBuffer = await readFile(broaderPath);
-               const broaderFileName = broaderMatches[0];
-               
-               console.log('✅ Download API - Broader match file found and read successfully:', broaderFileName);
-               
-               return new NextResponse(broaderBuffer as BodyInit, {
-                 headers: {
-                   'Content-Type': 'application/octet-stream',
-                   'Content-Disposition': `attachment; filename="${broaderFileName}"`,
-                   'Content-Length': broaderBuffer.length.toString(),
-                 },
-               });
-             } catch (broaderError) {
-               console.error('❌ Download API - Broader match file also failed:', broaderError);
-             }
-           }
+           console.log('🔍 Download API - No matching files found for:', fileName);
+           console.log('🔍 Download API - Available files:', availableFiles);
          }
          
        } catch (dirError) {

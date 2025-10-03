@@ -125,15 +125,21 @@ const ProjectDetailsPage = () => {
       let fileName = file.name || file.fileName || 'document';
       let filePath = file.filePath || '';
       
+      console.log('🔍 Frontend - File object:', file);
+      console.log('🔍 Frontend - fileName:', fileName);
+      console.log('🔍 Frontend - filePath:', filePath);
+      
       // If no filePath, try to construct it
       if (!filePath) {
         filePath = `\\public\\uploads\\${fileName}`;
+        console.log('🔧 Frontend - Constructed filePath:', filePath);
       }
       
-      console.log('📥 Downloading file:', fileName, 'from path:', filePath);
+      console.log('📥 Frontend - Downloading file:', fileName, 'from path:', filePath);
       
       // Use the download API endpoint
       const downloadUrl = `/api/download-file?path=${encodeURIComponent(filePath)}`;
+      console.log('🔗 Frontend - Download URL:', downloadUrl);
       
       // Create download link
       const link = document.createElement('a');
@@ -145,8 +151,9 @@ const ProjectDetailsPage = () => {
       document.body.removeChild(link);
       
     } catch (error) {
-      console.error('❌ Error downloading file:', error);
-      alert('Failed to download file. Please try again.');
+      console.error('❌ Frontend - Error downloading file:', error);
+      const fileName = file.name || file.fileName || 'document';
+      alert(`Failed to download file "${fileName}". The file may have been moved or deleted from the server. Please contact support if this issue persists.`);
     }
   };
 

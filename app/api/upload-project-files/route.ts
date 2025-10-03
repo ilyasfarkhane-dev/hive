@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { sanitizeFileName, generateUniqueFileName } from '@/utils/fileUtils';
 
 export const runtime = 'nodejs';
 
@@ -63,9 +64,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Generate filename with timestamp and original filename
-      const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const timestamp = Date.now();
-      const uniqueFileName = `${timestamp}_${safeFileName}`;
+      // Sanitize filename by removing/replacing special characters
+      const safeFileName = sanitizeFileName(file.name);
+      const uniqueFileName = generateUniqueFileName(file.name);
       const filePath = path.join(uploadsDir, uniqueFileName);
 
       console.log('=== SAVING PROJECT FILE ===');

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { sanitizeFileName } from '@/utils/fileUtils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -91,10 +92,22 @@ export async function GET(request: NextRequest) {
          const fileName = fullPath.split('/').pop() || fullPath.split('\\').pop();
          console.log('🔍 Download API - Looking for file:', fileName);
          
-         const matchingFiles = availableFiles.filter((file: string) => 
-           file.includes(fileName?.split('_')[0] || '') || // Check by timestamp
-           file.includes(fileName?.split('_').slice(1).join('_') || '') // Check by original name
-         );
+         // Sanitize the filename to match how files are stored on server
+         
+         const sanitizedFileName = sanitizeFileName(fileName || '');
+         console.log('🔍 Download API - Sanitized filename:', sanitizedFileName);
+         
+         const matchingFiles = availableFiles.filter((file: string) => {
+           // Check by timestamp (first part before underscore)
+           const timestamp = fileName?.split('_')[0] || '';
+           // Check by sanitized filename
+           const sanitizedOriginalName = fileName?.split('_').slice(1).join('_') || '';
+           const sanitizedOriginalNameClean = sanitizeFileName(sanitizedOriginalName);
+           
+           return file.includes(timestamp) || 
+                  file.includes(sanitizedOriginalNameClean) ||
+                  file.includes(sanitizedFileName);
+         });
          console.log('🔍 Download API - Potentially matching files:', matchingFiles);
          
          // If we found matching files, try the first one

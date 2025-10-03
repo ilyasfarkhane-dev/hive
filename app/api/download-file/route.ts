@@ -53,7 +53,10 @@ export async function GET(request: NextRequest) {
     console.log('📥 Download API - Processing:', {
       originalPath: filePath,
       cleanPath,
-      fullPath
+      fullPath,
+      processCwd: process.cwd(),
+      nodeEnv: process.env.NODE_ENV,
+      platform: process.platform
     });
     
      // Check if file exists before trying to read it
@@ -80,10 +83,46 @@ export async function GET(request: NextRequest) {
        const fs = require('fs');
        const uploadsDir = join(process.cwd(), 'public/uploads');
        try {
+         console.log('🔍 Download API - Checking uploads directory:', uploadsDir);
          const availableFiles = fs.readdirSync(uploadsDir);
          console.log('📁 Download API - Available files in uploads folder:', availableFiles);
+         
+         // Check if the specific file exists with different naming patterns
+         const fileName = fullPath.split('/').pop() || fullPath.split('\\').pop();
+         console.log('🔍 Download API - Looking for file:', fileName);
+         
+         const matchingFiles = availableFiles.filter((file: string) => 
+           file.includes(fileName?.split('_')[0] || '') || // Check by timestamp
+           file.includes(fileName?.split('_').slice(1).join('_') || '') // Check by original name
+         );
+         console.log('🔍 Download API - Potentially matching files:', matchingFiles);
+         
+         // If we found matching files, try the first one
+         if (matchingFiles.length > 0) {
+           const fallbackPath = join(uploadsDir, matchingFiles[0]);
+           console.log('🔄 Download API - Trying fallback file:', fallbackPath);
+           
+           try {
+             const fallbackBuffer = await readFile(fallbackPath);
+             const fallbackFileName = matchingFiles[0];
+             
+             console.log('✅ Download API - Fallback file found and read successfully:', fallbackFileName);
+             
+             return new NextResponse(fallbackBuffer as BodyInit, {
+               headers: {
+                 'Content-Type': 'application/octet-stream',
+                 'Content-Disposition': `attachment; filename="${fallbackFileName}"`,
+                 'Content-Length': fallbackBuffer.length.toString(),
+               },
+             });
+           } catch (fallbackError) {
+             console.error('❌ Download API - Fallback file also failed:', fallbackError);
+           }
+         }
+         
        } catch (dirError) {
          console.error('❌ Download API - Could not read uploads directory:', dirError);
+         console.error('❌ Download API - Directory path:', uploadsDir);
        }
        
        throw fileError; // Re-throw the original error

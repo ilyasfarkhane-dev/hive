@@ -125,23 +125,19 @@ const ProjectDetailsPage = () => {
       let fileName = file.name || file.fileName || 'document';
       let filePath = file.filePath || '';
       
-      // Clean up the file path - remove \public\ prefix if present
-      if (filePath.startsWith('\\public\\')) {
-        filePath = filePath.replace('\\public\\', '/');
-      } else if (filePath.startsWith('/public/')) {
-        filePath = filePath.replace('/public/', '/');
-      }
-      
       // If no filePath, try to construct it
       if (!filePath) {
-        filePath = `/uploads/${fileName}`;
+        filePath = `\\public\\uploads\\${fileName}`;
       }
       
       console.log('📥 Downloading file:', fileName, 'from path:', filePath);
       
+      // Use the download API endpoint
+      const downloadUrl = `/api/download-file?path=${encodeURIComponent(filePath)}`;
+      
       // Create download link
       const link = document.createElement('a');
-      link.href = filePath;
+      link.href = downloadUrl;
       link.download = fileName;
       link.target = '_blank';
       document.body.appendChild(link);

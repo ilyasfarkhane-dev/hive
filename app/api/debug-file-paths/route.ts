@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const uploadsDir = join(process.cwd(), 'public/uploads');
     const availableFiles = await readdir(uploadsDir);
     
-    let analysis = {
+    let analysis: any = {
       crmFilePath: crmFilePath,
       uploadsDirectory: uploadsDir,
       totalFilesOnServer: availableFiles.length,
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         sanitizedMatches: sanitizedMatches,
         timestampMatches: timestampMatches,
         partialMatches: partialMatches,
-        allMatches: [...new Set([...exactMatches, ...sanitizedMatches, ...timestampMatches, ...partialMatches])]
+        allMatches: Array.from(new Set([...exactMatches, ...sanitizedMatches, ...timestampMatches, ...partialMatches]))
       };
     }
     

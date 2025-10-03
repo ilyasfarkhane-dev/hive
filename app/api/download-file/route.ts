@@ -14,30 +14,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'File path is required' }, { status: 400 });
     }
     
-    // Clean the file path - remove \public\ prefix if present
-    let cleanPath = filePath;
-    if (cleanPath.startsWith('\\public\\')) {
-      cleanPath = cleanPath.replace('\\public\\', '');
-    } else if (cleanPath.startsWith('/public/')) {
-      cleanPath = cleanPath.replace('/public/', '');
-    }
-    
-    // Handle the case where the path might be malformed
-    // If it starts with _uploads_, it might be a malformed path
-    if (cleanPath.startsWith('_uploads_')) {
-      console.log('⚠️ Download API - Detected malformed path starting with _uploads_');
-      // Try to reconstruct the proper path
-      const fileName = cleanPath.split('_').pop(); // Get the last part after the last underscore
-      if (fileName) {
-        cleanPath = `uploads/${fileName}`;
-        console.log('🔧 Download API - Reconstructed path:', cleanPath);
-      }
-    }
-    
-    // Ensure the path starts with public/
-    if (!cleanPath.startsWith('public/')) {
-      cleanPath = `public/${cleanPath}`;
-    }
+     // Clean the file path - handle different path formats
+     let cleanPath = filePath;
+     
+     // Handle Windows-style paths with backslashes
+     if (cleanPath.startsWith('\\public\\')) {
+       cleanPath = cleanPath.replace('\\public\\', '');
+     } else if (cleanPath.startsWith('/public/')) {
+       cleanPath = cleanPath.replace('/public/', '');
+     }
+     
+     // Handle paths that start with /uploads/ (new format)
+     if (cleanPath.startsWith('/uploads/')) {
+       cleanPath = cleanPath.substring(1); // Remove leading slash
+       console.log('🔧 Download API - Removed leading slash:', cleanPath);
+     }
+     
+     // Handle the case where the path might be malformed
+     // If it starts with _uploads_, it might be a malformed path
+     if (cleanPath.startsWith('_uploads_')) {
+       console.log('⚠️ Download API - Detected malformed path starting with _uploads_');
+       // Try to reconstruct the proper path
+       const fileName = cleanPath.split('_').pop(); // Get the last part after the last underscore
+       if (fileName) {
+         cleanPath = `uploads/${fileName}`;
+         console.log('🔧 Download API - Reconstructed path:', cleanPath);
+       }
+     }
+     
+     // Ensure the path starts with public/
+     if (!cleanPath.startsWith('public/')) {
+       cleanPath = `public/${cleanPath}`;
+     }
     
     // Construct the full file path
     const fullPath = join(process.cwd(), cleanPath);
@@ -58,7 +66,7 @@ export async function GET(request: NextRequest) {
        console.log('✅ Download API - File found and read successfully:', fileName);
        
        // Return the file with appropriate headers
-       return new NextResponse(fileBuffer, {
+       return new NextResponse(fileBuffer as BodyInit, {
          headers: {
            'Content-Type': 'application/octet-stream',
            'Content-Disposition': `attachment; filename="${fileName}"`,

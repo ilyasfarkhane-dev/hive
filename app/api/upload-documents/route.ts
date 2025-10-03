@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       uploadedFiles.push({
         originalName: file.name,
         fileName: uniqueFileName,
-        filePath: `\\public\\uploads\\${uniqueFileName}`,
+        filePath: `/uploads/${uniqueFileName}`,
         size: file.size,
         type: file.type,
       });

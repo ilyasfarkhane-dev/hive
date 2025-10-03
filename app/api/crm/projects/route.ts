@@ -634,11 +634,11 @@ export async function GET(request: NextRequest) {
           }
           
           // Split the semicolon-separated values
-          const paths = documentPaths.split('; ').filter(path => path.trim());
-          const names = documentNames.split('; ').filter(name => name.trim());
+          const paths = documentPaths.split('; ').filter((path: string) => path.trim());
+          const names = documentNames.split('; ').filter((name: string) => name.trim());
           
           // Create file objects from the paths and names
-          return paths.map((path, index) => {
+          return paths.map((path: string, index: number) => {
             const name = names[index] || `Document ${index + 1}`;
             // Extract filename from path for display
             const fileName = path.split('\\').pop() || path.split('/').pop() || name;

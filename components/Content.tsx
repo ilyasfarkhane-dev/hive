@@ -104,6 +104,9 @@ const Rooms = () => {
 
   // Hide draft button when project is successfully submitted
   useEffect(() => {
+    console.log('🔍 Content - submissionResult changed:', submissionResult);
+    console.log('🔍 Content - submissionResult success:', submissionResult?.success);
+    console.log('🔍 Content - submissionResult message:', submissionResult?.message);
     if (submissionResult?.success) {
       setShowDraftButton(false);
     }
@@ -1701,6 +1704,11 @@ useEffect(() => {
         }
         
         // Set success result to show success message (same as regular submission)
+        console.log('🔍 Content - Setting submissionResult for draft success:', {
+          success: true,
+          projectId: result.projectId,
+          message: isEditing ? 'Draft updated successfully' : 'Project saved as draft successfully'
+        });
         setSubmissionResult({
           success: true,
           projectId: result.projectId,
@@ -2551,7 +2559,7 @@ useEffect(() => {
                   style={{ opacity: 0, transform: 'translateY(30px)' }}
                 >
                 <StepErrorBoundary stepName="Step 5 (Project Details)">
-                  <StepFive ref={stepFiveRef} onNext={handleProjectDetails} onPrevious={handlePrevious} onSaveAsDraft={handleSaveAsDraft} selectedCards={selectedCards} isDraftSaving={isDraftSaving} showDraftButton={showDraftButton && !showFloatingDraft} />
+                  <StepFive ref={stepFiveRef} onNext={handleProjectDetails} onPrevious={handlePrevious} onSaveAsDraft={handleSaveAsDraft} selectedCards={selectedCards} isDraftSaving={isDraftSaving} showDraftButton={showDraftButton && !showFloatingDraft} submissionResult={submissionResult} />
                 </StepErrorBoundary>
                 </div>
               )}

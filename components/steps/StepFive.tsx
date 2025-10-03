@@ -1,5 +1,6 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from "react";
 import { useTranslation } from 'react-i18next'
+import { useRouter } from 'next/navigation'
 
 // Debug function to check for multilingual objects
 const debugRender = (value: any, context: string) => {
@@ -21,15 +22,28 @@ type Step5Props = {
   selectedCards?: any[];
   isDraftSaving?: boolean;
   showDraftButton?: boolean;
+  submissionResult?: {
+    success: boolean;
+    projectId?: string;
+    message?: string;
+  } | null;
 };
 
 export type StepFiveRef = {
   getFormValues: () => any;
 };
 
-const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSaveAsDraft, initialValues, selectedCards = [], isDraftSaving = false, showDraftButton = false }, ref) => {
+const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSaveAsDraft, initialValues, selectedCards = [], isDraftSaving = false, showDraftButton = false, submissionResult }, ref) => {
   const { t: originalT, i18n } = useTranslation('common');
   const currentLanguage = i18n.language || 'en';
+  const router = useRouter();
+
+  // Debug logging for submissionResult
+  useEffect(() => {
+    console.log('🔍 StepFive - submissionResult changed:', submissionResult);
+    console.log('🔍 StepFive - submissionResult success:', submissionResult?.success);
+    console.log('🔍 StepFive - submissionResult message:', submissionResult?.message);
+  }, [submissionResult]);
 
   // Safe translation function to ensure strings are returned
   const t = (key: string): string => {
@@ -450,6 +464,33 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
   const getFieldValidationClass = (isValid: boolean) => {
     return isValid ? "" : "border-red-500 focus:border-red-500 focus:ring-red-100";
   };
+  // If we have a successful submission result, show only the success message
+  if (submissionResult?.success) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+            <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-medium text-gray-900 mb-3">
+            {t('success')}
+          </h3>
+          <p className="text-gray-600 mb-8">
+            {submissionResult.message || t('projectSavedSuccessfully')}
+          </p>
+          <button
+            onClick={() => router.push('/projects')}
+            className="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-8 rounded-lg transition-colors duration-200"
+          >
+            {t('ok')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
 
     <div id="step5Content" className="step-five max-w-6xl mx-auto" data-step="5">
@@ -1392,6 +1433,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
           </div>
         )}
       </div>
+      
     </div>
 
   );

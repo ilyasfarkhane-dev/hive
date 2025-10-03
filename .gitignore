@@ -120,9 +120,7 @@ dist
 
 # Gatsby files
 .cache/
-public
-# But keep the uploads folder
-!public/uploads/
+
 
 # Storybook build outputs
 .out

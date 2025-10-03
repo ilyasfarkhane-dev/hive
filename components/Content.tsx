@@ -70,7 +70,7 @@ import { pillarServicesData } from "@/Data/services/data";
 import type { Goal, Pillar, SubService, Service } from "@/types";
 import { serviceSubservicesData } from "@/Data/sub-service/data";
 import { useProjectSubmission, ProjectSubmissionData } from "@/hooks/useProjectSubmission";
-import { saveProjectToLocal, handleMultipleFileUploads, getProjectsFromLocal } from "@/utils/localStorage";
+import { saveProjectToLocal, handleMultipleFileUploads, getProjectsFromLocal, handleFileUpload } from "@/utils/localStorage";
 
 
 const Rooms = () => {
@@ -78,7 +78,7 @@ const Rooms = () => {
   const { isRTL, currentLanguage } = useI18n();
   const [currentStep, setCurrentStep] = useState(1);
   const stepFiveRef = useRef<StepFiveRef>(null);
-  const { submitProject, saveAsDraft, updateProject, retrySubmission, isSubmitting, isRetrying, submissionResult, retryCount, maxRetries, resetSubmission } = useProjectSubmission();
+  const { submitProject, saveAsDraft, updateProject, retrySubmission, isSubmitting, isRetrying, submissionResult, setSubmissionResult, retryCount, maxRetries, resetSubmission } = useProjectSubmission();
   const [showDraftButton, setShowDraftButton] = useState(false);
   const [showFloatingDraft, setShowFloatingDraft] = useState(false);
   const [isDraftSaving, setIsDraftSaving] = useState(false);
@@ -105,7 +105,6 @@ const Rooms = () => {
   // Hide draft button when project is successfully submitted
   useEffect(() => {
     if (submissionResult?.success) {
-      console.log('✅ Project submitted successfully, hiding draft button');
       setShowDraftButton(false);
     }
   }, [submissionResult?.success]);
@@ -113,9 +112,7 @@ const Rooms = () => {
   // Show two-column layout when selected cards are loaded (for editing mode)
   useEffect(() => {
     const isEditing = localStorage.getItem('isEditingProject') === 'true';
-    console.log('🔍 Sidebar check - isEditing:', isEditing, 'selectedCards.length:', selectedCards.length, 'showTwoColumns:', showTwoColumns);
     if (isEditing && selectedCards.length > 0) {
-      console.log('✅ Selected cards loaded in editing mode, showing sidebar');
       setShowTwoColumns(true);
     }
   }, [selectedCards, showTwoColumns]);
@@ -128,7 +125,6 @@ const Rooms = () => {
       const editingProjectId = localStorage.getItem('editingProjectId');
       
       if (isEditing && editingProjectId) {
-        console.log('🔄 Editing mode detected for project:', editingProjectId);
         setIsEditingLoading(true);
         
         // Add a small delay to ensure other components are ready
@@ -138,7 +134,6 @@ const Rooms = () => {
           if (savedData) {
             try {
               const parsedData = JSON.parse(savedData);
-              console.log('📝 Loading saved form data for editing:', parsedData);
             
               // Pre-fill the form with saved data
               setProjectDetails(parsedData);
@@ -181,14 +176,9 @@ const Rooms = () => {
               
               // Load subservices if service is selected
               if (parsedData.selectedService) {
-                console.log('🔍 Loading subservices for editing mode:');
-                console.log('- Selected service:', parsedData.selectedService);
-                console.log('- Service subservices data keys:', Object.keys(serviceSubservicesData));
-                
+               
                 const serviceSubservicesRaw = serviceSubservicesData[parsedData.selectedService as keyof typeof serviceSubservicesData] || [];
-                console.log('- Raw subservices data:', serviceSubservicesRaw);
-                console.log('- Number of raw subservices:', serviceSubservicesRaw.length);
-                
+             
                 const serviceSubservices = serviceSubservicesRaw.map((s: any, index: number) => {
                   const mappedSubservice = {
                     id: s.id || s.code || `subservice-${index}`,
@@ -202,13 +192,10 @@ const Rooms = () => {
                     name_subservice_ar_c: s.name_subservice_ar_c,
                     name_subservice: s.description_subservice,
                   };
-                  console.log(`- Mapped subservice ${index + 1}:`, mappedSubservice);
                   return mappedSubservice;
                 });
                 
-                console.log('✅ Final subservices array:', serviceSubservices);
-                console.log('✅ Number of final subservices:', serviceSubservices.length);
-                setSubServices(serviceSubservices);
+                 setSubServices(serviceSubservices);
               } else {
                 console.log('❌ No selected service found for subservices loading');
               }
@@ -244,7 +231,6 @@ const Rooms = () => {
             if (savedData) {
               const parsedData = JSON.parse(savedData);
               const hasProjectTitle = parsedData.title && parsedData.title.trim() !== '';
-              console.log('🔄 Checking draft button on mount/change - hasProjectTitle:', hasProjectTitle);
               setShowDraftButton(hasProjectTitle);
             }
           } catch (error) {
@@ -288,36 +274,21 @@ const Rooms = () => {
       let hasProjectTitle = false;
       if (projectDetails?.title && projectDetails.title.trim() !== '') {
         hasProjectTitle = true;
-        console.log('✅ Project title found in projectDetails:', projectDetails.title);
-      } else {
+       } else {
         // Check localStorage for project title
         try {
           const savedData = localStorage.getItem('projectDetails');
           if (savedData) {
             const parsedData = JSON.parse(savedData);
             hasProjectTitle = parsedData.title && parsedData.title.trim() !== '';
-            if (hasProjectTitle) {
-              console.log('✅ Project title found in localStorage:', parsedData.title);
-            } else {
-              console.log('❌ No project title in localStorage:', parsedData);
-            }
-          } else {
-            console.log('❌ No projectDetails in localStorage');
+          
           }
         } catch (error) {
           console.error('Error checking localStorage for project title:', error);
         }
       }
       
-      console.log('=== DRAFT BUTTON DEBUG ===');
-      console.log('Selected cards count:', selectedCards.length);
-      console.log('Selected cards:', selectedCards);
-      console.log('Has selected cards:', hasSelectedCards);
-      console.log('Has project title:', hasProjectTitle);
-      console.log('Submission successful:', submissionResult?.success);
-      console.log('Should show draft button:', hasProjectTitle && !submissionResult?.success);
-      console.log('========================');
-      
+     
       setShowDraftButton(hasProjectTitle && !submissionResult?.success);
     };
 
@@ -327,14 +298,13 @@ const Rooms = () => {
     // Listen for localStorage changes from other tabs/windows
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'projectDetails') {
-        console.log('🔄 localStorage changed, rechecking draft button');
         checkDraftButton();
       }
     };
 
     // Listen for focus events (when user returns to tab)
     const handleFocus = () => {
-      console.log('🔄 Window focused, rechecking draft button');
+     
       checkDraftButton();
     };
 
@@ -352,12 +322,10 @@ const Rooms = () => {
   // Listen for real-time updates from StepFive component
   useEffect(() => {
     const handleProjectDetailsUpdate = (event: CustomEvent) => {
-      // console.log('🔄 handleProjectDetailsUpdate called');
       
       if (event.detail?.formValues) {
         const hasProjectTitle = event.detail.formValues.title && event.detail.formValues.title.trim() !== '';
-        console.log('🔄 Custom event - hasProjectTitle:', hasProjectTitle, 'title:', event.detail.formValues.title);
-        
+       
         // Update projectDetails state with the latest form values
         setProjectDetails(event.detail.formValues);
         
@@ -449,9 +417,7 @@ const Rooms = () => {
   const SelectedCardText = React.memo(({ card }: { card: any }) => {
     const { i18n } = useTranslation("common");
     const currentLang = i18n.language || "en";
-    
-    console.log('SelectedCardText rendering for card:', card.id, 'language:', currentLang);
-    
+   
     // Try to get translated title from the card data
     if (card.title && typeof card.title === 'object') {
       const result = card.title[currentLang] || card.title.en || card.title;
@@ -492,10 +458,7 @@ const Rooms = () => {
   const SelectedCardsSection = React.memo(() => {
     const { t, i18n } = useTranslation("common");
     const currentLang = i18n.language || "en";
-    
-    console.log('SelectedCardsSection rendering for language:', currentLang);
-    console.log('Selected cards:', memoizedSelectedCards);
-    
+   
     return (
       <div className="relative min-h-[120px] flex flex-col gap-4" style={{ direction: 'ltr' }}>
         {memoizedSelectedCards.length === 0 ? (
@@ -636,9 +599,6 @@ const Rooms = () => {
 
   // Debug subservices state changes
   useEffect(() => {
-    console.log('🔍 Subservices state changed:');
-    console.log('- Number of subservices:', subServices.length);
-    console.log('- Subservices data:', subServices);
   }, [subServices]);
 
   // Fallback function to use names when hierarchy lookup fails
@@ -690,7 +650,6 @@ const Rooms = () => {
     }
     
     if (fallbackCards.length > 0) {
-      console.log('Using fallback cards:', fallbackCards);
       setSelectedCards(fallbackCards);
       setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
       localStorage.removeItem('editingProjectData'); // Clean up
@@ -705,8 +664,6 @@ const Rooms = () => {
     if (editingData && isEditing) {
       try {
         const parsedData = JSON.parse(editingData);
-        console.log('🔄 Reconstructing cards from hierarchy...');
-        console.log('Subservice ID:', parsedData.selectedSubService);
         setIsReconstructingCards(true);
         
         // Add a small delay to ensure other components are ready
@@ -718,7 +675,6 @@ const Rooms = () => {
           if (parsedData.selectedSubService) {
             const reconstructFromHierarchy = async () => {
               try {
-                console.log('🌐 Fetching hierarchy data...');
                 const response = await fetch(`/api/crm/project-hierarchy?subserviceId=${parsedData.selectedSubService}`);
                 
                 if (!response.ok) {
@@ -726,8 +682,6 @@ const Rooms = () => {
                 }
                 
                 const hierarchyData = await response.json();
-                console.log('Hierarchy data received:', hierarchyData);
-                
                 if (hierarchyData.success && hierarchyData.hierarchy) {
                   const { goal, pillar, service, subservice } = hierarchyData.hierarchy;
                   const reconstructedCards = [];
@@ -835,7 +789,6 @@ const Rooms = () => {
                 }
                 
                   if (reconstructedCards.length > 0) {
-                    console.log('✅ Reconstructed cards from hierarchy:', reconstructedCards);
                     setSelectedCards(reconstructedCards);
                     setShowTwoColumns(true); // Show sidebar when cards are loaded
                     // Don't remove editingProjectData immediately - let other components load first
@@ -849,7 +802,7 @@ const Rooms = () => {
                   
                   setIsReconstructingCards(false);
                 } else {
-                  console.log('⚠️ Hierarchy API failed, using fallback...');
+                 
                   createFallbackCards(parsedData);
                   setShowTwoColumns(true); // Show sidebar when fallback cards are loaded
                   setIsReconstructingCards(false);
@@ -885,8 +838,7 @@ const Rooms = () => {
 
   // Function to create fallback cards when hierarchy reconstruction fails
   const createFallbackCards = (parsedData: any) => {
-    console.log('🔄 Creating fallback cards from parsed data:', parsedData);
-    
+   
     const fallbackCards: any[] = [];
     
     // Create cards based on the parsed data selections
@@ -935,15 +887,10 @@ const Rooms = () => {
     }
     
     if (parsedData.selectedSubService) {
-      console.log('🔍 Fallback: Loading subservice for card reconstruction:');
-      console.log('- Selected subservice:', parsedData.selectedSubService);
-      console.log('- Selected service:', parsedData.selectedService);
-      
+     
       const serviceSubservicesRaw = (serviceSubservicesData as any)[parsedData.selectedService] || [];
-      console.log('- Raw subservices data for fallback:', serviceSubservicesRaw);
       
       const subservice = serviceSubservicesRaw.find((s: any) => s.id === parsedData.selectedSubService || s.name === parsedData.selectedSubService);
-      console.log('- Found subservice in fallback:', subservice);
       
       if (subservice) {
         const subserviceCard = {
@@ -954,14 +901,12 @@ const Rooms = () => {
           code: subservice.name || subservice.id,
           colorIndex: 3
         };
-        console.log('✅ Adding subservice card to fallback:', subserviceCard);
         fallbackCards.push(subserviceCard);
       } else {
         console.log('❌ Subservice not found in fallback data');
       }
     }
     
-    console.log('✅ Created fallback cards:', fallbackCards);
     setSelectedCards(fallbackCards);
   };
 
@@ -1007,7 +952,6 @@ const Rooms = () => {
     const isEditingProject = localStorage.getItem('isEditingProject') === 'true';
     
     if (isEditingProject && !editingProjectId) {
-      console.log('🧹 Clearing invalid editing flags on mount');
       
       // Preserve specific localStorage items
       const contactEeemailHash = localStorage.getItem('contactEeemailHash');
@@ -1030,12 +974,10 @@ const Rooms = () => {
   useEffect(() => {
     const handleHashNavigation = () => {
       if (window.location.hash === '#next-section') {
-        console.log('🔍 Hash navigation detected: #next-section');
         // Scroll to the section
         const element = document.getElementById('next-section');
         if (element) {
           element.scrollIntoView({ behavior: 'smooth' });
-          console.log('✅ Scrolled to next-section');
         } else {
           console.log('❌ next-section element not found');
         }
@@ -1249,7 +1191,6 @@ useEffect(() => {
 
   // Handle pillar selection
   const handlePillarSelect = (pillarId: string) => {
-    console.log("🟢 Service card clicked ID:", pillarId);
     setSelectedPillar(pillarId);
 
     const pillar = pillars.find((p) => p.id === pillarId);
@@ -1290,7 +1231,6 @@ useEffect(() => {
   // Handle service selection - fix the sub-service loading
   // Handle service selection
   const handleServiceSelect = (serviceId: string) => {
-    console.log("🟢 Service card clicked ID:", serviceId);
     setSelectedService(serviceId);
 
     const service = services.find((s) => s.id === serviceId);
@@ -1313,15 +1253,9 @@ useEffect(() => {
       addSelectedCard("service", service.id, serviceTitle, serviceDesc, selectedColorIndex, service.code);
     }
 
-    // 🔹 Get sub-services for this serviceId
-    console.log('🔍 Loading subservices for service selection:');
-    console.log('- Service ID:', serviceId);
-    console.log('- Service subservices data keys:', Object.keys(serviceSubservicesData));
-    
+   
     const serviceSubServicesRaw = (serviceSubservicesData as any)[serviceId] || [];
-    console.log('- Raw subservices data:', serviceSubServicesRaw);
-    console.log('- Number of raw subservices:', serviceSubServicesRaw.length);
-
+   
     const serviceSubServices: SubService[] = serviceSubServicesRaw.map((s: any, index: number) => {
       const mappedSubservice = {
         id: s.id,
@@ -1338,12 +1272,10 @@ useEffect(() => {
         description_subservice_fr_c: s.description_subservice_fr_c,
         description_subservice_en_c: s.description_subservice_en_c,
       };
-      console.log(`- Mapped subservice ${index + 1}:`, mappedSubservice);
+     
       return mappedSubservice;
     });
 
-    console.log('✅ Final subservices array for service selection:', serviceSubServices);
-    console.log('✅ Number of final subservices:', serviceSubServices.length);
     setSubServices(serviceSubServices);
     setCurrentStep(4);
   };
@@ -1354,15 +1286,10 @@ useEffect(() => {
 
   // Handle sub-service selection
   const handleSubServiceSelect = (subServiceId: string) => {
-    console.log('🔍 Subservice selection:');
-    console.log('- Selected subservice ID:', subServiceId);
-    console.log('- Available subservices:', subServices);
-    console.log('- Number of available subservices:', subServices.length);
     
     setSelectedSubService(subServiceId);
 
     const subService = subServices.find((s) => s.id === subServiceId);
-    console.log('- Found subservice:', subService);
 
     if (subService && selectedColorIndex !== null) {
       // Extract the correct language value from the sub-service data
@@ -1390,11 +1317,14 @@ useEffect(() => {
   const handleProjectDetails = () => {
     const details = stepFiveRef.current?.getFormValues();
     if (details) {
-      console.log('=== CONTENT.TSX: Processing Step 5 details ===');
-      console.log('Raw details from StepFive:', details);
       
       // Sanitize the details to ensure no multilingual objects
       const sanitizeValue = (value: any): any => {
+        // Preserve File objects - don't sanitize them
+        if (value instanceof File) {
+          return value;
+        }
+        
         if (value && typeof value === 'object' && !Array.isArray(value) && !React.isValidElement(value)) {
           if (value.hasOwnProperty('en') && value.hasOwnProperty('fr') && value.hasOwnProperty('ar')) {
             console.warn('🚨 Found multilingual object in project details:', value);
@@ -1413,7 +1343,6 @@ useEffect(() => {
       };
       
       const sanitizedDetails = sanitizeValue(details);
-      console.log('Sanitized details:', sanitizedDetails);
       
       setProjectDetails(sanitizedDetails);
       setCurrentStep(6);
@@ -1436,6 +1365,93 @@ useEffect(() => {
       }
     }
     
+    // Debug: Check if we have files in projectDetails
+    console.log('=== DRAFT SAVE DEBUG ===');
+    console.log('currentProjectDetails:', currentProjectDetails);
+    console.log('Files in currentProjectDetails:', currentProjectDetails?.files);
+    console.log('Files count:', currentProjectDetails?.files?.length || 0);
+    
+    // Always get fresh files from StepFive ref for draft save (since projectDetails might have lost File objects)
+    console.log('🔍 Checking file source for draft save...');
+    console.log('currentProjectDetails.files exists:', !!currentProjectDetails?.files);
+    console.log('currentProjectDetails.files length:', currentProjectDetails?.files?.length || 0);
+    console.log('currentProjectDetails.files first item:', currentProjectDetails?.files?.[0]);
+    console.log('currentProjectDetails.files first item has fileObject:', !!currentProjectDetails?.files?.[0]?.fileObject);
+    
+    // Always get fresh files from StepFive ref for draft save
+    console.log('Getting fresh files from StepFive ref for draft save...');
+    const stepFiveData = stepFiveRef.current?.getFormValues();
+    console.log('StepFive data retrieved:', stepFiveData);
+    console.log('StepFive files:', stepFiveData?.files);
+    console.log('StepFive files length:', stepFiveData?.files?.length || 0);
+    console.log('StepFive files first item:', stepFiveData?.files?.[0]);
+    console.log('StepFive files first item has fileObject:', !!stepFiveData?.files?.[0]?.fileObject);
+      
+    if (stepFiveData) {
+      // Use the same sanitization logic as regular submission
+      const sanitizeValue = (value: any): any => {
+        // Preserve File objects - don't sanitize them
+        if (value instanceof File) {
+          return value;
+        }
+        
+        // Special handling for files array - preserve File objects
+        if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && value[0].hasOwnProperty('fileObject')) {
+          console.log('🔍 Detected files array, preserving File objects...');
+          return value.map((fileItem: any) => {
+            if (fileItem && typeof fileItem === 'object' && fileItem.fileObject instanceof File) {
+              console.log('✅ Preserving File object for:', fileItem.name);
+              return {
+                ...fileItem,
+                fileObject: fileItem.fileObject // Keep the File object as-is
+              };
+            }
+            return fileItem;
+          });
+        }
+        
+        if (value && typeof value === 'object' && !Array.isArray(value) && !React.isValidElement(value)) {
+          if (value.hasOwnProperty('en') && value.hasOwnProperty('fr') && value.hasOwnProperty('ar')) {
+            console.warn('🚨 Found multilingual object in project details:', value);
+            return String(value.en || value.fr || value.ar || '');
+          }
+          // Recursively sanitize object properties
+          const sanitized: any = {};
+          for (const [key, val] of Object.entries(value)) {
+            sanitized[key] = sanitizeValue(val);
+          }
+          return sanitized;
+        } else if (Array.isArray(value)) {
+          return value.map(item => sanitizeValue(item));
+        }
+        return value;
+      };
+      
+      console.log('🔍 Files before sanitization:', stepFiveData.files);
+      console.log('🔍 First file before sanitization:', stepFiveData.files?.[0]);
+      console.log('🔍 First file fileObject before sanitization:', stepFiveData.files?.[0]?.fileObject);
+      
+      const sanitizedDetails = sanitizeValue(stepFiveData);
+      
+      console.log('🔍 Files after sanitization:', sanitizedDetails.files);
+      console.log('🔍 First file after sanitization:', sanitizedDetails.files?.[0]);
+      console.log('🔍 First file fileObject after sanitization:', sanitizedDetails.files?.[0]?.fileObject);
+      
+      // Update currentProjectDetails with sanitized data (including files)
+      currentProjectDetails = {
+        ...currentProjectDetails,
+        ...sanitizedDetails
+      };
+      
+      console.log('Updated currentProjectDetails with sanitized StepFive data');
+      console.log('Updated currentProjectDetails.files:', currentProjectDetails.files);
+      console.log('Files count after update:', currentProjectDetails.files?.length || 0);
+    } else {
+      console.log('No data found in StepFive ref');
+      console.log('StepFive ref available:', !!stepFiveRef.current);
+      console.log('StepFive getFormValues available:', !!stepFiveRef.current?.getFormValues);
+    }
+    
     if (!currentProjectDetails) {
       console.error('No project details available for draft save');
       return;
@@ -1445,28 +1461,15 @@ useEffect(() => {
     const editingProjectId = localStorage.getItem('editingProjectId');
     const isEditing = editingProjectId && localStorage.getItem('isEditingProject') === 'true';
     
-    console.log('🔍 Edit mode check:');
-    console.log('- editingProjectId:', editingProjectId);
-    console.log('- isEditingProject flag:', localStorage.getItem('isEditingProject'));
-    console.log('- isEditing:', isEditing);
     
-    if (isEditing) {
-      console.log('🔄 Updating existing project:', editingProjectId);
-    } else {
-      console.log('🆕 Creating new project');
-    }
+  
 
     setIsDraftSaving(true);
     try {
-      // Handle file uploads first
-      let supportingDocuments: string[] = [];
-      if (currentProjectDetails.files && currentProjectDetails.files.length > 0) {
-        console.log('Uploading files for draft:', currentProjectDetails.files);
-        supportingDocuments = await handleMultipleFileUploads(currentProjectDetails.files);
-        console.log('Files uploaded successfully for draft:', supportingDocuments);
-      }
+      // Upload files first to get file paths for draft submission
+      const uploadedFilePaths = await uploadFilesAndGetPaths(currentProjectDetails.files || []);
       
-      // Prepare project data for draft submission
+      // Prepare project data for draft submission (with file paths)
       const projectData = {
         // Project ID for updates
         ...(isEditing && editingProjectId ? { id: editingProjectId } : {}),
@@ -1540,8 +1543,7 @@ useEffect(() => {
           try {
             // If editing a project, use the contact ID from the project data
             if (isEditing && currentProjectDetails.contact_id) {
-              console.log('✅ Using contact ID from project data:', currentProjectDetails.contact_id);
-              return currentProjectDetails.contact_id;
+             return currentProjectDetails.contact_id;
             }
             
             // For new projects, try to get from localStorage
@@ -1549,7 +1551,6 @@ useEffect(() => {
             if (contactData) {
               const parsed = JSON.parse(contactData);
               if (parsed.id) {
-                console.log('✅ Contact ID found in contactData:', parsed.id);
                 return parsed.id;
               }
             }
@@ -1559,7 +1560,6 @@ useEffect(() => {
             if (contactInfo) {
               const parsed = JSON.parse(contactInfo);
               if (parsed.id) {
-                console.log('✅ Contact ID found in contactInfo:', parsed.id);
                 return parsed.id;
               }
             }
@@ -1577,8 +1577,7 @@ useEffect(() => {
           try {
             // If editing a project, use the account ID from the project data
             if (isEditing && currentProjectDetails.account_id) {
-              console.log('✅ Using account ID from project data:', currentProjectDetails.account_id);
-              return currentProjectDetails.account_id;
+             return currentProjectDetails.account_id;
             }
             
             // For new projects, try to get from localStorage
@@ -1586,7 +1585,7 @@ useEffect(() => {
             if (contactData) {
               const parsed = JSON.parse(contactData);
               if (parsed.account_id) {
-                console.log('✅ Account ID found in contactData:', parsed.account_id);
+                
                 return parsed.account_id;
               }
             }
@@ -1596,7 +1595,7 @@ useEffect(() => {
             if (contactInfo) {
               const parsed = JSON.parse(contactInfo);
               if (parsed.account_id) {
-                console.log('✅ Account ID found in contactInfo:', parsed.account_id);
+                
                 return parsed.account_id;
               }
             }
@@ -1612,36 +1611,29 @@ useEffect(() => {
           try {
             // If editing a project, use the account name from the project data
             if (isEditing && currentProjectDetails.account_name) {
-              console.log('✅ Using account name from project data:', currentProjectDetails.account_name);
+              
               return currentProjectDetails.account_name;
             }
             
             // For new projects, try to get from localStorage
             const contactData = localStorage.getItem('contactData');
-            console.log('=== DEBUG: contactData from localStorage (handleSaveAsDraft) ===');
-            console.log('contactData:', contactData);
+           
             if (contactData) {
               const parsed = JSON.parse(contactData);
-              console.log('Parsed contactData:', parsed);
-              console.log('Available keys in contactData:', Object.keys(parsed));
-              console.log('All contactData values:', JSON.stringify(parsed, null, 2));
+            
               if (parsed.account_name) {
-                console.log('✅ Account name found in contactData:', parsed.account_name);
+               
                 return parsed.account_name;
               }
             }
             
             // If not found, try to get from contactInfo
             const contactInfo = localStorage.getItem('contactInfo');
-            console.log('=== DEBUG: contactInfo from localStorage (handleSaveAsDraft) ===');
-            console.log('contactInfo:', contactInfo);
+           
             if (contactInfo) {
               const parsed = JSON.parse(contactInfo);
-              console.log('Parsed contactInfo:', parsed);
-              console.log('Available keys in contactInfo:', Object.keys(parsed));
-              console.log('All contactInfo values:', JSON.stringify(parsed, null, 2));
-              if (parsed.account_name) {
-                console.log('✅ Account name found in contactInfo:', parsed.account_name);
+               if (parsed.account_name) {
+               
                 return parsed.account_name;
               }
             }
@@ -1656,36 +1648,20 @@ useEffect(() => {
         
         // Additional info
         comments: currentProjectDetails.comments || '',
-        supporting_documents: [], // Empty array since we have URLs, not Files
+        // Supporting documents - will be uploaded after project creation
+        supporting_documents: [],
+        
+        // Document fields for CRM storage - use uploaded file paths
+        ...(uploadedFilePaths.length > 0 ? {
+          document_c: uploadedFilePaths.join('; '),
+          documents_icesc_project_suggestions_1_name: uploadedFilePaths.join('; ')
+        } : {}),
+        
       };
 
-      console.log('=== DEBUG: About to save draft ===');
-      console.log('Project data keys:', Object.keys(projectData));
-      console.log('Project data sample:', {
-        name: projectData.name,
-        contact_id: projectData.contact_id,
-        contact_name: projectData.contact_name,
-        contact_email: projectData.contact_email,
-        contact_phone: projectData.contact_phone,
-        contact_role: projectData.contact_role,
-        account_id: projectData.account_id,
-        account_name: projectData.account_name,
-        strategic_goal_id: projectData.strategic_goal_id,
-        pillar_id: projectData.pillar_id,
-        service_id: projectData.service_id,
-        sub_service_id: projectData.sub_service_id,
-        status: 'Draft'
-      });
+     
       
-      console.log('=== CONTACT INFORMATION DEBUG ===');
-      console.log('Contact name:', projectData.contact_name);
-      console.log('Contact email:', projectData.contact_email);
-      console.log('Contact phone:', projectData.contact_phone);
-      console.log('Contact role:', projectData.contact_role);
-      console.log('Contact ID:', projectData.contact_id);
-      console.log('Account ID:', projectData.account_id);
-      console.log('Account name:', projectData.account_name);
-      console.log('================================');
+     
 
       // Add status field to ensure it's treated as a draft
       const draftProjectData = {
@@ -1699,8 +1675,12 @@ useEffect(() => {
         : await saveAsDraft(draftProjectData);
       
       if (result.success) {
-        console.log(isEditing ? '✅ Project updated successfully!' : '✅ Draft saved successfully!');
-        // The hook will handle setting the submission result
+        // Also save to local storage for backup
+        const projectId = saveProjectToLocal(projectData);
+        console.log(isEditing ? 'Draft updated in CRM and saved locally with ID:' : 'Draft submitted to CRM and saved locally with ID:', projectId);
+        
+        // Files were already uploaded in uploadFilesAndGetPaths function before CRM submission
+        // No need to upload them again here
         
         // Clear editing flags
         if (isEditing) {
@@ -1720,19 +1700,22 @@ useEffect(() => {
           if (session_id) localStorage.setItem('session_id', session_id);
         }
         
-        // Redirect to projects page after 2 seconds
-        setTimeout(() => {
-          window.location.href = '/projects';
-        }, 2000);
+        // Set success result to show success message (same as regular submission)
+        setSubmissionResult({
+          success: true,
+          projectId: result.projectId,
+          message: isEditing ? 'Draft updated successfully' : 'Project saved as draft successfully'
+        });
+        
+        // Redirect to projects page after 2 seconds - DISABLED FOR DEBUGGING
+        // setTimeout(() => {
+        //   window.location.href = '/projects';
+        // }, 2000);
+        console.log('✅ Draft save completed successfully - redirect disabled for debugging');
+        console.log('🔗 To go to projects page, run: window.location.href = "/projects"');
       } else {
         console.error('❌ Draft save failed:', result.error);
-        console.log('🔍 Error details for debugging:', {
-          error: result.error,
-          includesETIMEDOUT: result.error?.includes('ETIMEDOUT'),
-          includesFailedAuth: result.error?.includes('Failed to authenticate'),
-          includesConnectETIMEDOUT: result.error?.includes('connect ETIMEDOUT'),
-          includesInternalServer: result.error?.includes('Internal server error')
-        });
+        
         
         // If CRM is unavailable or any server error, save locally as fallback
         const isServerError = result.error && (
@@ -1744,17 +1727,28 @@ useEffect(() => {
         );
         
         if (isServerError) {
-          console.log('🔄 CRM unavailable or server error, saving locally as fallback...');
-          
+         
           try {
             // Save to local storage as backup
             const localProjectId = saveProjectToLocal(projectData);
-            console.log('✅ Project saved locally with ID:', localProjectId);
+            console.log('Draft saved locally as fallback with ID:', localProjectId);
             
-            // Redirect to projects page after 2 seconds
-            setTimeout(() => {
-              window.location.href = '/projects';
-            }, 2000);
+            // Files were already uploaded in uploadFilesAndGetPaths function before CRM submission
+            // No need to upload them again here
+            
+            // Set success result to show success message (same as regular submission)
+            setSubmissionResult({
+              success: true,
+              projectId: localProjectId,
+              message: 'Project saved as draft successfully (offline)'
+            });
+            
+            // Redirect to projects page after 2 seconds - DISABLED FOR DEBUGGING
+            // setTimeout(() => {
+            //   window.location.href = '/projects';
+            // }, 2000);
+            console.log('✅ Local draft fallback completed - redirect disabled for debugging');
+            console.log('🔗 To go to projects page, run: window.location.href = "/projects"');
           } catch (localError) {
             console.error('❌ Local save also failed:', localError);
           }
@@ -1765,6 +1759,43 @@ useEffect(() => {
       // The hook will handle setting the submission result
     } finally {
       setIsDraftSaving(false);
+    }
+  };
+
+  // Helper function to upload files and get file paths
+  const uploadFilesAndGetPaths = async (files: any[]): Promise<string[]> => {
+    if (!files || files.length === 0) {
+      return [];
+    }
+
+    try {
+      // Upload files using the existing handleFileUpload function
+      const uploadPromises = files.map(async (fileItem: any) => {
+        let fileToUpload = null;
+        
+        // Get the actual File object
+        if (fileItem.fileObject && fileItem.fileObject instanceof File) {
+          fileToUpload = fileItem.fileObject;
+        } else if (fileItem instanceof File) {
+          fileToUpload = fileItem;
+        }
+        
+        if (fileToUpload) {
+          const filePath = await handleFileUpload(fileToUpload);
+          return filePath;
+        }
+        
+        return null;
+      });
+      
+      const filePaths = await Promise.all(uploadPromises);
+      const validPaths = filePaths.filter((path: string | null): path is string => path !== null);
+      
+      return validPaths;
+    } catch (error) {
+      console.error('Error uploading files before CRM submission:', error);
+      // Don't fail the entire submission if file upload fails
+      return [];
     }
   };
 
@@ -1779,10 +1810,6 @@ useEffect(() => {
     const editingProjectId = localStorage.getItem('editingProjectId');
     const isEditing = editingProjectId && localStorage.getItem('isEditingProject') === 'true';
     
-    console.log('🔍 Project submission edit mode check:');
-    console.log('- editingProjectId:', editingProjectId);
-    console.log('- isEditingProject flag:', localStorage.getItem('isEditingProject'));
-    console.log('- isEditing:', isEditing);
     
     // If we're not actually editing (no valid project ID), clear the flags and create new project
     if (isEditing && !editingProjectId) {
@@ -1793,22 +1820,10 @@ useEffect(() => {
     }
     
     try {
-      // Handle file uploads first
-      let supportingDocuments: string[] = [];
-      if (projectDetails.files && projectDetails.files.length > 0) {
-        console.log('Uploading files:', projectDetails.files);
-        console.log('File details:', projectDetails.files.map((f: File) => ({
-          name: f.name,
-          size: f.size,
-          type: f.type,
-          isFile: f instanceof File,
-          constructor: f.constructor.name
-        })));
-        supportingDocuments = await handleMultipleFileUploads(projectDetails.files);
-        console.log('Files uploaded successfully:', supportingDocuments);
-      }
+      // Upload files first to get file paths for CRM submission
+      const uploadedFilePaths = await uploadFilesAndGetPaths(projectDetails.files || []);
       
-      // Prepare project data for CRM submission
+      // Prepare project data for CRM submission (with file paths)
       const projectData = {
         // Basic project info
         name: projectDetails.title || '',
@@ -1890,7 +1905,7 @@ useEffect(() => {
           try {
             // If editing a project, use the account ID from the project data
             if (isEditing && projectDetails.account_id) {
-              console.log('✅ Using account ID from project data:', projectDetails.account_id);
+            
               return projectDetails.account_id;
             }
             
@@ -1899,7 +1914,6 @@ useEffect(() => {
             if (contactData) {
               const parsed = JSON.parse(contactData);
               if (parsed.account_id) {
-                console.log('✅ Account ID found in contactData:', parsed.account_id);
                 return parsed.account_id;
               }
             }
@@ -1909,7 +1923,6 @@ useEffect(() => {
             if (contactInfo) {
               const parsed = JSON.parse(contactInfo);
               if (parsed.account_id) {
-                console.log('✅ Account ID found in contactInfo:', parsed.account_id);
                 return parsed.account_id;
               }
             }
@@ -1925,8 +1938,7 @@ useEffect(() => {
           try {
             // If editing a project, use the account name from the project data
             if (isEditing && projectDetails.account_name) {
-              console.log('✅ Using account name from project data:', projectDetails.account_name);
-              return projectDetails.account_name;
+             return projectDetails.account_name;
             }
             
             // For new projects, try to get from localStorage
@@ -1934,7 +1946,6 @@ useEffect(() => {
             if (contactData) {
               const parsed = JSON.parse(contactData);
               if (parsed.account_name) {
-                console.log('✅ Account name found in contactData:', parsed.account_name);
                 return parsed.account_name;
               }
             }
@@ -1944,7 +1955,6 @@ useEffect(() => {
             if (contactInfo) {
               const parsed = JSON.parse(contactInfo);
               if (parsed.account_name) {
-                console.log('✅ Account name found in contactInfo:', parsed.account_name);
                 return parsed.account_name;
               }
             }
@@ -1959,38 +1969,28 @@ useEffect(() => {
         
         // Additional info
         comments: projectDetails.comments || '',
-        // Note: supporting_documents is expected to be File[] but we have URLs
-        // We'll store the URLs in comments instead
-        supporting_documents: [], // Empty array since we have URLs, not Files
+        // Supporting documents - will be uploaded after project creation
+        supporting_documents: [],
+        
+        // Document fields for CRM storage - use uploaded file paths
+        ...(uploadedFilePaths.length > 0 ? {
+          document_c: uploadedFilePaths.join('; '),
+          documents_icesc_project_suggestions_1_name: uploadedFilePaths.join('; ')
+        } : {}),
+        
         
         // Status - Published for normal submission, Draft for save as draft
         status: 'Published'
       };
 
-      // Submit to CRM using the hook
-      console.log('=== DEBUG: About to submit project ===');
-      console.log('Project data keys:', Object.keys(projectData));
-      console.log('Project data sample:', {
-        name: projectData.name,
-        contact_id: projectData.contact_id,
-        account_id: projectData.account_id,
-        account_name: projectData.account_name,
-        strategic_goal_id: projectData.strategic_goal_id,
-        pillar_id: projectData.pillar_id,
-        service_id: projectData.service_id,
-        sub_service_id: projectData.sub_service_id
-      });
+   
       
       // Use updateProject if editing, otherwise use submitProject
       const result = isEditing 
         ? await updateProject({ ...projectData, id: editingProjectId! })
         : await submitProject(projectData);
       
-      console.log('=== DEBUG: Submission result ===');
-      console.log('Result success:', result.success);
-      console.log('Result error:', result.error);
-      console.log('Result projectId:', result.projectId);
-      
+   
       if (result.success) {
         // Clear editing flags after successful update
         if (isEditing) {
@@ -2009,12 +2009,15 @@ useEffect(() => {
           if (i18nextLng) localStorage.setItem('i18nextLng', i18nextLng);
           if (session_id) localStorage.setItem('session_id', session_id);
           
-          console.log('✅ Editing flags cleared after successful update');
+          
         }
         
         // Also save to local storage for backup
         const projectId = saveProjectToLocal(projectData);
         console.log(isEditing ? 'Project updated in CRM and saved locally with ID:' : 'Project submitted to CRM and saved locally with ID:', projectId);
+        
+        // Files were already uploaded in uploadFilesAndGetPaths function before CRM submission
+        // No need to upload them again here
         
         // The hook will handle setting the submission result
       } else {
@@ -2112,14 +2115,10 @@ useEffect(() => {
 
   const getCardDescription = (card: any) => {
     const currentLang = i18n.language || "en";
-    
-    // Debug log
-    console.log('Card desc data:', card.desc, 'Current lang:', currentLang);
-    
+   
     // Try to get translated description from the card data
     if (card.desc && typeof card.desc === 'object') {
       const result = card.desc[currentLang] || card.desc.en || card.desc;
-      console.log('Translated desc:', result);
       // Ensure we return a string, not an object
       if (typeof result === 'string') {
         return decodeHtmlEntities(result);
@@ -2132,7 +2131,6 @@ useEffect(() => {
     
     // If desc is a string, return it as is
     if (typeof card.desc === 'string') {
-      console.log('String desc:', card.desc);
       return decodeHtmlEntities(card.desc);
     }
     
@@ -2161,12 +2159,9 @@ useEffect(() => {
     const currentLang = i18n.language || "en";
     
     // Debug: Log the card structure
-    console.log('Card data:', card, 'Current lang:', currentLang);
-    
     // Try to get translated title from the card data
     if (card.title && typeof card.title === 'object') {
       const result = card.title[currentLang] || card.title.en || card.title;
-      console.log('Title result:', result);
       // Ensure we return a string, not an object
       if (typeof result === 'string') {
         return decodeHtmlEntities(result);
@@ -2180,7 +2175,6 @@ useEffect(() => {
     // Try desc field if title doesn't have translations
     if (card.desc && typeof card.desc === 'object') {
       const result = card.desc[currentLang] || card.desc.en || card.desc;
-      console.log('Desc result:', result);
       if (typeof result === 'string') {
         return decodeHtmlEntities(result);
       } else {
@@ -2260,8 +2254,7 @@ useEffect(() => {
         (entries) => {
           entries.forEach((entry) => {
             if (entry.isIntersecting && !hasAnimated) {
-              console.log('Content section came into view - starting GSAP animations...');
-
+             
               setHasAnimated(true);
 
               const ctx = gsap.context(() => {

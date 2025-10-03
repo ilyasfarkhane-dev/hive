@@ -4,6 +4,117 @@ import { mapProjectDataToCRM } from '@/utils/crmFieldMapping';
 
 const CRM_BASE_URL = 'https://crm.icesco.org';
 
+// Function to create documents in CRM and link them to project
+async function createAndLinkDocuments(
+  sessionId: string, 
+  projectId: string, 
+  documentPaths: string, 
+  documentNames: string
+): Promise<void> {
+  try {
+    console.log('=== Creating and linking documents for update ===');
+    console.log('Project ID:', projectId);
+    console.log('Document paths:', documentPaths);
+    console.log('Document names:', documentNames);
+    
+    // Split document paths and names
+    const paths = documentPaths.split('; ').filter(path => path.trim());
+    const names = documentNames.split('; ').filter(name => name.trim());
+    
+    if (paths.length !== names.length) {
+      console.error('Mismatch between document paths and names count');
+      return;
+    }
+    
+    const documentIds: string[] = [];
+    
+    // Create each document record
+    for (let i = 0; i < paths.length; i++) {
+      const path = paths[i].trim();
+      const name = names[i].trim();
+      
+      console.log(`Creating document ${i + 1}: ${name} at ${path}`);
+      
+      const documentData = {
+        session: sessionId,
+        module_name: 'Documents',
+        name_value_list: [
+          { name: 'document_name', value: name },
+          { name: 'description', value: `Document uploaded for project: ${projectId}` },
+          { name: 'status_id', value: 'Active' },
+          { name: 'active_date', value: new Date().toISOString().split('T')[0] }
+        ]
+      };
+      
+      const createResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          method: 'set_entry',
+          input_type: 'JSON',
+          response_type: 'JSON',
+          rest_data: JSON.stringify(documentData)
+        }),
+      });
+      
+      const createResponseText = await createResponse.text();
+      console.log(`Document creation response for ${name}:`, createResponseText);
+      
+      let createResult;
+      if (createResponseText.trim()) {
+        createResult = JSON.parse(createResponseText);
+      }
+      
+      if (createResult && createResult.id) {
+        documentIds.push(createResult.id);
+        console.log(`✅ Document created with ID: ${createResult.id}`);
+      } else {
+        console.error(`❌ Failed to create document: ${name}`, createResult);
+      }
+    }
+    
+    // Link all documents to the project
+    if (documentIds.length > 0) {
+      console.log('Linking documents to project:', documentIds);
+      
+      const linkResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          method: 'set_relationship',
+          input_type: 'JSON',
+          response_type: 'JSON',
+          rest_data: JSON.stringify({
+            session: sessionId,
+            module_name: 'icesc_project_suggestions',
+            module_id: projectId,
+            link_field_name: 'documents_icesc_project_suggestions_1',
+            related_ids: documentIds
+          }),
+        }),
+      });
+      
+      const linkResponseText = await linkResponse.text();
+      console.log('Document linking response:', linkResponseText);
+      
+      let linkResult;
+      if (linkResponseText.trim()) {
+        linkResult = JSON.parse(linkResponseText);
+      }
+      
+      if (linkResult && linkResult.created === documentIds.length) {
+        console.log(`✅ Successfully linked ${documentIds.length} documents to project`);
+      } else {
+        console.error('❌ Failed to link documents to project:', linkResult);
+      }
+    }
+    
+    console.log('=== Document creation and linking completed for update ===');
+  } catch (error) {
+    console.error('Error creating and linking documents for update:', error);
+  }
+}
+
 // Function to get a fresh session ID
 async function getFreshSessionId(): Promise<string> {
   try {
@@ -92,6 +203,12 @@ export async function POST(request: NextRequest) {
     // Use proper CRM field mapping (same as submit)
     console.log('=== DEBUG: Creating CRM field mapping ===');
     const crmData = mapProjectDataToCRM(projectData);
+    
+    // Debug logging for partners, milestones, and KPIs
+    console.log('🔍 DEBUG - Project Data Partners:', projectData.partners);
+    console.log('🔍 DEBUG - Project Data Milestones:', projectData.milestones);
+    console.log('🔍 DEBUG - Project Data KPIs:', projectData.kpis);
+    console.log('🔍 DEBUG - CRM Data after mapping:', crmData);
     
     // Fix phone number length (max 15 characters for better compatibility)
     crmData.forEach(field => {
@@ -372,6 +489,11 @@ export async function POST(request: NextRequest) {
                 }
               } else {
                 console.log('No contact ID provided, skipping contact relationship');
+              }
+              
+              // Create and link documents if any
+              if (projectData.document_c && projectData.documents_icesc_project_suggestions_1_name) {
+                await createAndLinkDocuments(sessionId, data.id, projectData.document_c, projectData.documents_icesc_project_suggestions_1_name);
               }
               
               // Verify the update by fetching the project again

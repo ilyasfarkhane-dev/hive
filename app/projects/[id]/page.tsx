@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, MapPin, Users, DollarSign, FileText, Landmark, Settings, Pin, Clock, Tag, Target, BarChart3, User, MessageSquare, AlertCircle, FileX } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, DollarSign, FileText, Landmark, Settings, Pin, Clock, Tag, Target, BarChart3, User, MessageSquare, AlertCircle, FileX, Download } from 'lucide-react';
 import Image from 'next/image';
 import ProjectsPageHeader from '@/components/ProjectsPageHeader';
 // import maquettesImage from '@/public/maquettes.png'; // Removed during cleanup
@@ -117,6 +117,42 @@ const ProjectDetailsPage = () => {
 
   // Helper function to delay execution
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Function to handle file download
+  const handleDownload = (file: any) => {
+    try {
+      // Extract filename from file path or use file name
+      let fileName = file.name || file.fileName || 'document';
+      let filePath = file.filePath || '';
+      
+      // Clean up the file path - remove \public\ prefix if present
+      if (filePath.startsWith('\\public\\')) {
+        filePath = filePath.replace('\\public\\', '/');
+      } else if (filePath.startsWith('/public/')) {
+        filePath = filePath.replace('/public/', '/');
+      }
+      
+      // If no filePath, try to construct it
+      if (!filePath) {
+        filePath = `/uploads/${fileName}`;
+      }
+      
+      console.log('📥 Downloading file:', fileName, 'from path:', filePath);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = filePath;
+      link.download = fileName;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('❌ Error downloading file:', error);
+      alert('Failed to download file. Please try again.');
+    }
+  };
 
   // Retry utility function with exponential backoff - retry indefinitely
   const retryWithBackoff = async (fn: () => Promise<any>, baseDelay: number = 1000) => {
@@ -603,6 +639,81 @@ const ProjectDetailsPage = () => {
         sub_service: project?.sub_service,
         sub_service_id: project?.sub_service_id
       });
+
+      // Handle file uploads and document management
+      let uploadedFilePaths: string[] = [];
+      let documentNames: string[] = [];
+      
+      console.log('📁 Processing documents for project update...');
+      console.log('📁 editedProject.files:', editedProject.files);
+      console.log('📁 Files count:', editedProject.files?.length || 0);
+      
+      if (editedProject.files && editedProject.files.length > 0) {
+        console.log('📁 Files detected in edited project, processing...');
+        
+        // Upload new files (filter out existing files that don't need re-upload)
+        const newFiles = editedProject.files.filter((file: any) => file instanceof File);
+        const existingFiles = editedProject.files.filter((file: any) => !(file instanceof File));
+        
+        console.log('📁 New files to upload:', newFiles.length);
+        console.log('📁 Existing files:', existingFiles.length);
+        
+        // Upload new files
+        for (const file of newFiles) {
+          try {
+            const formData = new FormData();
+            formData.append('files', file);
+            
+            // Get user email from localStorage
+            let userEmail = 'unknown';
+            try {
+              const contactInfo = localStorage.getItem('contactInfo');
+              if (contactInfo) {
+                const contact = JSON.parse(contactInfo);
+                userEmail = contact.email || 'unknown';
+              }
+            } catch (e) {
+              console.error('Error getting user email:', e);
+            }
+            
+            formData.append('userEmail', userEmail);
+            
+            const response = await fetch('/api/upload-documents', {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              if (result.files && result.files.length > 0) {
+                uploadedFilePaths.push(result.files[0].filePath);
+                documentNames.push(file.name);
+                console.log('✅ File uploaded:', file.name, '->', result.files[0].filePath);
+              }
+            } else {
+              console.error('❌ File upload failed:', file.name);
+            }
+          } catch (error) {
+            console.error('❌ Error uploading file:', file.name, error);
+          }
+        }
+        
+        // Add existing file paths
+        for (const file of existingFiles) {
+          if (file.filePath || file.fileName) {
+            // If it's an existing file, use its current path or generate one
+            const filePath = file.filePath || `\\public\\uploads\\${file.fileName || file.name}`;
+            uploadedFilePaths.push(filePath);
+            documentNames.push(file.name || file.fileName);
+          }
+        }
+        
+        console.log('📁 Final file paths:', uploadedFilePaths);
+        console.log('📁 Final document names:', documentNames);
+      } else {
+        console.log('📁 No files in edited project - clearing document fields');
+        console.log('📁 This means all documents were removed');
+      }
       
       // Prepare the data for CRM update
       const updateData = {
@@ -663,6 +774,10 @@ const ProjectDetailsPage = () => {
         
         // Additional info
         comments: editedProject.comments || '',
+        
+        // Document fields - always include to properly update/clear CRM fields
+        document_c: uploadedFilePaths.join('; '),
+        documents_icesc_project_suggestions_1_name: documentNames.join('; '),
         
         // Metadata
         session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
@@ -833,6 +948,81 @@ const ProjectDetailsPage = () => {
     try {
       console.log('💾 Saving project as draft:', editedProject);
       
+      // Handle file uploads and document management (same logic as handleSaveChanges)
+      let uploadedFilePaths: string[] = [];
+      let documentNames: string[] = [];
+      
+      console.log('📁 Processing documents for draft save...');
+      console.log('📁 editedProject.files:', editedProject.files);
+      console.log('📁 Files count:', editedProject.files?.length || 0);
+      
+      if (editedProject.files && editedProject.files.length > 0) {
+        console.log('📁 Files detected in edited project, processing...');
+        
+        // Upload new files (filter out existing files that don't need re-upload)
+        const newFiles = editedProject.files.filter((file: any) => file instanceof File);
+        const existingFiles = editedProject.files.filter((file: any) => !(file instanceof File));
+        
+        console.log('📁 New files to upload:', newFiles.length);
+        console.log('📁 Existing files:', existingFiles.length);
+        
+        // Upload new files
+        for (const file of newFiles) {
+          try {
+            const formData = new FormData();
+            formData.append('files', file);
+            
+            // Get user email from localStorage
+            let userEmail = 'unknown';
+            try {
+              const contactInfo = localStorage.getItem('contactInfo');
+              if (contactInfo) {
+                const contact = JSON.parse(contactInfo);
+                userEmail = contact.email || 'unknown';
+              }
+            } catch (e) {
+              console.error('Error getting user email:', e);
+            }
+            
+            formData.append('userEmail', userEmail);
+            
+            const response = await fetch('/api/upload-documents', {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              if (result.files && result.files.length > 0) {
+                uploadedFilePaths.push(result.files[0].filePath);
+                documentNames.push(file.name);
+                console.log('✅ File uploaded for draft:', file.name, '->', result.files[0].filePath);
+              }
+            } else {
+              console.error('❌ File upload failed for draft:', file.name);
+            }
+          } catch (error) {
+            console.error('❌ Error uploading file for draft:', file.name, error);
+          }
+        }
+        
+        // Add existing file paths
+        for (const file of existingFiles) {
+          if (file.filePath || file.fileName) {
+            // If it's an existing file, use its current path or generate one
+            const filePath = file.filePath || `\\public\\uploads\\${file.fileName || file.name}`;
+            uploadedFilePaths.push(filePath);
+            documentNames.push(file.name || file.fileName);
+          }
+        }
+        
+        console.log('📁 Final file paths for draft:', uploadedFilePaths);
+        console.log('📁 Final document names for draft:', documentNames);
+      } else {
+        console.log('📁 No files in edited project - clearing document fields for draft');
+        console.log('📁 This means all documents were removed');
+      }
+      
       // Prepare the data for draft update (same as save changes but with Draft status)
       const draftData = {
         id: editedProject.id,
@@ -892,6 +1082,10 @@ const ProjectDetailsPage = () => {
         
         // Additional info
         comments: editedProject.comments || '',
+        
+        // Document fields - always include to properly update/clear CRM fields
+        document_c: uploadedFilePaths.join('; '),
+        documents_icesc_project_suggestions_1_name: documentNames.join('; '),
         
         // Metadata
         session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
@@ -1393,13 +1587,32 @@ const ProjectDetailsPage = () => {
                   
                   {/* Edit/Save/Cancel Buttons */}
                   {!isEditing ? (
-                    <button
-                      onClick={handleEditProject}
-                      className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-                    >
-                      <Settings className="w-4 h-4 mx-2 group-hover:rotate-90 transition-transform duration-200" />
-                      {t('editProject') || 'Edit Project'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleEditProject}
+                        className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                      >
+                        <Settings className="w-4 h-4 mx-2 group-hover:rotate-90 transition-transform duration-200" />
+                        {t('editProject') || 'Edit Project'}
+                      </button>
+                      
+                      {/* Project Status */}
+                      {project && (() => {
+                        console.log('🔍 DEBUG - Project status:', (project as any).status);
+                        console.log('🔍 DEBUG - Full project object:', project);
+                        return null;
+                      })()}
+                      {project && (
+                        <div className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full ${
+                          (project as any).status === 'Draft' || (project as any).status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                          (project as any).status === 'Published' || (project as any).status === 'published' || (project as any).status === 'Active' || (project as any).status === 'active' ? 'bg-green-100 text-green-800' :
+                          (project as any).status === 'Submitted' || (project as any).status === 'submitted' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {(project as any).status || 'Unknown'}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex items-center gap-1">
                       <button
@@ -1413,7 +1626,7 @@ const ProjectDetailsPage = () => {
                             Saving...
                           </>
                         ) : (
-                          'Save'
+                          'Save as Published'
                         )}
                       </button>
                       <button
@@ -1427,7 +1640,7 @@ const ProjectDetailsPage = () => {
                             Saving...
                           </>
                         ) : (
-                          'Draft'
+                          'Save as Draft'
                         )}
                       </button>
                       <button
@@ -1504,16 +1717,89 @@ const ProjectDetailsPage = () => {
                       />
                     ) : (
                       <p className="text-gray-700 leading-relaxed">
-                        {project.rationale || ('problem_statement' in project ? (project as any).problem_statement : '') || t('noDescription')}
+                        {project.rationale || ('problem_statement' in project ? (project as any).problem_statement : '') || t('problemStatement')}
                       </p>
                     )}
                   </div>
                 </div>
                 
+                {/* Beneficiaries Section */}
+                <div className="space-y-4">
+                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('beneficiaries')}</label>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {[
+                          { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: String(t('beneficiaryStudents')) },
+                          { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: String(t('beneficiaryTeachers')) },
+                          { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: String(t('beneficiaryYouth')) },
+                          { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: String(t('beneficiaryPublic')) },
+                          { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: String(t('beneficiaryPolicymakers')) },
+                          { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: String(t('beneficiaryOther')) },
+                        ].map((benef) => (
+                          <label
+                            key={benef.value}
+                            className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
+                              editedProject?.beneficiaries?.includes(benef.value)
+                                ? 'border-teal-500 bg-teal-50 shadow-sm'
+                                : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="mt-1 accent-teal-500 w-4 h-4"
+                              value={benef.value}
+                              checked={editedProject?.beneficiaries?.includes(benef.value) || false}
+                              onChange={(e) => handleBeneficiaryChange(benef.value, e.target.checked)}
+                            />
+                            <div className="flex-1">
+                              <span className="font-medium text-gray-900 text-sm">{benef.label}</span>
+                              <p className="text-gray-500 text-xs mt-1 leading-relaxed">{benef.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Show input only when "Other" is selected */}
+                      {showOtherBeneficiaryInput && (
+                        <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
+                          <label className="block text-sm font-medium text-teal-800 mb-2">
+                            {t('otherBeneficiaryPlaceholder')} <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="w-full px-4 py-3 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                            placeholder={t('otherBeneficiaryPlaceholder')}
+                            value={editedProject?.other_beneficiary || ''}
+                            onChange={(e) => handleOtherBeneficiaryChange(e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-3">
+                      {project.beneficiaries && Array.isArray(project.beneficiaries) && project.beneficiaries.length > 0 ? (
+                        project.beneficiaries.map((beneficiary, index) => (
+                          <span key={index} className="px-4 py-2 bg-blue-100 text-blue-800 rounded-xl text-sm font-medium border border-blue-200">
+                            {translateBeneficiary(beneficiary)}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
+                      )}
+                      {project.other_beneficiary && (
+                        <span className="px-4 py-2 bg-gray-100 text-gray-800 rounded-xl text-sm font-medium border border-gray-200">
+                          {project.other_beneficiary}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
              
               </div>
             </motion.div>
 
+            
             {/* Implementation & Budget */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -1700,6 +1986,85 @@ const ProjectDetailsPage = () => {
             </motion.div>
 
 
+              {/* Partners */}
+              <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-8 py-6 border-b border-gray-100">
+                <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
+                  <div className={`w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  {t('partnersCollaboration')}
+                </h2>
+              </div>
+              <div className="p-8">
+                <div className="space-y-4">
+                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('partners')}</label>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {editedProject?.partners?.map((partner, index) => (
+                          <span key={index} className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                            {partner}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!editedProject) return;
+                                const newPartners = editedProject.partners?.filter((_, i) => i !== index) || [];
+                                setEditedProject(prev => ({ ...prev!, partners: newPartners }));
+                              }}
+                              className="w-4 h-4 flex items-center justify-center text-green-600 hover:text-green-900"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={t('addPartnerPlaceholder')}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.target as HTMLInputElement;
+                              const value = input.value.trim();
+                              if (value && editedProject && (!editedProject.partners || !editedProject.partners.includes(value))) {
+                                setEditedProject(prev => ({
+                                  ...prev!,
+                                  partners: [...(prev?.partners || []), value]
+                                }));
+                                input.value = '';
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-3">
+                      {project.partners && Array.isArray(project.partners) && project.partners.length > 0 ? (
+                        project.partners.map((partner, index) => (
+                          <span key={index} className="px-4 py-2 bg-green-100 text-green-800 rounded-xl text-sm font-medium border border-green-200">
+                            {partner}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+
+
+
             {/* Project Scope & Modality */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -1839,156 +2204,116 @@ const ProjectDetailsPage = () => {
               </div>
             </motion.div>
 
-            {/* Partners & Beneficiaries */}
+            {/* Contact Information */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+              transition={{ delay: 0.7 }}
               className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
             >
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-8 py-6 border-b border-gray-100">
+              <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-8 py-6 border-b border-gray-100">
                 <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
-                  <div className={`w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
-                    <Users className="w-6 h-6 text-white" />
+                  <div className={`w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
+                    <User className="w-6 h-6 text-white" />
                   </div>
-                  {t('partnersCollaboration')}
+                  {t('contactInformation')}
                 </h2>
               </div>
               <div className="p-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('partners')}</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('name')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                          {editedProject?.partners?.map((partner, index) => (
-                            <span key={index} className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                              {partner}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!editedProject) return;
-                                  const newPartners = editedProject.partners?.filter((_, i) => i !== index) || [];
-                                  setEditedProject(prev => ({ ...prev!, partners: newPartners }));
-                                }}
-                                className="w-4 h-4 flex items-center justify-center text-green-600 hover:text-green-900"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder={t('addPartnerPlaceholder')}
-                            className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const input = e.target as HTMLInputElement;
-                                const value = input.value.trim();
-                                if (value && editedProject && (!editedProject.partners || !editedProject.partners.includes(value))) {
-                                  setEditedProject(prev => ({
-                                    ...prev!,
-                                    partners: [...(prev?.partners || []), value]
-                                  }));
-                                  input.value = '';
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
+                      <input
+                        type="text"
+                        value={editedProject?.contact?.name || ('contact_name' in (editedProject || {}) ? (editedProject as any).contact_name : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, name: e.target.value });
+                          } else {
+                            handleFieldChange('contact_name', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactFullNamePlaceholder')}
+                      />
                     ) : (
-                    <div className="flex flex-wrap gap-3">
-                      {project.partners && Array.isArray(project.partners) && project.partners.length > 0 ? (
-                        project.partners.map((partner, index) => (
-                          <span key={index} className="px-4 py-2 bg-green-100 text-green-800 rounded-xl text-sm font-medium border border-green-200">
-                            {partner}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
-                      )}
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <p className="text-gray-900 font-medium">{project.contact?.name || ('contact_name' in project ? (project as any).contact_name : '') || t('notSpecified')}</p>
                     </div>
                     )}
                   </div>
-                  <div className="space-y-4">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('beneficiaries')}</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('email')} <span className="text-red-500">*</span></label>
                     {isEditing ? (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {[
-                            { label: t('beneficiaryStudents'), desc: t('beneficiaryStudentsDesc'), value: String(t('beneficiaryStudents')) },
-                            { label: t('beneficiaryTeachers'), desc: t('beneficiaryTeachersDesc'), value: String(t('beneficiaryTeachers')) },
-                            { label: t('beneficiaryYouth'), desc: t('beneficiaryYouthDesc'), value: String(t('beneficiaryYouth')) },
-                            { label: t('beneficiaryPublic'), desc: t('beneficiaryPublicDesc'), value: String(t('beneficiaryPublic')) },
-                            { label: t('beneficiaryPolicymakers'), desc: t('beneficiaryPolicymakersDesc'), value: String(t('beneficiaryPolicymakers')) },
-                            { label: t('beneficiaryOther'), desc: t('beneficiaryOtherDesc'), value: String(t('beneficiaryOther')) },
-                          ].map((benef) => (
-                            <label
-                              key={benef.value}
-                              className={`flex items-start gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
-                                editedProject?.beneficiaries?.includes(benef.value)
-                                  ? 'border-teal-500 bg-teal-50 shadow-sm'
-                                  : 'border-gray-200 hover:border-teal-300 hover:bg-gray-50'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                className="mt-1 accent-teal-500 w-4 h-4"
-                                value={benef.value}
-                                checked={editedProject?.beneficiaries?.includes(benef.value) || false}
-                                onChange={(e) => handleBeneficiaryChange(benef.value, e.target.checked)}
-                              />
-                              <div className="flex-1">
-                                <span className="font-medium text-gray-900 text-sm">{benef.label}</span>
-                                <p className="text-gray-500 text-xs mt-1 leading-relaxed">{benef.desc}</p>
-                              </div>
-                            </label>
-                          ))}
-                        </div>
-
-                        {/* Show input only when "Other" is selected */}
-                        {showOtherBeneficiaryInput && (
-                          <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
-                            <label className="block text-sm font-medium text-teal-800 mb-2">
-                              {t('otherBeneficiaryPlaceholder')} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              className="w-full px-4 py-3 border border-teal-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                              placeholder={t('otherBeneficiaryPlaceholder')}
-                              value={editedProject?.other_beneficiary || ''}
-                              onChange={(e) => handleOtherBeneficiaryChange(e.target.value)}
-                            />
-                          </div>
-                        )}
-                      </div>
+                      <input
+                        type="email"
+                        value={editedProject?.contact?.email || ('contact_email' in (editedProject || {}) ? (editedProject as any).contact_email : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, email: e.target.value });
+                          } else {
+                            handleFieldChange('contact_email', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactEmailPlaceholder')}
+                      />
                     ) : (
-                      <div className="flex flex-wrap gap-3">
-                        {project.beneficiaries && Array.isArray(project.beneficiaries) && project.beneficiaries.length > 0 ? (
-                          project.beneficiaries.map((beneficiary, index) => (
-                            <span key={index} className="px-4 py-2 bg-blue-100 text-blue-800 rounded-xl text-sm font-medium border border-blue-200">
-                              {translateBeneficiary(beneficiary)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-gray-500 italic text-sm">{t('notSpecified')}</span>
-                        )}
-                        {project.other_beneficiary && (
-                          <span className="px-4 py-2 bg-gray-100 text-gray-800 rounded-xl text-sm font-medium border border-gray-200">
-                            {project.other_beneficiary}
-                          </span>
-                        )}
-                      </div>
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <p className="text-gray-900 font-medium">{project.contact?.email || ('contact_email' in project ? (project as any).contact_email : '') || t('notSpecified')}</p>
+                    </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('phone')} <span className="text-red-500">*</span></label>
+                    {isEditing ? (
+                      <input
+                        type="tel"
+                        value={editedProject?.contact?.phone || ('contact_phone' in (editedProject || {}) ? (editedProject as any).contact_phone : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, phone: e.target.value });
+                          } else {
+                            handleFieldChange('contact_phone', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactPhonePlaceholder')}
+                      />
+                    ) : (
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <p className="text-gray-900 font-medium">{project.contact?.phone || ('contact_phone' in project ? (project as any).contact_phone : '') || t('notSpecified')}</p>
+                    </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('role')} <span className="text-red-500">*</span></label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedProject?.contact?.role || ('contact_role' in (editedProject || {}) ? (editedProject as any).contact_role : '') || ''}
+                        onChange={(e) => {
+                          if (editedProject?.contact) {
+                            handleFieldChange('contact', { ...editedProject.contact, role: e.target.value });
+                          } else {
+                            handleFieldChange('contact_role', e.target.value);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
+                        placeholder={t('contactRolePlaceholder')}
+                      />
+                    ) : (
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <p className="text-gray-900 font-medium">{project.contact?.role || ('contact_role' in project ? (project as any).contact_role : '') || t('notSpecified')}</p>
+                    </div>
                     )}
                   </div>
                 </div>
               </div>
             </motion.div>
 
+          
             {/* Monitoring & Evaluation */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -2142,115 +2467,6 @@ const ProjectDetailsPage = () => {
               </div>
             </motion.div>
 
-            {/* Contact Information */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-            >
-              <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-8 py-6 border-b border-gray-100">
-                <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
-                  <div className={`w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
-                    <User className="w-6 h-6 text-white" />
-                  </div>
-                  {t('contactInformation')}
-                </h2>
-              </div>
-              <div className="p-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('name')} <span className="text-red-500">*</span></label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editedProject?.contact?.name || ('contact_name' in (editedProject || {}) ? (editedProject as any).contact_name : '') || ''}
-                        onChange={(e) => {
-                          if (editedProject?.contact) {
-                            handleFieldChange('contact', { ...editedProject.contact, name: e.target.value });
-                          } else {
-                            handleFieldChange('contact_name', e.target.value);
-                          }
-                        }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                        placeholder={t('contactFullNamePlaceholder')}
-                      />
-                    ) : (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <p className="text-gray-900 font-medium">{project.contact?.name || ('contact_name' in project ? (project as any).contact_name : '') || t('notSpecified')}</p>
-                    </div>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('email')} <span className="text-red-500">*</span></label>
-                    {isEditing ? (
-                      <input
-                        type="email"
-                        value={editedProject?.contact?.email || ('contact_email' in (editedProject || {}) ? (editedProject as any).contact_email : '') || ''}
-                        onChange={(e) => {
-                          if (editedProject?.contact) {
-                            handleFieldChange('contact', { ...editedProject.contact, email: e.target.value });
-                          } else {
-                            handleFieldChange('contact_email', e.target.value);
-                          }
-                        }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                        placeholder={t('contactEmailPlaceholder')}
-                      />
-                    ) : (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <p className="text-gray-900 font-medium">{project.contact?.email || ('contact_email' in project ? (project as any).contact_email : '') || t('notSpecified')}</p>
-                    </div>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('phone')} <span className="text-red-500">*</span></label>
-                    {isEditing ? (
-                      <input
-                        type="tel"
-                        value={editedProject?.contact?.phone || ('contact_phone' in (editedProject || {}) ? (editedProject as any).contact_phone : '') || ''}
-                        onChange={(e) => {
-                          if (editedProject?.contact) {
-                            handleFieldChange('contact', { ...editedProject.contact, phone: e.target.value });
-                          } else {
-                            handleFieldChange('contact_phone', e.target.value);
-                          }
-                        }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                        placeholder={t('contactPhonePlaceholder')}
-                      />
-                    ) : (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <p className="text-gray-900 font-medium">{project.contact?.phone || ('contact_phone' in project ? (project as any).contact_phone : '') || t('notSpecified')}</p>
-                    </div>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('role')} <span className="text-red-500">*</span></label>
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editedProject?.contact?.role || ('contact_role' in (editedProject || {}) ? (editedProject as any).contact_role : '') || ''}
-                        onChange={(e) => {
-                          if (editedProject?.contact) {
-                            handleFieldChange('contact', { ...editedProject.contact, role: e.target.value });
-                          } else {
-                            handleFieldChange('contact_role', e.target.value);
-                          }
-                        }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-200 focus:border-teal-500 transition-all duration-200"
-                        placeholder={t('contactRolePlaceholder')}
-                      />
-                    ) : (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <p className="text-gray-900 font-medium">{project.contact?.role || ('contact_role' in project ? (project as any).contact_role : '') || t('notSpecified')}</p>
-                    </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
             {/* Comments */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -2279,6 +2495,113 @@ const ProjectDetailsPage = () => {
                   ) : (
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                       <p className="text-gray-900 leading-relaxed">{project.comments || t('notSpecified')}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Supporting Documents */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9 }}
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-8 py-6 border-b border-gray-100">
+                <h2 className="text-2xl font-sans font-bold text-gray-900 flex items-center">
+                  <div className={`w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-4' : 'mr-4'}`}>
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+                  {t('supportingDocuments')}
+                </h2>
+              </div>
+              <div className="p-8">
+                <div className="space-y-4">
+                  <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('supportingDocuments')}</label>
+                  {isEditing ? (
+                    <div className="space-y-4">
+                      {/* Display current files */}
+                      {editedProject?.files && editedProject.files.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-gray-700">{t('currentDocuments')}:</p>
+                          {editedProject.files.map((file: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownload(file)}
+                                  className="w-5 h-5 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
+                                  title="Download file"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </button>
+                                <FileText className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-600">{file.name || file.fileName || 'Unknown file'}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!editedProject) return;
+                                  const newFiles = editedProject.files?.filter((_, i) => i !== index) || [];
+                                  setEditedProject(prev => ({ ...prev!, files: newFiles }));
+                                }}
+                                className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* File upload for editing */}
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-teal-400 transition-colors">
+                        <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">{t('addNewDocuments')}</p>
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
+                          onChange={(e) => {
+                            if (!editedProject) return;
+                            const newFiles = Array.from(e.target.files || []);
+                            const updatedFiles = [...(editedProject.files || []), ...newFiles];
+                            setEditedProject(prev => ({ ...prev!, files: updatedFiles }));
+                          }}
+                          className="hidden"
+                          id="file-upload-edit"
+                        />
+                        <label
+                          htmlFor="file-upload-edit"
+                          className="inline-block px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 cursor-pointer transition-colors text-sm"
+                        >
+                          {t('selectFiles')}
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      {project.files && project.files.length > 0 ? (
+                        <div className="space-y-2">
+                          {project.files.map((file: any, index: number) => (
+                            <div key={index} className="flex items-center gap-3 p-2 bg-white rounded-lg">
+                              <button
+                                type="button"
+                                onClick={() => handleDownload(file)}
+                                className="w-5 h-5 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
+                                title="Download file"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                              <FileText className="w-4 h-4 text-gray-400" />
+                              <span className="text-sm text-gray-600">{file.name || file.fileName || 'Unknown file'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">{t('noDocuments')}</p>
+                      )}
                     </div>
                   )}
                 </div>

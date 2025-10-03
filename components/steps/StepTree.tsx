@@ -39,8 +39,7 @@ const getLocalizedTitle = () => {
     case 'fr':
       return service.name_service_fr_c || service.description;
     default:
-      console.log("service description:", service.description);
-      console.log("service :", service);
+    
       return service.description;
   }
 };

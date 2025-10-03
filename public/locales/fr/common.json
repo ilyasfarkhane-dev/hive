@@ -130,6 +130,7 @@
   "phone": "Téléphone",
   "role": "Rôle",
   "supportingDocuments": "Documents de Soutien",
+  "supportingDocumentsDesc": "Téléchargez tous documents pertinents (optionnel)",
   "uploadDropOrBrowse": "Déposez les fichiers ici ou parcourez pour téléverser",
   "uploadTypesLimit": "PDF, DOCX, PNG, JPG, XLSX, PPTX jusqu'à 10MB par fichier",
   "optional": "(Optionnel)",

@@ -203,6 +203,7 @@
   "phone": "الهاتف",
   "role": "الدور",
   "supportingDocuments": "الوثائق الداعمة",
+  "supportingDocumentsDesc": "قم بتحميل أي مستندات ذات صلة (اختياري)",
   "comments": "التعليقات",
   "submitProject": "تقديم المشروع",
   "submitNewProject": "تقديم مشروع جديد",

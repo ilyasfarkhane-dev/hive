@@ -237,6 +237,18 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     crmField: 'comments',
     type: 'text'
   },
+  
+  // Supporting documents (stored as JSON string)
+  supporting_documents: {
+    crmField: 'supporting_documents',
+    type: 'text',
+    customMapping: (value: any) => {
+      if (Array.isArray(value) && value.length > 0) {
+        return JSON.stringify(value);
+      }
+      return '';
+    }
+  },
 
   // Status field
   status: {
@@ -307,6 +319,13 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     crmField: 'session_id',
     type: 'string',
     required: true
+  },
+
+  // Document fields - document_c stores file paths, documents_icesc_project_suggestions_1_name is handled via relationship
+  document_c: {
+    crmField: 'document_c',
+    type: 'string',
+    maxLength: 500
   }
 };
 
@@ -328,6 +347,24 @@ export function mapProjectDataToCRM(projectData: any): any[] {
     const value = projectData[projectField];
     
     if (value === undefined || value === null || value === '') {
+      return;
+    }
+
+    // Check if there's a custom mapping function
+    if (mapping.customMapping) {
+      const mappedValue = mapping.customMapping(value);
+      if (mappedValue !== undefined && mappedValue !== null && mappedValue !== '') {
+        // If the mapped value is an object with multiple fields, add each field individually
+        if (typeof mappedValue === 'object' && !Array.isArray(mappedValue)) {
+          Object.entries(mappedValue).forEach(([fieldName, fieldValue]) => {
+            if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
+              addField(fieldName, fieldValue);
+            }
+          });
+        } else {
+          addField(mapping.crmField, mappedValue);
+        }
+      }
       return;
     }
 
@@ -410,8 +447,17 @@ export function validateProjectData(projectData: any, isDraft: boolean = false):
     // For non-drafts, check if field is required
     if (mapping.required && !isDraft) {
       const value = projectData[projectField];
-      if (!value || (Array.isArray(value) && value.length === 0)) {
-        errors.push(`Field '${projectField}' is required`);
+      
+      // Special handling for numeric fields (currency) - 0 is a valid value
+      if (mapping.type === 'currency') {
+        if (value === undefined || value === null || value === '') {
+          errors.push(`Field '${projectField}' is required`);
+        }
+      } else {
+        // For other fields, use standard truthy check
+        if (!value || (Array.isArray(value) && value.length === 0)) {
+          errors.push(`Field '${projectField}' is required`);
+        }
       }
     }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from "react";
 import { useTranslation } from 'react-i18next'
 
 // Debug function to check for multilingual objects
@@ -73,9 +73,12 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
       phone: "",
       role: "",
     },
-    files: [] as File[],
+    files: [] as any[],
     comments: "",
   });
+  
+  // Store actual File objects separately to avoid serialization issues
+  const fileObjectsRef = useRef(new Map());
 
   const [emailError, setEmailError] = useState("");
 
@@ -107,9 +110,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
               ...parsedData,
               // Note: Files from localStorage can't be restored as File objects
               // We'll only keep actual File objects that were added after page load
+              // Files from localStorage are just metadata and won't be uploaded
               files: prev.files || []
             };
-            
             
             return newFormValues;
           });
@@ -146,11 +149,14 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
     if (!isInitialized) return; // Don't save during initial load
 
 
+    // Don't save File objects to localStorage as they can't be serialized
+    // Only save file metadata for persistence
     const serializableFiles = formValues.files.map((file) => ({
       name: file.name,
       size: file.size,
       type: file.type,
       lastModified: file.lastModified,
+      // Don't include the actual File object as it can't be serialized
     }));
 
     const dataToSave = {
@@ -171,34 +177,98 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
     ref,
     () => ({
       getFormValues: () => {
-        // Filter out any files that are not actual File objects (e.g., from localStorage)
-        const validFiles = formValues.files.filter(file => file instanceof File);
-
+        // Return files with actual File objects from ref
+        console.log('=== StepFive getFormValues called ===');
+        console.log('Files in state:', formValues.files.length);
+        console.log('Files in ref:', fileObjectsRef.current.size);
+        console.log('Ref keys:', Array.from(fileObjectsRef.current.keys()));
+        
+        const filesWithFileObjects = formValues.files.map((fileMetadata, index) => {
+          const fileObject = fileMetadata.id ? fileObjectsRef.current.get(fileMetadata.id) : null;
+          console.log(`File ${index}:`, {
+            id: fileMetadata.id,
+            name: fileMetadata.name,
+            hasFileObject: !!fileObject,
+            isFile: fileObject instanceof File,
+            fileObjectType: typeof fileObject
+          });
+          
+          return {
+            ...fileMetadata,
+            fileObject: fileObject || null
+          };
+        });
+        
+        console.log('Files with File objects:', filesWithFileObjects);
+        console.log('=====================================');
+        
         return {
           ...formValues,
-          files: validFiles, // Only return actual File objects
+          files: filesWithFileObjects,
         };
       },
     }),
     [formValues]
   );
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const selectedFiles = Array.from(e.target.files);
     const validFiles = selectedFiles.filter((file) => file.size <= 10 * 1024 * 1024);
-    setFormValues((prev) => ({
-      ...prev,
-      files: [...prev.files, ...validFiles],
-    }));
+    
+    if (validFiles.length === 0) {
+      console.warn('No valid files selected');
+      return;
+    }
+
+    try {
+     
+      // Store files temporarily without uploading
+      // Store File objects in ref to avoid serialization issues
+      const filesWithMetadata = validFiles.map((file: File, index: number) => {
+        const fileId = `${file.name}_${file.size}_${Date.now()}_${index}`;
+        
+        // Store the actual File object in the ref
+        fileObjectsRef.current.set(fileId, file);
+        
+        // Return only metadata for state
+        return {
+          id: fileId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified,
+        };
+      });
+
+      setFormValues((prev) => ({
+        ...prev,
+        files: [...prev.files, ...filesWithMetadata],
+      }));
+      
+      console.log('Files stored temporarily for later upload');
+      console.log('File objects stored in ref:', fileObjectsRef.current.size);
+    } catch (error) {
+      console.error('Error storing files:', error);
+      alert('Error storing files. Please try again.');
+    }
+
     e.target.value = "";
   };
 
   const handleRemoveFile = (index: number) => {
-    setFormValues((prev) => ({
-      ...prev,
-      files: prev.files.filter((_, i) => i !== index),
-    }));
+    setFormValues((prev) => {
+      const fileToRemove = prev.files[index];
+      if (fileToRemove && fileToRemove.id) {
+        // Remove from ref
+        fileObjectsRef.current.delete(fileToRemove.id);
+      }
+      
+      return {
+        ...prev,
+        files: prev.files.filter((_, i) => i !== index),
+      };
+    });
   };
 
   // Email validation function

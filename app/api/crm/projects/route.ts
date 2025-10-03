@@ -143,6 +143,8 @@ export async function GET(request: NextRequest) {
           'kpis4',
           'kpis5',
           'comments',
+          'document_c',
+          'documents_icesc_project_suggestions_1_name',
           'assigned_user_id',
           'assigned_user_name',
           'created_by',
@@ -617,6 +619,39 @@ export async function GET(request: NextRequest) {
           return kpiFields.filter(kpi => kpi && kpi.trim() !== '');
         })(),
         comments: entry.comments || '',
+        
+        // Document fields
+        document_c: entry.document_c || '',
+        documents_icesc_project_suggestions_1_name: entry.documents_icesc_project_suggestions_1_name || '',
+        
+        // Parse files from document fields if they exist
+        files: (() => {
+          const documentPaths = entry.document_c || '';
+          const documentNames = entry.documents_icesc_project_suggestions_1_name || '';
+          
+          if (!documentPaths || !documentNames) {
+            return [];
+          }
+          
+          // Split the semicolon-separated values
+          const paths = documentPaths.split('; ').filter(path => path.trim());
+          const names = documentNames.split('; ').filter(name => name.trim());
+          
+          // Create file objects from the paths and names
+          return paths.map((path, index) => {
+            const name = names[index] || `Document ${index + 1}`;
+            // Extract filename from path for display
+            const fileName = path.split('\\').pop() || path.split('/').pop() || name;
+            
+            return {
+              name: fileName,
+              fileName: fileName,
+              filePath: path,
+              size: 0, // Size not available from CRM
+              type: 'application/octet-stream' // Default type
+            };
+          });
+        })(),
         
         // CRM specific fields
         assigned_user_id: entry.assigned_user_id || '',

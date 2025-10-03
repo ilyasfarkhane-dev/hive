@@ -71,7 +71,17 @@ export interface ProjectSubmissionData {
   
   // Additional info
   comments?: string;
-  supporting_documents?: File[];
+  supporting_documents?: Array<{
+    name: string;
+    size: number;
+    type: string;
+    filePath: string;
+    fileName: string;
+  }>;
+  
+  // Document fields for CRM storage
+  document_c?: string; // Document path for CRM storage
+  documents_icesc_project_suggestions_1_name?: string; // Document relationship field
   
   // Metadata
   session_id: string;

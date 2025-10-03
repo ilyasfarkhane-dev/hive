@@ -74,6 +74,8 @@ export interface SubmissionResult {
   retryCount?: number;
   maxRetries?: number;
   canRetry?: boolean;
+  errorType?: string;
+  errors?: string[];
 }
 
 export const useProjectSubmission = () => {
@@ -190,12 +192,25 @@ export const useProjectSubmission = () => {
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
+      // Parse response first to check error type
       const result = await response.json();
       console.log('API response:', result);
+      
+      // Don't throw error for validation failures - return them directly
+      if (!response.ok) {
+        // Check if this is a validation error (don't retry these)
+        if (result.errorType === 'VALIDATION_ERROR') {
+          console.error('Validation error - will not retry:', result.errors);
+          return {
+            success: false,
+            error: result.error || 'Validation failed',
+            errorType: 'VALIDATION_ERROR',
+            errors: result.errors,
+            canRetry: false // Prevent retry for validation errors
+          };
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       if (result.success) {
         // Log all projects after successful submission
@@ -250,8 +265,11 @@ export const useProjectSubmission = () => {
           message: result.message,
         });
       } else {
-        // If submission failed, try retry logic automatically
-        if (retryCount < MAX_RETRIES) {
+        // Check if this error should be retried (don't retry validation errors)
+        const shouldRetry = result.canRetry !== false && retryCount < MAX_RETRIES;
+        
+        // If submission failed, try retry logic automatically (unless it's a validation error)
+        if (shouldRetry) {
           console.log(`🔄 Initial submission failed, attempting automatic retry...`);
           return await retrySubmission(projectData);
         } else {
@@ -259,7 +277,7 @@ export const useProjectSubmission = () => {
             ...result,
             retryCount: 0,
             maxRetries: MAX_RETRIES,
-            canRetry: true,
+            canRetry: result.canRetry !== false ? true : false,
           };
           setSubmissionResult(errorResult);
         }
@@ -482,6 +500,7 @@ export const useProjectSubmission = () => {
     isSubmitting,
     isRetrying,
     submissionResult,
+    setSubmissionResult, // Added for draft success message
     retryCount,
     maxRetries: MAX_RETRIES,
     resetSubmission,

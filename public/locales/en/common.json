@@ -129,6 +129,7 @@
   "phone": "Phone",
   "role": "Role",
   "supportingDocuments": "Supporting Documents",
+  "supportingDocumentsDesc": "Upload any relevant documents (optional)",
   "uploadDropOrBrowse": "Drop files here or browse to upload",
   "uploadTypesLimit": "PDF, DOCX, PNG, JPG, XLSX, PPTX up to 10MB per file",
   "optional": "(Optional)",

@@ -6,13 +6,13 @@ import {
   BlobProperties
 } from '@azure/storage-blob';
 
-// Azure Storage configuration - using NEXT_PUBLIC_ prefix for client-side access
-const AZURE_STORAGE_ACCOUNT = process.env.NEXT_PUBLIC_AZURE_STORAGE_ACCOUNT;
-const AZURE_STORAGE_CONTAINER = process.env.NEXT_PUBLIC_AZURE_STORAGE_CONTAINER;
-const AZURE_STORAGE_SAS_TOKEN = process.env.NEXT_PUBLIC_AZURE_STORAGE_SAS_TOKEN;
+// Azure Storage configuration 
+const AZURE_STORAGE_ACCOUNT = process.env.AZURE_STORAGE_ACCOUNT;
+const AZURE_STORAGE_CONTAINER = process.env.AZURE_STORAGE_CONTAINER;
+const AZURE_STORAGE_SAS_TOKEN = process.env.AZURE_STORAGE_SAS_TOKEN;
 
 if (!AZURE_STORAGE_ACCOUNT || !AZURE_STORAGE_CONTAINER || !AZURE_STORAGE_SAS_TOKEN) {
-    throw new Error('Azure Storage configuration missing. Please set NEXT_PUBLIC_AZURE_STORAGE_ACCOUNT, NEXT_PUBLIC_AZURE_STORAGE_CONTAINER, and NEXT_PUBLIC_AZURE_STORAGE_SAS_TOKEN in your environment variables.');
+    throw new Error('Azure Storage configuration missing. Please set AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_CONTAINER, and AZURE_STORAGE_SAS_TOKEN in your environment variables.');
   }
 
 // Create BlobServiceClient

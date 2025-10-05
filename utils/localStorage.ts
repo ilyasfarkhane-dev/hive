@@ -1,5 +1,7 @@
 // Utility functions for local storage and file handling
 
+import { isCloudinaryUrl, getDownloadUrl } from './fileUtils';
+
 export interface ProjectData {
   id: string;
   name: string;
@@ -321,6 +323,41 @@ export const handleFileUpload = async (file: File | any): Promise<string> => {
       }
     });
   }
+};
+
+/**
+ * Gets the appropriate download URL for a document
+ * Handles both Cloudinary URLs and local file paths
+ */
+export const getDocumentDownloadUrl = (filePath: string): string => {
+  return getDownloadUrl(filePath);
+};
+
+/**
+ * Checks if a document is stored in Cloudinary
+ */
+export const isDocumentInCloudinary = (filePath: string): boolean => {
+  return isCloudinaryUrl(filePath);
+};
+
+/**
+ * Formats document information for display
+ */
+export const formatDocumentInfo = (doc: any) => {
+  const isCloudinary = isCloudinaryUrl(doc.filePath || doc.url || '');
+  const cloudinaryUrl = doc.filePath || doc.url || doc.cloudinaryUrl || '';
+  
+  return {
+    name: doc.originalName || doc.fileName || doc.name || 'Unknown Document',
+    url: cloudinaryUrl,
+    signedUrl: doc.signedUrl || '',
+    downloadUrl: doc.signedUrl || getDocumentDownloadUrl(cloudinaryUrl),
+    size: doc.size || 0,
+    type: doc.type || 'application/octet-stream',
+    isCloudinary,
+    isLocalFallback: doc.isLocalFallback || false,
+    hasSignedUrl: !!(doc.signedUrl)
+  };
 };
 
 // Handle multiple file uploads

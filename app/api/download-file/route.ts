@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { sanitizeFileName } from '@/utils/fileUtils';
+import { getAzureDownloadURL, getAzureFileInfo } from '@/services/azureService';
 
 // Dynamic fuzzy matching function for file names
 function createDynamicMatcher(coreFileName: string, candidateFile: string): boolean {
@@ -73,6 +74,96 @@ export async function GET(request: NextRequest) {
     if (!filePath) {
       console.log('❌ Download API - No file path provided');
       return NextResponse.json({ error: 'File path is required' }, { status: 400 });
+    }
+
+    // Check if this is an Azure Storage path or Cloudinary URL
+    if (filePath.includes('hive-documents/') || filePath.startsWith('https://res.cloudinary.com/') || filePath.includes('/')) {
+      console.log('☁️ Download API - Azure/Cloudinary reference detected');
+      
+      try {
+        let fullPath: string;
+        
+        if (filePath.startsWith('https://res.cloudinary.com/')) {
+          // This is still a Cloudinary URL - handle as before for backward compatibility
+          console.log('☁️ Legacy Cloudinary URL detected, redirecting to cloudinary-download API');
+          return NextResponse.redirect(`${request.nextUrl.origin}/api/cloudinary-download?publicId=${encodeURIComponent(filePath)}`, 302);
+        } else if (filePath.startsWith('https://') && filePath.includes('.blob.core.windows.net/')) {
+          // Azure Storage URL - extract the path
+          const match = filePath.match(/\/[^\/]+\/(.+?)(?:\?.*)?$/);
+          if (match) {
+            fullPath = decodeURIComponent(match[1]);
+          } else {
+            throw new Error('Invalid Azure Storage URL');
+          }
+        } else {
+          // Treat as Azure Storage path directly
+          fullPath = filePath;
+        }
+        
+        console.log('🔄 Getting download URL for Azure path:', fullPath);
+        
+        // Get download URL from our API
+        const downloadUrlResponse = await fetch(`${request.nextUrl.origin}/api/getFileUrl?fullPath=${encodeURIComponent(fullPath)}`);
+        
+        if (!downloadUrlResponse.ok) {
+          console.error('❌ Failed to get download URL:', downloadUrlResponse.status, downloadUrlResponse.statusText);
+          return NextResponse.json({ error: 'Failed to generate download URL' }, { status: 500 });
+        }
+        
+        const downloadUrlData = await downloadUrlResponse.json();
+        
+        if (!downloadUrlData.url) {
+          console.error('❌ No URL in download URL response:', downloadUrlData);
+          return NextResponse.json({ error: 'Failed to generate download URL' }, { status: 500 });
+        }
+        
+        console.log('🔐 Got download URL, redirecting to:', downloadUrlData.url);
+        
+        // Redirect to the download URL
+        return NextResponse.redirect(downloadUrlData.url, 302);
+        
+      } catch (error) {
+        console.error('❌ Error accessing Azure file:', error);
+        
+        // Fallback: try to proxy the file directly if it's a URL
+        if (filePath.startsWith('http')) {
+          try {
+            console.log('🔄 Fallback: attempting direct proxy...');
+            const response = await fetch(filePath);
+            
+            if (!response.ok) {
+              console.error('❌ Fallback proxy failed:', response.status, response.statusText);
+              return NextResponse.json({ error: 'File not found or inaccessible' }, { status: 404 });
+            }
+            
+            // Get file content and metadata
+            const fileBuffer = await response.arrayBuffer();
+            const contentType = response.headers.get('content-type') || 'application/octet-stream';
+            
+            // Extract filename from URL
+            const urlParts = filePath.split('/');
+            const lastPart = urlParts[urlParts.length - 1];
+            const filename = lastPart.split('?')[0] || 'document';
+            
+            console.log('✅ Fallback proxy successful:', { filename, contentType, size: fileBuffer.byteLength });
+            
+            // Return the file with appropriate headers
+            return new NextResponse(fileBuffer as BodyInit, {
+              headers: {
+                'Content-Type': contentType,
+                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Content-Length': fileBuffer.byteLength.toString(),
+              },
+            });
+            
+          } catch (fallbackError) {
+            console.error('❌ Fallback proxy also failed:', fallbackError);
+            return NextResponse.json({ error: 'Failed to access file' }, { status: 500 });
+          }
+        } else {
+          return NextResponse.json({ error: 'File not found or inaccessible' }, { status: 404 });
+        }
+      }
     }
     
      // Clean the file path - handle different path formats

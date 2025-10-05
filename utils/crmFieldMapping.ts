@@ -238,15 +238,28 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     type: 'text'
   },
   
-  // Supporting documents (stored as JSON string)
+  // Supporting documents (stored as JSON string with Azure Storage paths and Cloudinary URLs for backward compatibility)
   supporting_documents: {
     crmField: 'supporting_documents',
     type: 'text',
     customMapping: (value: any) => {
       if (Array.isArray(value) && value.length > 0) {
-        return JSON.stringify(value);
+        return JSON.stringify(value.map(doc => ({
+          name: doc.name || doc.fileName || doc.originalName || 'document',
+          url: doc.url || doc.filePath || doc.downloadURL || doc.cloudinaryUrl || '',
+          downloadURL: doc.downloadURL || '',
+          fullPath: doc.fullPath || '',
+          cloudinaryUrl: doc.cloudinaryUrl || (doc.filePath && doc.filePath.startsWith('https://res.cloudinary.com/') ? doc.filePath : ''),
+          signedUrl: doc.signedUrl || '',
+          publicId: doc.publicId || '',
+          size: doc.size || 0,
+          type: doc.type || 'application/octet-stream',
+          isAzure: !!(doc.fullPath || doc.downloadURL || (doc.filePath && doc.filePath.includes('hive-documents/'))),
+          isCloudinary: !!(doc.cloudinaryUrl || (doc.filePath && doc.filePath.startsWith('https://res.cloudinary.com/'))),
+          isLocalFallback: doc.isLocalFallback || false
+        })));
       }
-      return '';
+      return JSON.stringify([]);
     }
   },
 

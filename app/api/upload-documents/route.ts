@@ -3,6 +3,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { sanitizeFileName, generateUniqueFileName } from '@/utils/fileUtils';
+import { uploadToAzure, AzureUploadResult } from '@/services/azureService';
 
 export const runtime = 'nodejs';
 
@@ -52,33 +53,71 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Generate filename with timestamp and original filename
-      // Sanitize filename by removing/replacing special characters
-      const safeFileName = sanitizeFileName(file.name);
-      const uniqueFileName = generateUniqueFileName(file.name);
-      const filePath = path.join(uploadsDir, uniqueFileName);
-
-      console.log('=== SAVING FILE ===');
+      console.log('=== UPLOADING TO AZURE ===');
       console.log('Original filename:', file.name);
-      console.log('Safe filename:', safeFileName);
-      console.log('Final filename:', uniqueFileName);
-      console.log('Full path:', filePath);
-      console.log('==================');
+      console.log('File size:', file.size);
+      console.log('File type:', file.type);
+      console.log('User email:', userEmail);
+      console.log('==============================');
 
-      // Convert File to Buffer and save
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      await writeFile(filePath, buffer as any); // Type assertion: Buffer is compatible with writeFile
-      
-      console.log('✅ File saved successfully:', uniqueFileName);
+      try {
+        // Upload to Azure
+        const azureResult: AzureUploadResult = await uploadToAzure(file, {
+          folder: `hive-documents/${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          metadata: {
+            originalName: file.name,
+            userEmail: userEmail,
+            uploadedAt: new Date().toISOString()
+          }
+        });
 
-      uploadedFiles.push({
-        originalName: file.name,
-        fileName: uniqueFileName,
-        filePath: `/uploads/${uniqueFileName}`,
-        size: file.size,
-        type: file.type,
-      });
+        console.log('✅ File uploaded to Azure successfully:', {
+          fileName: azureResult.fileName,
+          downloadURL: azureResult.downloadURL,
+          fullPath: azureResult.fullPath,
+          originalName: azureResult.originalName
+        });
+
+        uploadedFiles.push({
+          originalName: file.name,
+          fileName: azureResult.fileName,
+          filePath: azureResult.fullPath, // Store full path
+          downloadURL: azureResult.downloadURL, // Store download URL
+          size: file.size,
+          type: file.type,
+        });
+
+      } catch (azureError) {
+        console.error('❌ Azure upload failed, falling back to local storage:', azureError);
+        
+        // Fallback to local storage if Azure fails
+        const safeFileName = sanitizeFileName(file.name);
+        const uniqueFileName = generateUniqueFileName(file.name);
+        const filePath = path.join(uploadsDir, uniqueFileName);
+
+        console.log('=== FALLBACK TO LOCAL STORAGE ===');
+        console.log('Original filename:', file.name);
+        console.log('Safe filename:', safeFileName);
+        console.log('Final filename:', uniqueFileName);
+        console.log('Full path:', filePath);
+        console.log('==================================');
+
+        // Convert File to Buffer and save locally
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        await writeFile(filePath, buffer as any);
+        
+        console.log('✅ File saved locally as fallback:', uniqueFileName);
+
+        uploadedFiles.push({
+          originalName: file.name,
+          fileName: uniqueFileName,
+          filePath: `/uploads/${uniqueFileName}`,
+          size: file.size,
+          type: file.type,
+          isLocalFallback: true
+        });
+      }
     }
 
     return NextResponse.json({

@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
     console.log('=== FILE UPLOAD DEBUG ===');
     console.log('User email from formData:', userEmail);
     console.log('Number of files:', files.length);
+    console.log('First file type:', files[0]?.constructor?.name);
+    console.log('First file instanceof File:', files[0] instanceof File);
     console.log('========================');
     
     if (!files || files.length === 0) {
@@ -62,6 +64,13 @@ export async function POST(request: NextRequest) {
 
       try {
         // Upload to Azure
+        console.log('🔄 Calling uploadToAzure with file:', {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          constructor: file.constructor.name
+        });
+        
         const azureResult: AzureUploadResult = await uploadToAzure(file, {
           folder: `hive-documents/${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
           metadata: {

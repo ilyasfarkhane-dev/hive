@@ -6,21 +6,68 @@ import {
   BlobProperties
 } from '@azure/storage-blob';
 
-// Azure Storage configuration 
-const AZURE_STORAGE_ACCOUNT = process.env.AZURE_STORAGE_ACCOUNT;
-const AZURE_STORAGE_CONTAINER = process.env.AZURE_STORAGE_CONTAINER;
-const AZURE_STORAGE_SAS_TOKEN = process.env.AZURE_STORAGE_SAS_TOKEN;
+// Azure Storage configuration
+let blobServiceClient: BlobServiceClient;
+let containerClient: any;
 
-if (!AZURE_STORAGE_ACCOUNT || !AZURE_STORAGE_CONTAINER || !AZURE_STORAGE_SAS_TOKEN) {
-    throw new Error('Azure Storage configuration missing. Please set AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_CONTAINER, and AZURE_STORAGE_SAS_TOKEN in your environment variables.');
+// Initialize Azure Storage client
+async function initializeAzureClient() {
+  if (blobServiceClient && containerClient) {
+    return { blobServiceClient, containerClient };
   }
 
-// Create BlobServiceClient
-const blobServiceClient = new BlobServiceClient(
-    `https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net?${AZURE_STORAGE_SAS_TOKEN}`
-  );
+  try {
+    // Get configuration directly from environment variables (server-side)
+    const account = process.env.AZURE_STORAGE_ACCOUNT;
+    const container = process.env.AZURE_STORAGE_CONTAINER;
+    const sasToken = process.env.AZURE_STORAGE_SAS_TOKEN;
 
-const containerClient = blobServiceClient.getContainerClient(AZURE_STORAGE_CONTAINER);
+    // Debug: Check if we're in a server environment
+    console.log('🔧 Environment check:', {
+      isServer: typeof window === 'undefined',
+      nodeEnv: process.env.NODE_ENV,
+      hasProcessEnv: typeof process !== 'undefined'
+    });
+
+    console.log('🔧 Azure Storage Configuration loaded:', {
+      hasAccount: !!account,
+      hasContainer: !!container,
+      hasSasToken: !!sasToken,
+      accountName: account ? `${account.substring(0, 3)}...` : 'undefined',
+      containerName: container || 'undefined',
+      sasTokenLength: sasToken ? sasToken.length : 0,
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV
+    });
+
+    if (!account || !container || !sasToken) {
+      const missingVars = [];
+      if (!account) missingVars.push('AZURE_STORAGE_ACCOUNT');
+      if (!container) missingVars.push('AZURE_STORAGE_CONTAINER');
+      if (!sasToken) missingVars.push('AZURE_STORAGE_SAS_TOKEN');
+      
+      throw new Error(`Azure Storage configuration missing. Missing environment variables: ${missingVars.join(', ')}. Please set these in your .env.local file for local development or in Vercel environment variables for production.`);
+    }
+
+    // Create BlobServiceClient
+    const blobEndpoint = `https://${account}.blob.core.windows.net`;
+    const fullUrl = sasToken.startsWith('?') 
+      ? `${blobEndpoint}${sasToken}`
+      : `${blobEndpoint}?${sasToken}`;
+    
+    console.log('🔗 Constructed Azure URL:', fullUrl.substring(0, 100) + '...');
+    
+    blobServiceClient = new BlobServiceClient(fullUrl);
+    containerClient = blobServiceClient.getContainerClient(container);
+
+    console.log('✅ Azure Storage client initialized successfully');
+
+    return { blobServiceClient, containerClient };
+  } catch (error) {
+    console.error('❌ Failed to initialize Azure Storage client:', error);
+    throw new Error(`Azure Storage initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
 export interface AzureUploadResult {
   fileName: string;
@@ -52,6 +99,11 @@ export async function uploadToAzure(
       fileSize: file instanceof File ? file.size : file.length,
       options
     });
+
+    // Initialize Azure client
+    console.log('🔄 Initializing Azure client...');
+    const { containerClient } = await initializeAzureClient();
+    console.log('✅ Azure client initialized, proceeding with upload...');
 
     // Convert File to Buffer if needed
     let buffer: Uint8Array;
@@ -133,6 +185,9 @@ export async function deleteFromAzure(fullPath: string): Promise<boolean> {
   try {
     console.log('🗑️ Deleting from Azure:', fullPath);
     
+    // Initialize Azure client
+    const { containerClient } = await initializeAzureClient();
+    
     const blockBlobClient = containerClient.getBlockBlobClient(fullPath);
     const deleteResponse: BlobDeleteResponse = await blockBlobClient.delete();
     
@@ -149,6 +204,9 @@ export async function deleteFromAzure(fullPath: string): Promise<boolean> {
  */
 export async function getAzureFileInfo(fullPath: string) {
   try {
+    // Initialize Azure client
+    const { containerClient } = await initializeAzureClient();
+    
     const blockBlobClient = containerClient.getBlockBlobClient(fullPath);
     const properties = await blockBlobClient.getProperties();
     
@@ -173,6 +231,9 @@ export async function getAzureFileInfo(fullPath: string) {
  */
 export async function getAzureDownloadURL(fullPath: string): Promise<string> {
   try {
+    // Initialize Azure client
+    const { containerClient } = await initializeAzureClient();
+    
     const blockBlobClient = containerClient.getBlockBlobClient(fullPath);
     return blockBlobClient.url;
   } catch (error) {
@@ -186,6 +247,9 @@ export async function getAzureDownloadURL(fullPath: string): Promise<string> {
  */
 export async function listAzureFiles(folder?: string): Promise<any[]> {
   try {
+    // Initialize Azure client
+    const { containerClient } = await initializeAzureClient();
+    
     const files: any[] = [];
     
     for await (const blob of containerClient.listBlobsFlat({
@@ -232,4 +296,4 @@ export function isAzureUrl(url: string): boolean {
   return url.includes('.blob.core.windows.net/');
 }
 
-export default containerClient;
+export default { initializeAzureClient };

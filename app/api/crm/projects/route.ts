@@ -643,10 +643,15 @@ export async function GET(request: NextRequest) {
             // Extract filename from path for display
             const fileName = path.split('\\').pop() || path.split('/').pop() || name;
             
+            // Check if the path is already a full Azure URL with SAS token
+            const isAzureUrl = path.includes('blob.core.windows.net') && path.includes('sv=');
+            
             return {
               name: fileName,
               fileName: fileName,
               filePath: path,
+              downloadURL: isAzureUrl ? path : '', // Use the path as downloadURL if it's already a full Azure URL
+              url: isAzureUrl ? path : '', // Also set url field for compatibility
               size: 0, // Size not available from CRM
               type: 'application/octet-stream' // Default type
             };

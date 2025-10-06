@@ -60,6 +60,13 @@ export async function POST(request: NextRequest) {
       console.log('File size:', file.size);
       console.log('File type:', file.type);
       console.log('User email:', userEmail);
+      console.log('Azure config check:', {
+        hasAccount: !!process.env.AZURE_STORAGE_ACCOUNT,
+        hasContainer: !!process.env.AZURE_STORAGE_CONTAINER,
+        hasSasToken: !!process.env.AZURE_STORAGE_SAS_TOKEN,
+        accountName: process.env.AZURE_STORAGE_ACCOUNT || 'NOT_SET',
+        containerName: process.env.AZURE_STORAGE_CONTAINER || 'NOT_SET'
+      });
       console.log('==============================');
 
       try {
@@ -71,6 +78,7 @@ export async function POST(request: NextRequest) {
           constructor: file.constructor.name
         });
         
+        console.log('🔄 About to call uploadToAzure function...');
         const azureResult: AzureUploadResult = await uploadToAzure(file, {
           folder: `hive-documents/${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
           metadata: {
@@ -79,6 +87,7 @@ export async function POST(request: NextRequest) {
             uploadedAt: new Date().toISOString()
           }
         });
+        console.log('🔄 uploadToAzure completed successfully');
 
         console.log('✅ File uploaded to Azure successfully:', {
           fileName: azureResult.fileName,
@@ -98,6 +107,20 @@ export async function POST(request: NextRequest) {
 
       } catch (azureError) {
         console.error('❌ Azure upload failed, falling back to local storage:', azureError);
+        console.error('❌ Azure error details:', {
+          message: azureError instanceof Error ? azureError.message : 'Unknown error',
+          stack: azureError instanceof Error ? azureError.stack : undefined,
+          name: azureError instanceof Error ? azureError.name : undefined
+        });
+        
+        // Check if it's a configuration error
+        if (azureError instanceof Error && azureError.message.includes('Azure Storage configuration missing')) {
+          console.error('🚨 CRITICAL: Azure Storage is not configured! Please set these environment variables:');
+          console.error('   - AZURE_STORAGE_ACCOUNT');
+          console.error('   - AZURE_STORAGE_CONTAINER');
+          console.error('   - AZURE_STORAGE_SAS_TOKEN');
+          console.error('   Without these, documents will be stored locally instead of Azure.');
+        }
         
         // Fallback to local storage if Azure fails
         const safeFileName = sanitizeFileName(file.name);
@@ -129,10 +152,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check if any files were stored locally instead of Azure
+    const localFiles = uploadedFiles.filter(file => file.isLocalFallback);
+    const azureFiles = uploadedFiles.filter(file => !file.isLocalFallback);
+    
+    let message = `Successfully uploaded ${uploadedFiles.length} file(s)`;
+    if (localFiles.length > 0) {
+      message += ` (${localFiles.length} stored locally, ${azureFiles.length} in Azure)`;
+      console.warn(`⚠️ WARNING: ${localFiles.length} files were stored locally instead of Azure. Check Azure configuration.`);
+    }
+
     return NextResponse.json({
       success: true,
       files: uploadedFiles,
-      message: `Successfully uploaded ${uploadedFiles.length} file(s)`,
+      message,
+      warnings: localFiles.length > 0 ? [
+        `${localFiles.length} files were stored locally instead of Azure. Please configure Azure Storage environment variables for proper document URL generation.`
+      ] : undefined
     });
   } catch (error) {
     console.error('File upload error:', error);

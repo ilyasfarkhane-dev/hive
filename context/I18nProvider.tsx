@@ -272,10 +272,12 @@ if (!i18n.isInitialized) {
           "contactRolePlaceholder": "Enter your role",
           "noProjectsFound": "No projects found",
           "tryAdjustingFilters": "Try adjusting your search or filters",
+          "noDocuments": "No documents available",
         },
       },
       fr: {
         common: {
+          "noDocuments": "Aucun document disponible",
           "saving": "Enregistrement...",
           online: "En ligne",
           offline: "Hors ligne",
@@ -744,6 +746,7 @@ if (!i18n.isInitialized) {
           submitProject: "إرسال المشروع",
           submitNewProject: "إرسال مشروع جديد",
           noDescription: "لا يوجد وصف متاح",
+          noDocuments: "لا يوجد وثائق متاحة",
           notSpecified: "غير محدد",
           timeline: "الجدول الزمني",
           expectedImpact: "الأثر المتوقع",

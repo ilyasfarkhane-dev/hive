@@ -87,6 +87,9 @@ type AnyProject = {
   contact_phone?: string;
   contact_role?: string;
   session_id?: string;
+  // Document fields
+  document_c?: string;
+  documents_icesc_project_suggestions_1_name?: string;
 };
 
 const ProjectDetailsPage = () => {
@@ -118,43 +121,148 @@ const ProjectDetailsPage = () => {
   // Helper function to delay execution
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  // Function to handle file download
-  const handleDownload = (file: any) => {
+  // Function to parse documents from CRM fields
+  const parseDocumentsFromCRM = (project: AnyProject) => {
+    const documentPaths = project.document_c || '';
+    const documentNames = project.documents_icesc_project_suggestions_1_name || '';
+    
+    if (!documentPaths || !documentNames) {
+      return [];
+    }
+    
+    // Split the semicolon-separated values
+    const paths = documentPaths.split('; ').filter((path: string) => path.trim());
+    const names = documentNames.split('; ').filter((name: string) => name.trim());
+    
+    // Create file objects from the paths and names
+    return paths.map((path: string, index: number) => {
+      const name = names[index] || `Document ${index + 1}`;
+      // Extract filename from path for display
+      const fileName = path.split('\\').pop() || path.split('/').pop() || name;
+      
+      // Check if the path is already a full Azure URL with SAS token
+      const isAzureUrl = path.includes('blob.core.windows.net') && path.includes('sv=');
+      
+      return {
+        name: fileName,
+        fileName: fileName,
+        filePath: path,
+        downloadURL: isAzureUrl ? path : '', // Use the path as downloadURL if it's already a full Azure URL
+        url: isAzureUrl ? path : '', // Also set url field for compatibility
+        size: 0, // Size not available from CRM
+        type: 'application/octet-stream' // Default type
+      };
+    });
+  };
+
+  // Function to get download URL for a file
+  const getDownloadUrl = (file: any): string => {
     try {
       // Extract filename from file path or use file name
       let fileName = file.name || file.fileName || 'document';
       let filePath = file.filePath || '';
+      let downloadUrl = file.downloadURL || file.url || '';
       
       console.log('🔍 Frontend - File object:', file);
       console.log('🔍 Frontend - fileName:', fileName);
       console.log('🔍 Frontend - filePath:', filePath);
+      console.log('🔍 Frontend - downloadURL:', downloadUrl);
       
-      // If no filePath, try to construct it
+      // Check if we have a direct Azure URL with SAS token
+      if (downloadUrl && downloadUrl.includes('blob.core.windows.net') && downloadUrl.includes('sv=')) {
+        console.log('✅ Frontend - Using direct Azure URL with SAS token');
+        console.log('🔗 Frontend - Azure Download URL:', downloadUrl);
+        return downloadUrl;
+      }
+      
+      // Fallback to API download for local files or other cases
       if (!filePath) {
         filePath = `\\public\\uploads\\${fileName}`;
         console.log('🔧 Frontend - Constructed filePath:', filePath);
       }
       
-      console.log('📥 Frontend - Downloading file:', fileName, 'from path:', filePath);
+      console.log('📥 Frontend - Using API download URL for:', fileName, 'from path:', filePath);
       
       // Use the download API endpoint
-      const downloadUrl = `/api/download-file?path=${encodeURIComponent(filePath)}`;
-      console.log('🔗 Frontend - Download URL:', downloadUrl);
-      
-      // Create download link
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = fileName;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const apiDownloadUrl = `/api/download-file?path=${encodeURIComponent(filePath)}`;
+      console.log('🔗 Frontend - API Download URL:', apiDownloadUrl);
+      return apiDownloadUrl;
       
     } catch (error) {
-      console.error('❌ Frontend - Error downloading file:', error);
-      const fileName = file.name || file.fileName || 'document';
-      alert(`Failed to download file "${fileName}". The file may have been moved or deleted from the server. Please contact support if this issue persists.`);
+      console.error('❌ Frontend - Error getting download URL:', error);
+      // Return a placeholder URL that will show an error when clicked
+      return 'javascript:void(0)';
     }
+  };
+
+  // Function to handle file download (for backward compatibility)
+  const handleDownload = (file: any) => {
+    const downloadUrl = getDownloadUrl(file);
+    if (downloadUrl === 'javascript:void(0)') {
+      const fileName = file.name || file.fileName || 'document';
+      alert(`Failed to get download URL for file "${fileName}". The file may have been moved or deleted from the server. Please contact support if this issue persists.`);
+      return;
+    }
+    
+    // Create download link and trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = file.name || file.fileName || 'document';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Function to handle document removal (local state only)
+  const handleRemoveDocument = (fileIndex: number) => {
+    if (!editedProject) return;
+    
+    // Get the file to be removed
+    const fileToRemove = editedProject.files?.[fileIndex];
+    if (!fileToRemove) {
+      console.error('❌ File not found at index:', fileIndex);
+      return;
+    }
+    
+    // Show confirmation dialog
+    const fileName = fileToRemove.name || fileToRemove.fileName || 'Document ' + (fileIndex + 1);
+    const confirmed = window.confirm(`Are you sure you want to remove "${fileName}"? Changes will be saved when you click Save or Draft.`);
+    
+    if (!confirmed) {
+      console.log('❌ Document removal cancelled by user');
+      return;
+    }
+    
+    console.log('🗑️ Removing document at index:', fileIndex);
+    console.log('🗑️ File to remove:', fileToRemove);
+    
+    // Remove from local state only (immediate UI update)
+    const newFiles = editedProject.files?.filter((_, i) => i !== fileIndex) || [];
+    
+    // Update document fields in local state to match the new files
+    const updatedDocumentPaths = newFiles.map(file => file.filePath || file.downloadURL || file.url).join('; ');
+    const updatedDocumentNames = newFiles.map(file => file.name || file.fileName).join('; ');
+    
+    console.log('🔄 Updating local document fields:', {
+      originalFilesCount: editedProject.files?.length || 0,
+      newFilesCount: newFiles.length,
+      originalDocument_c: editedProject.document_c || '',
+      newDocument_c: updatedDocumentPaths,
+      originalDocuments_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || '',
+      newDocuments_icesc_project_suggestions_1_name: updatedDocumentNames
+    });
+    
+    // Update both files array and document fields
+    setEditedProject(prev => ({
+      ...prev!,
+      files: newFiles,
+      document_c: updatedDocumentPaths,
+      documents_icesc_project_suggestions_1_name: updatedDocumentNames
+    }));
+    
+    console.log('✅ Document removed from local state. Remember to click Save or Draft to save changes to CRM.');
+    console.log('📊 Updated files count:', newFiles.length);
   };
 
   // Retry utility function with exponential backoff - retry indefinitely
@@ -552,6 +660,11 @@ const ProjectDetailsPage = () => {
     setShowOtherBeneficiaryInput(hasOtherBeneficiary);
     
     console.log('✅ Enabled inline editing for project:', project.id);
+    console.log('📄 Project document fields:', {
+      document_c: project.document_c || '',
+      documents_icesc_project_suggestions_1_name: project.documents_icesc_project_suggestions_1_name || '',
+      filesCount: project.files?.length || 0
+    });
   };
 
   // Retry function for save changes - runs automatically in background
@@ -2525,38 +2638,40 @@ const ProjectDetailsPage = () => {
                   {isEditing ? (
                     <div className="space-y-4">
                       {/* Display current files */}
-                      {editedProject?.files && editedProject.files.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium text-gray-700">{t('currentDocuments')}:</p>
-                          {editedProject.files.map((file: any, index: number) => (
+                      {(() => {
+                        const documents = editedProject ? parseDocumentsFromCRM(editedProject) : [];
+                        return documents.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-gray-700">{t('currentDocuments')}:</p>
+                            {documents.map((file: any, index: number) => (
                             <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                               <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownload(file)}
+                                <a
+                                  href={getDownloadUrl(file)}
+                                  download={file.name || file.fileName || 'document'}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
                                   className="w-5 h-5 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
                                   title="Download file"
                                 >
                                   <Download className="w-4 h-4" />
-                                </button>
+                                </a>
                                 <FileText className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm text-gray-600">{file.name || file.fileName || 'Unknown file'}</span>
+                                <span className="text-sm text-gray-600">Document {index + 1}</span>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  if (!editedProject) return;
-                                  const newFiles = editedProject.files?.filter((_, i) => i !== index) || [];
-                                  setEditedProject(prev => ({ ...prev!, files: newFiles }));
-                                }}
+                                onClick={() => handleRemoveDocument(index)}
                                 className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                                title="Remove document"
                               >
                                 ×
                               </button>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        );
+                      })()}
                       
                       {/* File upload for editing */}
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-teal-400 transition-colors">
@@ -2569,8 +2684,33 @@ const ProjectDetailsPage = () => {
                           onChange={(e) => {
                             if (!editedProject) return;
                             const newFiles = Array.from(e.target.files || []);
-                            const updatedFiles = [...(editedProject.files || []), ...newFiles];
-                            setEditedProject(prev => ({ ...prev!, files: updatedFiles }));
+                            
+                            // Parse existing documents from CRM fields
+                            const existingDocuments = parseDocumentsFromCRM(editedProject);
+                            
+                            // Add new files to existing documents
+                            const updatedFiles = [...existingDocuments, ...newFiles];
+                            
+                            // Update document fields
+                            const updatedDocumentPaths = updatedFiles.map(file => {
+                              if (file instanceof File) {
+                                return file.name; // For new files, use the file name
+                              }
+                              return file.filePath || file.downloadURL || file.url;
+                            }).join('; ');
+                            const updatedDocumentNames = updatedFiles.map(file => {
+                              if (file instanceof File) {
+                                return file.name; // For new files, use the file name
+                              }
+                              return file.name || file.fileName;
+                            }).join('; ');
+                            
+                            setEditedProject(prev => ({
+                              ...prev!,
+                              files: updatedFiles,
+                              document_c: updatedDocumentPaths,
+                              documents_icesc_project_suggestions_1_name: updatedDocumentNames
+                            }));
                           }}
                           className="hidden"
                           id="file-upload-edit"
@@ -2585,26 +2725,31 @@ const ProjectDetailsPage = () => {
                     </div>
                   ) : (
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      {project.files && project.files.length > 0 ? (
-                        <div className="space-y-2">
-                          {project.files.map((file: any, index: number) => (
+                      {(() => {
+                        const documents = parseDocumentsFromCRM(project);
+                        return documents.length > 0 ? (
+                          <div className="space-y-2">
+                            {documents.map((file: any, index: number) => (
                             <div key={index} className="flex items-center gap-3 p-2 bg-white rounded-lg">
-                              <button
-                                type="button"
-                                onClick={() => handleDownload(file)}
+                              <a
+                                href={getDownloadUrl(file)}
+                                download={file.name || file.fileName || 'document'}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="w-5 h-5 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
                                 title="Download file"
                               >
                                 <Download className="w-4 h-4" />
-                              </button>
+                              </a>
                               <FileText className="w-4 h-4 text-gray-400" />
-                              <span className="text-sm text-gray-600">{file.name || file.fileName || 'Unknown file'}</span>
+                              <span className="text-sm text-gray-600">Document {index + 1}</span>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 text-sm">{t('noDocuments')}</p>
-                      )}
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm">{t('noDocuments')}</p>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

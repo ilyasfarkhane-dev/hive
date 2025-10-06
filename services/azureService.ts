@@ -296,4 +296,7 @@ export function isAzureUrl(url: string): boolean {
   return url.includes('.blob.core.windows.net/');
 }
 
+// Export the function as a named export
+export { initializeAzureClient };
+
 export default { initializeAzureClient };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionId } from '@/utils/crm';
 import { mapProjectDataToCRM } from '@/utils/crmFieldMapping';
+import { getAzureDownloadURL } from '@/services/azureService';
 
 const CRM_BASE_URL = 'https://crm.icesco.org';
 
@@ -202,6 +203,54 @@ export async function POST(request: NextRequest) {
 
     // Use proper CRM field mapping (same as submit)
     console.log('=== DEBUG: Creating CRM field mapping ===');
+    
+    // Convert document paths to Azure URLs before mapping to CRM
+    if (projectData.documents_icesc_project_suggestions_1_name) {
+      console.log('🔄 Converting document paths to Azure URLs...');
+      const documentPaths = projectData.documents_icesc_project_suggestions_1_name.split('; ').filter((path: string) => path.trim());
+      const azureUrls: string[] = [];
+      
+      for (const path of documentPaths) {
+        try {
+          if (path.includes('hive-documents/') && !path.startsWith('https://')) {
+            console.log(`Converting document path to Azure URL: ${path}`);
+            const azureUrl = await getAzureDownloadURL(path);
+            
+            // The getAzureDownloadURL should already return URL with SAS token
+            // since the Azure client is initialized with SAS token
+            azureUrls.push(azureUrl);
+            console.log(`✅ Converted to Azure URL with SAS token: ${azureUrl}`);
+          } else if (path.startsWith('https://res.cloudinary.com/')) {
+            // Keep Cloudinary URLs as-is
+            azureUrls.push(path);
+            console.log(`✅ Keeping Cloudinary URL: ${path}`);
+          } else if (path.startsWith('https://') && path.includes('blob.core.windows.net')) {
+            // Already a full Azure URL, use as-is
+            azureUrls.push(path);
+            console.log(`✅ Using existing Azure URL: ${path}`);
+          } else {
+            // For other formats, use as-is
+            azureUrls.push(path);
+            console.log(`⚠️ Using path as-is: ${path}`);
+          }
+        } catch (urlError) {
+          console.error(`❌ Failed to convert document path: ${path}`, urlError);
+          azureUrls.push(path); // Fall back to original path
+        }
+      }
+      
+      // Update the project data with full Azure URLs
+      const finalUrls = azureUrls.join('; ');
+      
+      // Store full URLs in the document fields
+      projectData.documents_icesc_project_suggestions_1_name = finalUrls;
+      projectData.document_c = finalUrls;
+      
+      console.log('✅ Updated document fields with full Azure URLs');
+      console.log('📏 Total length of URLs:', finalUrls.length, 'characters');
+      console.log('🔗 Final URLs:', finalUrls);
+    }
+    
     const crmData = mapProjectDataToCRM(projectData);
     
     // Debug logging for partners, milestones, and KPIs

@@ -5,9 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, MapPin, Users, DollarSign, FileText, Landmark, Settings, Pin, Clock, Tag, Target, BarChart3, User, MessageSquare, AlertCircle, FileX, Download } from 'lucide-react';
-import Image from 'next/image';
 import ProjectsPageHeader from '@/components/ProjectsPageHeader';
-// import maquettesImage from '@/public/maquettes.png'; // Removed during cleanup
 
 import {
   getGoalCodeFromSubserviceId,
@@ -105,6 +103,7 @@ const ProjectDetailsPage = () => {
   const [editedProject, setEditedProject] = useState<AnyProject | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDraftSaving, setIsDraftSaving] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [showOtherBeneficiaryInput, setShowOtherBeneficiaryInput] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [draftMessage, setDraftMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -756,80 +755,11 @@ const ProjectDetailsPage = () => {
         sub_service_id: project?.sub_service_id
       });
 
-      // Handle file uploads and document management
-      let uploadedFilePaths: string[] = [];
-      let documentNames: string[] = [];
-      
-      console.log('📁 Processing documents for project update...');
-      console.log('📁 editedProject.files:', editedProject.files);
-      console.log('📁 Files count:', editedProject.files?.length || 0);
-      
-      if (editedProject.files && editedProject.files.length > 0) {
-        console.log('📁 Files detected in edited project, processing...');
-        
-        // Upload new files (filter out existing files that don't need re-upload)
-        const newFiles = editedProject.files.filter((file: any) => file instanceof File);
-        const existingFiles = editedProject.files.filter((file: any) => !(file instanceof File));
-        
-        console.log('📁 New files to upload:', newFiles.length);
-        console.log('📁 Existing files:', existingFiles.length);
-        
-        // Upload new files
-        for (const file of newFiles) {
-          try {
-            const formData = new FormData();
-            formData.append('files', file);
-            
-            // Get user email from localStorage
-            let userEmail = 'unknown';
-            try {
-              const contactInfo = localStorage.getItem('contactInfo');
-              if (contactInfo) {
-                const contact = JSON.parse(contactInfo);
-                userEmail = contact.email || 'unknown';
-              }
-            } catch (e) {
-              console.error('Error getting user email:', e);
-            }
-            
-            formData.append('userEmail', userEmail);
-            
-            const response = await fetch('/api/upload-documents', {
-              method: 'POST',
-              body: formData,
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              if (result.files && result.files.length > 0) {
-                uploadedFilePaths.push(result.files[0].filePath);
-                documentNames.push(file.name);
-                console.log('✅ File uploaded:', file.name, '->', result.files[0].filePath);
-              }
-            } else {
-              console.error('❌ File upload failed:', file.name);
-            }
-          } catch (error) {
-            console.error('❌ Error uploading file:', file.name, error);
-          }
-        }
-        
-        // Add existing file paths
-        for (const file of existingFiles) {
-          if (file.filePath || file.fileName) {
-            // If it's an existing file, use its current path or generate one
-            const filePath = file.filePath || `\\public\\uploads\\${file.fileName || file.name}`;
-            uploadedFilePaths.push(filePath);
-            documentNames.push(file.name || file.fileName);
-          }
-        }
-        
-        console.log('📁 Final file paths:', uploadedFilePaths);
-        console.log('📁 Final document names:', documentNames);
-      } else {
-        console.log('📁 No files in edited project - clearing document fields');
-        console.log('📁 This means all documents were removed');
-      }
+      // Document fields are now handled directly from editedProject.document_c and editedProject.documents_icesc_project_suggestions_1_name
+      console.log('📁 Using document fields from edited project:', {
+        document_c: editedProject.document_c || '',
+        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || ''
+      });
       
       // Prepare the data for CRM update
       const updateData = {
@@ -891,9 +821,9 @@ const ProjectDetailsPage = () => {
         // Additional info
         comments: editedProject.comments || '',
         
-        // Document fields - always include to properly update/clear CRM fields
-        document_c: uploadedFilePaths.join('; '),
-        documents_icesc_project_suggestions_1_name: documentNames.join('; '),
+        // Document fields - use the document fields from edited project
+        document_c: editedProject.document_c || '',
+        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || '',
         
         // Metadata
         session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
@@ -904,6 +834,10 @@ const ProjectDetailsPage = () => {
       
       console.log('📤 Sending update data to CRM:', updateData);
       console.log('🔑 Session ID in update data:', updateData.session_id ? 'Present' : 'Missing');
+      console.log('📄 Document fields being sent to CRM:', {
+        document_c: updateData.document_c,
+        documents_icesc_project_suggestions_1_name: updateData.documents_icesc_project_suggestions_1_name
+      });
       
       // Try initial save
       try {
@@ -1064,80 +998,11 @@ const ProjectDetailsPage = () => {
     try {
       console.log('💾 Saving project as draft:', editedProject);
       
-      // Handle file uploads and document management (same logic as handleSaveChanges)
-      let uploadedFilePaths: string[] = [];
-      let documentNames: string[] = [];
-      
-      console.log('📁 Processing documents for draft save...');
-      console.log('📁 editedProject.files:', editedProject.files);
-      console.log('📁 Files count:', editedProject.files?.length || 0);
-      
-      if (editedProject.files && editedProject.files.length > 0) {
-        console.log('📁 Files detected in edited project, processing...');
-        
-        // Upload new files (filter out existing files that don't need re-upload)
-        const newFiles = editedProject.files.filter((file: any) => file instanceof File);
-        const existingFiles = editedProject.files.filter((file: any) => !(file instanceof File));
-        
-        console.log('📁 New files to upload:', newFiles.length);
-        console.log('📁 Existing files:', existingFiles.length);
-        
-        // Upload new files
-        for (const file of newFiles) {
-          try {
-            const formData = new FormData();
-            formData.append('files', file);
-            
-            // Get user email from localStorage
-            let userEmail = 'unknown';
-            try {
-              const contactInfo = localStorage.getItem('contactInfo');
-              if (contactInfo) {
-                const contact = JSON.parse(contactInfo);
-                userEmail = contact.email || 'unknown';
-              }
-            } catch (e) {
-              console.error('Error getting user email:', e);
-            }
-            
-            formData.append('userEmail', userEmail);
-            
-            const response = await fetch('/api/upload-documents', {
-              method: 'POST',
-              body: formData,
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              if (result.files && result.files.length > 0) {
-                uploadedFilePaths.push(result.files[0].filePath);
-                documentNames.push(file.name);
-                console.log('✅ File uploaded for draft:', file.name, '->', result.files[0].filePath);
-              }
-            } else {
-              console.error('❌ File upload failed for draft:', file.name);
-            }
-          } catch (error) {
-            console.error('❌ Error uploading file for draft:', file.name, error);
-          }
-        }
-        
-        // Add existing file paths
-        for (const file of existingFiles) {
-          if (file.filePath || file.fileName) {
-            // If it's an existing file, use its current path or generate one
-            const filePath = file.filePath || `\\public\\uploads\\${file.fileName || file.name}`;
-            uploadedFilePaths.push(filePath);
-            documentNames.push(file.name || file.fileName);
-          }
-        }
-        
-        console.log('📁 Final file paths for draft:', uploadedFilePaths);
-        console.log('📁 Final document names for draft:', documentNames);
-      } else {
-        console.log('📁 No files in edited project - clearing document fields for draft');
-        console.log('📁 This means all documents were removed');
-      }
+      // Document fields are now handled directly from editedProject.document_c and editedProject.documents_icesc_project_suggestions_1_name
+      console.log('📁 Using document fields from edited project for draft:', {
+        document_c: editedProject.document_c || '',
+        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || ''
+      });
       
       // Prepare the data for draft update (same as save changes but with Draft status)
       const draftData = {
@@ -1199,9 +1064,9 @@ const ProjectDetailsPage = () => {
         // Additional info
         comments: editedProject.comments || '',
         
-        // Document fields - always include to properly update/clear CRM fields
-        document_c: uploadedFilePaths.join('; '),
-        documents_icesc_project_suggestions_1_name: documentNames.join('; '),
+        // Document fields - use the document fields from edited project
+        document_c: editedProject.document_c || '',
+        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || '',
         
         // Metadata
         session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
@@ -2681,45 +2546,99 @@ const ProjectDetailsPage = () => {
                           type="file"
                           multiple
                           accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             if (!editedProject) return;
                             const newFiles = Array.from(e.target.files || []);
                             
-                            // Parse existing documents from CRM fields
-                            const existingDocuments = parseDocumentsFromCRM(editedProject);
+                            if (newFiles.length === 0) return;
                             
-                            // Add new files to existing documents
-                            const updatedFiles = [...existingDocuments, ...newFiles];
+                            setIsUploadingFiles(true);
+                            console.log('📁 Uploading new files:', newFiles.map(f => f.name));
                             
-                            // Update document fields
-                            const updatedDocumentPaths = updatedFiles.map(file => {
-                              if (file instanceof File) {
-                                return file.name; // For new files, use the file name
+                            try {
+                              // Parse existing documents from CRM fields
+                              const existingDocuments = parseDocumentsFromCRM(editedProject);
+                              
+                              // Upload new files to Azure
+                              const uploadedFiles = [];
+                              for (const file of newFiles) {
+                                try {
+                                  const formData = new FormData();
+                                  formData.append('files', file);
+                                  formData.append('userEmail', 'project-edit@example.com'); // You might want to get this from user context
+                                  
+                                  const response = await fetch('/api/upload-documents', {
+                                    method: 'POST',
+                                    body: formData,
+                                  });
+                                  
+                                  if (response.ok) {
+                                    const result = await response.json();
+                                    if (result.files && result.files.length > 0) {
+                                      uploadedFiles.push({
+                                        name: file.name,
+                                        fileName: result.files[0].fileName,
+                                        filePath: result.files[0].filePath,
+                                        downloadURL: result.files[0].downloadURL,
+                                        url: result.files[0].downloadURL,
+                                        size: file.size,
+                                        type: file.type
+                                      });
+                                      console.log('✅ File uploaded successfully:', file.name, '->', result.files[0].filePath);
+                                    }
+                                  } else {
+                                    console.error('❌ File upload failed:', file.name);
+                                  }
+                                } catch (error) {
+                                  console.error('❌ Error uploading file:', file.name, error);
+                                }
                               }
-                              return file.filePath || file.downloadURL || file.url;
-                            }).join('; ');
-                            const updatedDocumentNames = updatedFiles.map(file => {
-                              if (file instanceof File) {
-                                return file.name; // For new files, use the file name
-                              }
-                              return file.name || file.fileName;
-                            }).join('; ');
-                            
-                            setEditedProject(prev => ({
-                              ...prev!,
-                              files: updatedFiles,
-                              document_c: updatedDocumentPaths,
-                              documents_icesc_project_suggestions_1_name: updatedDocumentNames
-                            }));
+                              
+                              // Combine existing documents with newly uploaded files
+                              const updatedFiles = [...existingDocuments, ...uploadedFiles];
+                              
+                              // Update document fields with proper Azure URLs
+                              const updatedDocumentPaths = updatedFiles.map(file => file.filePath || file.downloadURL || file.url).join('; ');
+                              const updatedDocumentNames = updatedFiles.map(file => file.name || file.fileName).join('; ');
+                              
+                              console.log('🔄 Updated document fields:', {
+                                document_c: updatedDocumentPaths,
+                                documents_icesc_project_suggestions_1_name: updatedDocumentNames
+                              });
+                              
+                              setEditedProject(prev => {
+                                const updated = {
+                                  ...prev!,
+                                  files: updatedFiles,
+                                  document_c: updatedDocumentPaths,
+                                  documents_icesc_project_suggestions_1_name: updatedDocumentNames
+                                };
+                                console.log('🔄 Setting editedProject with document fields:', {
+                                  document_c: updated.document_c,
+                                  documents_icesc_project_suggestions_1_name: updated.documents_icesc_project_suggestions_1_name
+                                });
+                                return updated;
+                              });
+                              
+                            } catch (error) {
+                              console.error('❌ Error processing file uploads:', error);
+                              alert('Error uploading files. Please try again.');
+                            } finally {
+                              setIsUploadingFiles(false);
+                            }
                           }}
                           className="hidden"
                           id="file-upload-edit"
                         />
                         <label
                           htmlFor="file-upload-edit"
-                          className="inline-block px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 cursor-pointer transition-colors text-sm"
+                          className={`inline-block px-4 py-2 rounded-lg transition-colors text-sm ${
+                            isUploadingFiles 
+                              ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                              : 'bg-teal-500 text-white hover:bg-teal-600 cursor-pointer'
+                          }`}
                         >
-                          {t('selectFiles')}
+                          {isUploadingFiles ? 'Uploading...' : t('selectFiles')}
                         </label>
                       </div>
                     </div>

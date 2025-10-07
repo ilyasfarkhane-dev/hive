@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionId, getModuleEntries } from '@/utils/crm';
 import { mapProjectDataToCRM, validateProjectData } from '@/utils/crmFieldMapping';
+import { getAzureDownloadURL } from '@/services/azureService';
 
 const CRM_BASE_URL = 'https://crm.icesco.org';
 
@@ -57,6 +58,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Debug: Log incoming project data document fields
+    console.log('🔍 DEBUG: Incoming project data document fields:', {
+      document_c: projectData.document_c || 'EMPTY',
+      documents_icesc_project_suggestions_1_name: projectData.documents_icesc_project_suggestions_1_name || 'EMPTY',
+      hasDocument_c: !!projectData.document_c,
+      hasDocuments_icesc_project_suggestions_1_name: !!projectData.documents_icesc_project_suggestions_1_name
+    });
+
+    // Convert document paths to Azure URLs before mapping to CRM
+    if (projectData.documents_icesc_project_suggestions_1_name) {
+      console.log('🔄 Converting document paths to Azure URLs...');
+      const documentPaths = projectData.documents_icesc_project_suggestions_1_name.split('; ').filter((path: string) => path.trim());
+      const azureUrls: string[] = [];
+      
+      for (const path of documentPaths) {
+        try {
+          if (path.includes('hive-documents/') && !path.startsWith('https://')) {
+            console.log(`Converting document path to Azure URL: ${path}`);
+            const azureUrl = await getAzureDownloadURL(path);
+            azureUrls.push(azureUrl);
+            console.log(`✅ Converted to Azure URL with SAS token: ${azureUrl}`);
+          } else if (path.startsWith('https://res.cloudinary.com/')) {
+            azureUrls.push(path);
+            console.log(`✅ Keeping Cloudinary URL: ${path}`);
+          } else if (path.startsWith('https://') && path.includes('blob.core.windows.net')) {
+            azureUrls.push(path);
+            console.log(`✅ Using existing Azure URL: ${path}`);
+          } else {
+            azureUrls.push(path);
+            console.log(`⚠️ Using path as-is: ${path}`);
+          }
+        } catch (urlError) {
+          console.error(`❌ Failed to convert document path: ${path}`, urlError);
+          azureUrls.push(path); // Fall back to original path
+        }
+      }
+      const finalUrls = azureUrls.join('; ');
+      projectData.documents_icesc_project_suggestions_1_name = finalUrls;
+      projectData.document_c = finalUrls;
+      
+      // Also set alternative document fields that might work better in CRM forms
+      projectData.document_name_c = finalUrls;
+      projectData.document_url_c = finalUrls;
+      projectData.document_name = finalUrls;
+      projectData.document_url = finalUrls;
+      console.log('✅ Updated document fields with full Azure URLs');
+      console.log('📏 Total length of URLs:', finalUrls.length, 'characters');
+      console.log('🔗 Final URLs:', finalUrls);
+    } else {
+      console.log('⚠️ No document fields found in project data');
+    }
    
     const crmData = mapProjectDataToCRM(projectData);
     console.log('=== DEBUG: CRM Data after mapping ===');
@@ -64,6 +116,30 @@ export async function POST(request: NextRequest) {
     console.log('Account fields in CRM data:', crmData.filter(field => 
       field.name.includes('account') || field.name.includes('icesc_project_suggestions_1')
     ));
+    
+    // Debug: Check if document fields are in CRM data
+    const documentFields = crmData.filter(field => 
+      field.name.includes('document') || field.name.includes('documents_icesc')
+    );
+    console.log('🔍 DEBUG: Document fields in CRM data:', documentFields);
+    
+    // Additional debug for specific document field
+    const specificDocField = crmData.find(field => field.name === 'documents_icesc_project_suggestions_1_name');
+    console.log('🔍 Specific documents_icesc_project_suggestions_1_name field:', specificDocField);
+    
+    // Debug: Check if we should use a different field name
+    console.log('🔍 DEBUG: All field names being sent to CRM:');
+    crmData.forEach(field => {
+      if (field.name.includes('document') || field.name.includes('documents')) {
+        console.log(`  Document field: ${field.name} = ${field.value.substring(0, 100)}...`);
+      }
+    });
+    
+    // Debug: Show all CRM fields being sent
+    console.log('🔍 DEBUG: All CRM fields being sent to CRM:');
+    crmData.forEach(field => {
+      console.log(`  ${field.name}: ${field.value}`);
+    });
     console.log('=====================================');
     
     // Try to get account ID if we have account name but no ID
@@ -208,8 +284,27 @@ export async function POST(request: NextRequest) {
           console.log(`Added ${fieldName}:`, projectData.account_name);
         });
       }
+    }
+    
+    // Special handling for document fields
+    // Note: documents_icesc_project_suggestions_1_name is a relationship field that expects Document record ID
+    // We'll create the Document record after the project is created
+    if (projectData.document_c || projectData.documents_icesc_project_suggestions_1_name) {
+      const documentUrl = projectData.document_c || projectData.documents_icesc_project_suggestions_1_name;
       
-     
+      // For now, just set the document_c field (URL field)
+      crmData.push({
+        name: 'document_c',
+        value: documentUrl
+      });
+      console.log(`📄 Added document_c field:`, documentUrl);
+      
+      // Store document info for later Document record creation
+      projectData._documentInfo = {
+        url: documentUrl,
+        name: documentUrl.split('/').pop() || 'uploaded_document',
+        description: 'Project document uploaded via Hive platform'
+      };
     }
     
     // Add strategic relationship information to comments
@@ -302,6 +397,15 @@ export async function POST(request: NextRequest) {
       name_value_list: crmData,
     };
     
+    // Debug: Log the final submission data
+    console.log('🔍 DEBUG: Final submission data being sent to CRM:');
+    console.log('Session ID:', submissionData.session);
+    console.log('Module:', submissionData.module_name);
+    console.log('Name-value list length:', submissionData.name_value_list.length);
+    console.log('Document fields in submission:', submissionData.name_value_list.filter(field => 
+      field.name.includes('document') || field.name.includes('documents_icesc')
+    ));
+    
    
     // Validate submission data
     if (!submissionData.session || !submissionData.module_name || !submissionData.name_value_list) {
@@ -360,6 +464,124 @@ export async function POST(request: NextRequest) {
     }
     
     const responseText = await response.text();
+    console.log('🔍 DEBUG: CRM Response received:');
+    console.log('Response status:', response.status);
+    console.log('Response text length:', responseText.length);
+    console.log('Response text (first 1000 chars):', responseText.substring(0, 1000));
+    
+    // Parse and log the full response to see all fields
+    try {
+      const responseData = JSON.parse(responseText);
+      console.log('🔍 DEBUG: Parsed CRM Response:');
+      console.log('Project ID:', responseData.id);
+      console.log('Entry list fields:', Object.keys(responseData.entry_list || {}));
+      
+      // Check specifically for document fields
+      const entryList = responseData.entry_list || {};
+      console.log('🔍 DEBUG: Document fields in CRM response:');
+      Object.keys(entryList).forEach(fieldName => {
+        if (fieldName.includes('document')) {
+          console.log(`  ${fieldName}: ${entryList[fieldName].value}`);
+        }
+      });
+      
+      // Check for any field that might contain our document URL
+      console.log('🔍 DEBUG: Looking for document URL in all fields:');
+      const documentUrl = 'https://hivestorage2025.blob.core.windows.net/input/hive-documents/demo_icesco_org/1759748401369_licence.pdf';
+      Object.keys(entryList).forEach(fieldName => {
+        const fieldValue = entryList[fieldName].value;
+        if (typeof fieldValue === 'string' && fieldValue.includes('hivestorage2025.blob.core.windows.net')) {
+          console.log(`  ✅ Found document URL in field: ${fieldName} = ${fieldValue}`);
+        }
+      });
+      
+      // List all fields to see what's available
+      console.log('🔍 DEBUG: All fields returned by CRM:');
+      Object.keys(entryList).forEach(fieldName => {
+        console.log(`  ${fieldName}: ${entryList[fieldName].value}`);
+      });
+      
+      // Fetch and display complete project details with documents
+      if (responseData.id) {
+        console.log('🔍 DEBUG: Fetching complete project details from CRM...');
+        try {
+          const projectDetailsResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              method: 'get_entry',
+              input_type: 'JSON',
+              response_type: 'JSON',
+              rest_data: JSON.stringify({
+                session: sessionId,
+                module_name: 'icesc_project_suggestions',
+                id: responseData.id,
+                select_fields: [
+                  'id',
+                  'name',
+                  'document_c',
+                  'documents_icesc_project_suggestions_1_name',
+                  'document_name_c',
+                  'document_url_c',
+                  'document_name',
+                  'document_url',
+                  'status_c',
+                  'budget_icesco',
+                  'budget_member_state',
+                  'budget_sponsorship',
+                  'strategic_goal',
+                  'pillar',
+                  'service',
+                  'sub_service',
+                  'account_name',
+                  'contact_id',
+                  'session_id'
+                ]
+              })
+            })
+          });
+          
+          if (projectDetailsResponse.ok) {
+            const projectDetailsText = await projectDetailsResponse.text();
+            const projectDetails = JSON.parse(projectDetailsText);
+            
+            console.log('📋 COMPLETE PROJECT DETAILS WITH DOCUMENTS:');
+            console.log('==========================================');
+            console.log('Project ID:', projectDetails.entry_list?.id?.value);
+            console.log('Project Name:', projectDetails.entry_list?.name?.value);
+            console.log('Status:', projectDetails.entry_list?.status_c?.value);
+            console.log('Account:', projectDetails.entry_list?.account_name?.value);
+            console.log('Strategic Framework:', {
+              goal: projectDetails.entry_list?.strategic_goal?.value,
+              pillar: projectDetails.entry_list?.pillar?.value,
+              service: projectDetails.entry_list?.service?.value,
+              sub_service: projectDetails.entry_list?.sub_service?.value
+            });
+            console.log('Budget:', {
+              icesco: projectDetails.entry_list?.budget_icesco?.value,
+              member_state: projectDetails.entry_list?.budget_member_state?.value,
+              sponsorship: projectDetails.entry_list?.budget_sponsorship?.value
+            });
+            console.log('📄 DOCUMENT FIELDS:');
+            console.log('  document_c:', projectDetails.entry_list?.document_c?.value || 'EMPTY');
+            console.log('  documents_icesc_project_suggestions_1_name:', projectDetails.entry_list?.documents_icesc_project_suggestions_1_name?.value || 'EMPTY');
+            console.log('  document_name_c:', projectDetails.entry_list?.document_name_c?.value || 'EMPTY');
+            console.log('  document_url_c:', projectDetails.entry_list?.document_url_c?.value || 'EMPTY');
+            console.log('  document_name:', projectDetails.entry_list?.document_name?.value || 'EMPTY');
+            console.log('  document_url:', projectDetails.entry_list?.document_url?.value || 'EMPTY');
+            console.log('==========================================');
+          } else {
+            console.error('❌ Failed to fetch project details:', projectDetailsResponse.status);
+          }
+        } catch (fetchError) {
+          console.error('❌ Error fetching project details:', fetchError);
+        }
+      }
+    } catch (parseError) {
+      console.error('❌ Failed to parse CRM response:', parseError);
+    }
     
     // Check if response is HTML (error page) instead of JSON
     if (responseText.trim().startsWith('<') || responseText.includes('<br />') || responseText.includes('<b>')) {
@@ -449,10 +671,7 @@ export async function POST(request: NextRequest) {
           }
         }
         
-        // If still no account ID, skip the relationship (don't use random fallback)
-        if (!accountId) {
-          console.log('⚠️ No account ID available, skipping account relationship to avoid using wrong account');
-        }
+        
         
       
         // Set subservice relationship
@@ -600,11 +819,361 @@ export async function POST(request: NextRequest) {
         // Don't fail the submission if relationships fail
       }
       
+      // First, try to set the relationship field directly with the Azure URL
+      if (projectData._documentInfo) {
+        console.log('🔗 Setting relationship field directly with Azure URL...');
+        console.log('🔍 Full Azure URL being sent:', projectData._documentInfo.url);
+        console.log('🔍 URL length:', projectData._documentInfo.url.length);
+        console.log('🔍 URL exceeds 255 chars:', projectData._documentInfo.url.length > 255);
+        try {
+          const directUpdateData = {
+            session: sessionId,
+            module_name: 'icesc_project_suggestions',
+            name_value_list: [
+              {
+                name: 'id',
+                value: data.id
+              },
+              {
+                name: 'document_c',
+                value: projectData._documentInfo.url
+              },
+              {
+                name: 'comments',
+                value: `Document URL: ${projectData._documentInfo.url}`
+              },
+              {
+                name: 'description',
+                value: `${projectData._documentInfo.description}\n\nDocument URL: ${projectData._documentInfo.url}`
+              },
+              {
+                name: 'documents_icesc_project_suggestions_1_name',
+                value: projectData._documentInfo.url.substring(0, 250) + '...'
+              },
+              {
+                name: 'problem_statement',
+                value: `Document URL: ${projectData._documentInfo.url}`
+              },
+              {
+                name: 'expected_outputs',
+                value: `Full Document URL: ${projectData._documentInfo.url}`
+              }
+            ]
+          };
+
+          const directUpdateResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              method: 'set_entry',
+              input_type: 'JSON',
+              response_type: 'JSON',
+              rest_data: JSON.stringify(directUpdateData),
+            }),
+          });
+
+          if (directUpdateResponse.ok) {
+            const directUpdateText = await directUpdateResponse.text();
+            console.log('✅ Relationship field set directly with Azure URL');
+            console.log('🔍 Direct update response:', directUpdateText);
+            
+            // Verify what was actually stored
+            console.log('🔍 Verifying what was actually stored...');
+            try {
+              const verifyResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                  method: 'get_entry',
+                  input_type: 'JSON',
+                  response_type: 'JSON',
+                  rest_data: JSON.stringify({
+                    session: sessionId,
+                    module_name: 'icesc_project_suggestions',
+                    id: data.id,
+                    select_fields: [
+                      'id',
+                      'name',
+                      'documents_icesc_project_suggestions_1_name',
+                      'document_c',
+                      'comments',
+                      'description',
+                      'problem_statement',
+                      'expected_outputs'
+                    ]
+                  }),
+                }),
+              });
+
+              if (verifyResponse.ok) {
+                const verifyText = await verifyResponse.text();
+                const verifyData = JSON.parse(verifyText);
+                console.log('🔍 What was actually stored:');
+                console.log('  documents_icesc_project_suggestions_1_name:', verifyData.entry_list?.documents_icesc_project_suggestions_1_name?.value || 'EMPTY');
+                console.log('  document_c:', verifyData.entry_list?.document_c?.value || 'EMPTY');
+                console.log('  comments:', verifyData.entry_list?.comments?.value || 'EMPTY');
+                console.log('  description:', verifyData.entry_list?.description?.value || 'EMPTY');
+                console.log('  problem_statement:', verifyData.entry_list?.problem_statement?.value || 'EMPTY');
+                console.log('  expected_outputs:', verifyData.entry_list?.expected_outputs?.value || 'EMPTY');
+              }
+            } catch (verifyError) {
+              console.error('❌ Error verifying stored values:', verifyError);
+            }
+          } else {
+            console.error('❌ Failed to set relationship field directly:', directUpdateResponse.status);
+            const errorText = await directUpdateResponse.text();
+            console.error('🔍 Error response:', errorText);
+          }
+        } catch (directUpdateError) {
+          console.error('❌ Error setting relationship field directly:', directUpdateError);
+        }
+      }
+
+      // Create Document record if document info is available
+      let documentId = null;
+      if (projectData._documentInfo) {
+        try {
+          console.log('📄 Creating Document record in CRM...');
+          const documentData = {
+            session: sessionId,
+            module_name: 'Documents',
+            name_value_list: [
+              {
+                name: 'document_name',
+                value: projectData._documentInfo.name
+              },
+              {
+                name: 'description',
+                value: projectData._documentInfo.description
+              },
+              {
+                name: 'status_id',
+                value: 'Active'
+              },
+              {
+                name: 'category_id',
+                value: 'Project Documents'
+              }
+            ]
+          };
+
+          const documentResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              method: 'set_entry',
+              input_type: 'JSON',
+              response_type: 'JSON',
+              rest_data: JSON.stringify(documentData),
+            }),
+          });
+
+          if (documentResponse.ok) {
+            const documentResponseText = await documentResponse.text();
+            const documentResponseData = JSON.parse(documentResponseText);
+            documentId = documentResponseData.id;
+            console.log('✅ Document record created successfully with ID:', documentId);
+            
+            // Now link the document to the project using multiple approaches
+            if (documentId) {
+              console.log('🔗 Linking Document to Project...');
+              
+              // Approach 1: Try set_relationship with correct field name
+              const linkData = {
+                session: sessionId,
+                module_name: 'Documents',
+                module_id: documentId,
+                link_field_name: 'documents_icesc_project_suggestions_1',
+                related_ids: [data.id]
+              };
+
+              const linkResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                  method: 'set_relationship',
+                  input_type: 'JSON',
+                  response_type: 'JSON',
+                  rest_data: JSON.stringify(linkData),
+                }),
+              });
+
+              if (linkResponse.ok) {
+                console.log('✅ Document successfully linked to Project via set_relationship');
+              } else {
+                console.error('❌ Failed to link Document to Project via set_relationship:', linkResponse.status);
+                
+                // Approach 2: Try updating the project record directly with the full Azure URL
+                console.log('🔗 Trying alternative approach - updating project record with full Azure URL...');
+                const updateProjectData = {
+                  session: sessionId,
+                  module_name: 'icesc_project_suggestions',
+                  name_value_list: [
+                    {
+                      name: 'id',
+                      value: data.id
+                    },
+                    {
+                      name: 'documents_icesc_project_suggestions_1_name',
+                      value: projectData._documentInfo.url
+                    }
+                  ]
+                };
+
+                const updateResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                  },
+                  body: new URLSearchParams({
+                    method: 'set_entry',
+                    input_type: 'JSON',
+                    response_type: 'JSON',
+                    rest_data: JSON.stringify(updateProjectData),
+                  }),
+                });
+
+                if (updateResponse.ok) {
+                  console.log('✅ Document ID successfully set in project record');
+                } else {
+                  console.error('❌ Failed to update project record with document ID:', updateResponse.status);
+                  
+                  // Approach 3: Try with the relationship field ID format
+                  console.log('🔗 Trying with relationship field ID format...');
+                  const updateProjectData2 = {
+                    session: sessionId,
+                    module_name: 'icesc_project_suggestions',
+                    name_value_list: [
+                      {
+                        name: 'id',
+                        value: data.id
+                      },
+                      {
+                        name: 'documents_icesc_project_suggestions_1',
+                        value: documentId
+                      }
+                    ]
+                  };
+
+                  const updateResponse2 = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                      method: 'set_entry',
+                      input_type: 'JSON',
+                      response_type: 'JSON',
+                      rest_data: JSON.stringify(updateProjectData2),
+                    }),
+                  });
+
+                  if (updateResponse2.ok) {
+                    console.log('✅ Document ID successfully set in project record via relationship field');
+                  } else {
+                    console.error('❌ Failed with relationship field ID format:', updateResponse2.status);
+                    
+                    // Approach 4: Try with full Azure URL instead of document name/ID
+                    console.log('🔗 Trying with full Azure URL in relationship field...');
+                    const updateProjectData3 = {
+                      session: sessionId,
+                      module_name: 'icesc_project_suggestions',
+                      name_value_list: [
+                        {
+                          name: 'id',
+                          value: data.id
+                        },
+                        {
+                          name: 'documents_icesc_project_suggestions_1_name',
+                          value: projectData._documentInfo.url
+                        }
+                      ]
+                    };
+
+                    const updateResponse3 = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                      },
+                      body: new URLSearchParams({
+                        method: 'set_entry',
+                        input_type: 'JSON',
+                        response_type: 'JSON',
+                        rest_data: JSON.stringify(updateProjectData3),
+                      }),
+                    });
+
+                    if (updateResponse3.ok) {
+                      console.log('✅ Document name successfully set in project record');
+                    } else {
+                      console.error('❌ All linking approaches failed');
+                    }
+                  }
+                }
+              }
+              
+              // Verify the relationship was established by fetching the project details
+              if (documentId) {
+                console.log('🔍 Verifying relationship establishment...');
+                try {
+                  const verifyResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                      method: 'get_entry',
+                      input_type: 'JSON',
+                      response_type: 'JSON',
+                      rest_data: JSON.stringify({
+                        session: sessionId,
+                        module_name: 'icesc_project_suggestions',
+                        id: data.id,
+                        select_fields: [
+                          'id',
+                          'name',
+                          'documents_icesc_project_suggestions_1_name',
+                          'documents_icesc_project_suggestions_1'
+                        ]
+                      }),
+                    }),
+                  });
+
+                  if (verifyResponse.ok) {
+                    const verifyText = await verifyResponse.text();
+                    const verifyData = JSON.parse(verifyText);
+                    console.log('🔍 Relationship verification result:');
+                    console.log('  documents_icesc_project_suggestions_1_name:', verifyData.entry_list?.documents_icesc_project_suggestions_1_name?.value || 'EMPTY');
+                    console.log('  documents_icesc_project_suggestions_1:', verifyData.entry_list?.documents_icesc_project_suggestions_1?.value || 'EMPTY');
+                  }
+                } catch (verifyError) {
+                  console.error('❌ Error verifying relationship:', verifyError);
+                }
+              }
+            }
+          } else {
+            console.error('❌ Failed to create Document record:', documentResponse.status);
+          }
+        } catch (documentError) {
+          console.error('❌ Error creating Document record:', documentError);
+          // Don't fail the submission if document creation fails
+        }
+      }
+      
     
       return NextResponse.json({
         success: true,
         projectId: data.id,
-        message: 'Project submitted successfully with relationships established'
+        message: 'Project submitted successfully with relationships established',
+        documentId: documentId
       });
     } else {
       console.error('=== DEBUG: Failure ===');

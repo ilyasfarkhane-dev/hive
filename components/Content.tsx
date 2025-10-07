@@ -1662,6 +1662,13 @@ useEffect(() => {
         
       };
 
+      // Debug: Log document fields being sent to CRM
+      console.log('🔍 DEBUG: Document fields in submission data:', {
+        uploadedFilePaths: uploadedFilePaths,
+        document_c: uploadedFilePaths.length > 0 ? uploadedFilePaths.join('; ') : 'EMPTY',
+        documents_icesc_project_suggestions_1_name: uploadedFilePaths.length > 0 ? uploadedFilePaths.join('; ') : 'EMPTY'
+      });
+
      
       
      
@@ -1789,8 +1796,49 @@ useEffect(() => {
         }
         
         if (fileToUpload) {
-          const filePath = await handleFileUpload(fileToUpload);
-          return filePath;
+          // Call upload API directly to get full result with downloadURL
+          try {
+            const formData = new FormData();
+            formData.append('files', fileToUpload);
+            
+            // Get user email from localStorage
+            let userEmail = 'unknown';
+            try {
+              const contactInfo = localStorage.getItem('contactInfo');
+              if (contactInfo) {
+                const contact = JSON.parse(contactInfo);
+                userEmail = contact.email || 'unknown';
+              }
+            } catch (e) {
+              console.warn('Could not get contact info from localStorage:', e);
+            }
+            
+            formData.append('userEmail', userEmail);
+            
+            const response = await fetch('/api/upload-documents', {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              if (result.files && result.files.length > 0) {
+                const fileResult = result.files[0];
+                console.log('🔍 DEBUG: File upload result:', {
+                  fileName: fileResult.fileName,
+                  filePath: fileResult.filePath,
+                  downloadURL: fileResult.downloadURL,
+                  usingDownloadURL: !!fileResult.downloadURL
+                });
+                // Return the downloadURL (full Azure URL with SAS token) instead of filePath
+                return fileResult.downloadURL || fileResult.filePath;
+              }
+            }
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            // Fallback to handleFileUpload
+            return await handleFileUpload(fileToUpload);
+          }
         }
         
         return null;
@@ -1908,7 +1956,7 @@ useEffect(() => {
           }
         })(),
         
-        // Account information - automatically get from localStorage
+       
         account_id: (() => {
           try {
             // If editing a project, use the account ID from the project data

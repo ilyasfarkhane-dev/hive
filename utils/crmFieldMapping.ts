@@ -338,7 +338,34 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
   document_c: {
     crmField: 'document_c',
     type: 'string',
-    maxLength: 500
+    maxLength: 2000
+  },
+  documents_icesc_project_suggestions_1_name: {
+    crmField: 'documents_icesc_project_suggestions_1_name',
+    type: 'string',
+    maxLength: 2000
+  },
+  // Try alternative field names that might work better in CRM
+  document_name_c: {
+    crmField: 'document_name_c',
+    type: 'string',
+    maxLength: 2000
+  },
+  document_url_c: {
+    crmField: 'document_url_c',
+    type: 'string',
+    maxLength: 2000
+  },
+  // Alternative document field names to try
+  document_name: {
+    crmField: 'document_name',
+    type: 'string',
+    maxLength: 2000
+  },
+  document_url: {
+    crmField: 'document_url',
+    type: 'string',
+    maxLength: 2000
   }
 };
 
@@ -358,6 +385,18 @@ export function mapProjectDataToCRM(projectData: any): any[] {
   // Process each field according to mapping
   Object.entries(ICESC_FIELD_MAPPING).forEach(([projectField, mapping]) => {
     const value = projectData[projectField];
+    
+    // Debug: Log document field processing
+    if (projectField.includes('document')) {
+      console.log(`🔍 DEBUG: Processing document field ${projectField}:`, {
+        value: value,
+        type: typeof value,
+        isUndefined: value === undefined,
+        isNull: value === null,
+        isEmpty: value === '',
+        willSkip: value === undefined || value === null || value === ''
+      });
+    }
     
     if (value === undefined || value === null || value === '') {
       return;

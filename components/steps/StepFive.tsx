@@ -40,9 +40,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
 
   // Debug logging for submissionResult
   useEffect(() => {
-    console.log('🔍 StepFive - submissionResult changed:', submissionResult);
-    console.log('🔍 StepFive - submissionResult success:', submissionResult?.success);
-    console.log('🔍 StepFive - submissionResult message:', submissionResult?.message);
+  
   }, [submissionResult]);
 
   // Safe translation function to ensure strings are returned
@@ -99,10 +97,6 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
   const [isInitialized, setIsInitialized] = useState(false);
 
 
-
-
-
-
   const otherBeneficiaryValue = t('beneficiaryOther');
   // Load saved data on component mount - only run once
   useEffect(() => {
@@ -113,7 +107,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
           const parsedData = JSON.parse(savedData);
 
 
-          // Check if "Other" beneficiary is selected to show the input
+          
           if (parsedData.beneficiaries && parsedData.beneficiaries.includes(otherBeneficiaryValue)) {
             setShowOtherInput(true);
           }
@@ -122,9 +116,6 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
             const newFormValues = {
               ...prev,
               ...parsedData,
-              // Note: Files from localStorage can't be restored as File objects
-              // We'll only keep actual File objects that were added after page load
-              // Files from localStorage are just metadata and won't be uploaded
               files: prev.files || []
             };
             

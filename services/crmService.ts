@@ -497,11 +497,12 @@ class CRMService {
         await this.authenticate();
       }
 
-      // Search for contact by login_c field (not email1)
-      let searchData = {
+      // Use empty query to avoid database errors with custom fields
+      // We'll filter the results in memory instead
+      const searchData = {
         session: this.sessionId,
         module_name: 'Contacts',
-        query: `contacts.login_c = '${login.replace(/'/g, "\\'")}'`,
+        query: '', // Empty query to get all contacts
         order_by: 'contacts.date_entered DESC',
         offset: 0,
         select_fields: [
@@ -524,11 +525,11 @@ class CRMService {
             value: ['id', 'name']
           }
         ],
-        max_results: 1
+        max_results: 100 // Get more results to search through
       };
 
-      // Try a simpler query first
-      let response = await fetch(`${this.config.baseUrl}/service/v4_1/rest.php`, {
+      console.log('Fetching contacts from CRM...');
+      const response = await fetch(`${this.config.baseUrl}/service/v4_1/rest.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -543,53 +544,6 @@ class CRMService {
 
       console.log('Contact search response status:', response.status);
       
-      // If the first query fails, try without the query filter
-      if (response.status === 500) {
-        console.log('First query failed, trying without login filter...');
-        searchData = {
-          session: this.sessionId,
-          module_name: 'Contacts',
-          query: '', // Empty query to get all contacts
-          order_by: 'contacts.date_entered DESC',
-          offset: 0,
-          select_fields: [
-            'id',
-            'first_name',
-            'last_name',
-            'email1',
-            'phone_mobile',
-            'phone_work',
-            'title',
-            'account_name',
-            'primary_address_country',
-            'login_c',
-            'password_c'
-          ],
-          link_name_to_fields_array: [
-            {
-              name: 'accounts_contacts',
-              value: ['id', 'name']
-            }
-          ],
-          max_results: 50 // Get more results to search through
-        };
-
-        response = await fetch(`${this.config.baseUrl}/service/v4_1/rest.php`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            method: 'get_entry_list',
-            input_type: 'JSON',
-            response_type: 'JSON',
-            rest_data: JSON.stringify(searchData),
-          }),
-        });
-      }
-
-      console.log('Contact search data:', JSON.stringify(searchData, null, 2));
-      
       // Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) { 
@@ -602,21 +556,13 @@ class CRMService {
       }
       
       const data = await response.json();
-      console.log('Contact search response data:', data);
+      console.log(`Contact search returned ${data.entry_list?.length || 0} contacts`);
 
       if (data.entry_list && data.entry_list.length > 0) {
-        // If we got results, find the one matching the login credentials
-        let matchingContact = null;
-        
-        if (searchData.query) {
-          // If we used a query filter, take the first result
-          matchingContact = data.entry_list[0];
-        } else {
-          // If we got all contacts, find the one with matching login
-          matchingContact = data.entry_list.find((contact: any) => 
-            contact.name_value_list.login_c?.value === login
-          );
-        }
+        // Find the contact with matching login_c
+        const matchingContact = data.entry_list.find((contact: any) => 
+          contact.name_value_list.login_c?.value === login
+        );
         
         if (matchingContact) {
           // Verify password

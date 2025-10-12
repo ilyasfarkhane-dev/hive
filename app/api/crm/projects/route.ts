@@ -3,164 +3,277 @@ import { getSessionId, getModuleEntries, getContactProjects } from '@/utils/crm'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('=== CRM PROJECTS API CALLED ===');
-    console.log('Environment:', process.env.NODE_ENV);
-    console.log('CRM Admin User:', process.env.CRM_ADMIN_USER || 'NOT_SET');
-    console.log('CRM Admin Pass:', process.env.CRM_ADMIN_PASS ? 'SET' : 'NOT_SET');
-    console.log('CRM Base URL:', process.env.CRM_BASE_URL || 'NOT_SET');
-    console.log('Request URL:', request.url);
-    console.log('Cache-Busting Params:', request.nextUrl.searchParams.toString());
     
     // Get parameters from query string
     const { searchParams } = new URL(request.url);
     const contactId = searchParams.get('contact_id');
     const projectId = searchParams.get('project_id');
-    console.log('Contact ID from query params:', contactId);
-    console.log('Project ID from query params:', projectId);
+    const sessionId = searchParams.get('session_id'); // Get from URL parameter sent by frontend
+
+    console.log('📋 Request Parameters:', {
+      contactId: contactId || 'none',
+      projectId: projectId || 'none',
+      sessionId: sessionId ? `${sessionId.substring(0, 10)}...` : 'none'
+    });
     
-    // Get session ID with timeout and retry logic
-    let sessionId: string;
-    try {
-      console.log('Attempting to get session ID...');
-      sessionId = await getSessionId();
-      console.log('Session ID obtained successfully:', sessionId ? 'YES' : 'NO');
-    } catch (sessionError) {
-      console.error('Failed to get session ID:', sessionError);
-      console.error('Session error details:', {
-        message: sessionError instanceof Error ? sessionError.message : 'Unknown error',
-        stack: sessionError instanceof Error ? sessionError.stack : 'No stack trace'
-      });
-      
-      // Check if it's a connection timeout error
-      if (sessionError instanceof Error && (
-        sessionError.message.includes('ETIMEDOUT') || 
-        sessionError.message.includes('timeout') ||
-        sessionError.message.includes('ECONNREFUSED') ||
-        sessionError.message.includes('ENOTFOUND')
-      )) {
-        console.log('Returning connection error response');
+    // Validate session ID
+    if (!sessionId) {
+      console.error('❌ No session ID provided');
         return NextResponse.json({
           success: false,
-          error: 'CRM server is currently unavailable. Please try again later.',
-          errorType: 'CONNECTION_ERROR',
+        error: 'Session ID is required. Please log in again.',
+        errorType: 'MISSING_SESSION_ID',
           projects: [],
-          count: 0,
-          debug: {
-            environment: process.env.NODE_ENV,
-            crmUserSet: !!process.env.CRM_ADMIN_USER,
-            crmPassSet: !!process.env.CRM_ADMIN_PASS,
-            crmBaseUrlSet: !!process.env.CRM_BASE_URL
-          }
-        }, { status: 503 }); // Service Unavailable
-      }
-      
-      throw sessionError;
+        count: 0
+      }, { status: 401 });
     }
     
-    // Fetch projects from CRM with timeout handling
-    let projectEntries: any[];
+    // Validate contact ID is provided
+    if (!contactId && !projectId) {
+      console.log('❌ No contact ID or project ID provided');
+      return NextResponse.json({
+        success: false,
+        error: 'Contact ID or Project ID is required',
+        errorType: 'MISSING_PARAMETERS',
+        projects: [],
+        count: 0
+      }, { status: 400 });
+    }
+    
+    // Fetch projects using appropriate method based on parameters
+    let projectEntries: any[] = [];
     try {
-      console.log('Fetching projects from CRM...');
-      console.log('Session ID length:', sessionId?.length);
-      console.log('Module: icesc_project_suggestions');
+      console.log('📋 Fetch parameters:', {
+        sessionId: sessionId ? `${sessionId.substring(0, 10)}...` : 'none',
+        contactId: contactId || 'none',
+        projectId: projectId || 'none'
+      });
       
-      // Fallback to the working approach: fetch all projects and filter by contact
-      // The get_relationships method is causing connection timeouts
-      console.log('CRM get_relationships method is causing timeouts, falling back to get_entries + filtering');
-      console.log('Contact ID for filtering:', contactId);
-      
-      if (!contactId && !projectId) {
-        console.log('No contact ID or project ID provided, returning empty array for security');
-        return NextResponse.json({
-          success: true,
-          count: 0,
-          contact_id: null,
-          project_id: null,
-          projects: [],
-          message: 'No contact ID or project ID provided'
+      // If project ID is provided, fetch single project using get_entry
+      if (projectId) {
+        console.log('⚡ Fetching single project by ID using get_entry');
+        
+        const response = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            method: 'get_entry',
+            input_type: 'JSON',
+            response_type: 'JSON',
+            rest_data: JSON.stringify({
+              session: sessionId,
+              module_name: 'icesc_project_suggestions',
+              id: projectId,
+              select_fields: [
+                'id',
+                'name',
+                'description',
+                'project_brief',
+                'problem_statement',
+                'rationale_impact',
+                'status_c',
+                'date_entered',
+                'date_modified',
+                'beneficiaries',
+                'beneficiaries_c',
+                'otherbeneficiary',
+                'documents_icesc_project_suggestions_1_name',
+                'document_c',
+                'date_start',
+                'date_end',
+                'project_frequency',
+                'currency_id',
+                'frequency_duration',
+                'partner1',
+                'partner2',
+                'partner3',
+                'partner4',
+                'partner5',
+                'delivery_modality',
+                'project_type',
+                'geographic_scope',
+                'convening_method',
+                'convening_method_other',
+                'expected_outputs',
+                'milestones1',
+                'milestones2',
+                'milestones3',
+                'milestones4',
+                'milestones5',
+                'kpis1',
+                'kpis2',
+                'kpis3',
+                'kpis4',
+                'kpis5',
+                'comments',
+                'budget_icesco',
+                'budget_member_state',
+                'budget_sponsorship',
+                'contact_name',
+                'contact_email',
+                'contact_phone',
+                'contact_role',
+                'strategic_goal',
+                'strategic_goal_id',
+                'pillar',
+                'pillar_id',
+                'service',
+                'service_id',
+                'ms_subservice_icesc_project_suggestions_1_name',
+                'ms_subservice_icesc_project_suggestions_1_id',
+                'ms_subservice_icesc_project_suggestions_1_code'
+              ],
+              link_name_to_fields_array: [
+                {
+                  name: 'contacts_icesc_project_suggestions_1',
+                  value: ['id', 'name', 'email']
+                },
+                {
+                  name: 'ms_subservice_icesc_project_suggestions_1',
+                  value: ['id', 'name', 'code', 'title']
+                }
+              ]
+            }),
+          }),
+          signal: AbortSignal.timeout(30000), // 30 second timeout
         });
+        
+        if (!response.ok) {
+          throw new Error(`CRM API returned status ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Single project response:', {
+          hasEntryList: !!data.entry_list,
+          hasId: !!data.id
+        });
+        
+        // get_entry returns a single object, not an array
+        if (data.id) {
+          projectEntries = [data]; // Wrap in array for consistent processing
+        } else if (data.entry_list) {
+          projectEntries = data.entry_list;
+        } else {
+          projectEntries = [];
+        }
       }
-      
-      projectEntries = await getModuleEntries(
-        sessionId,
-        'icesc_project_suggestions',
-        [
+      // Otherwise, fetch projects by contact ID using get_relationships
+      else if (contactId) {
+        console.log('⚡ Fetching projects by contact using get_relationships');
+        
+        const response = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            method: 'get_relationships',
+            input_type: 'JSON',
+            response_type: 'JSON',
+            rest_data: JSON.stringify({
+              session: sessionId,
+              module_name: 'Contacts',
+              module_id: contactId,
+              link_field_name: 'contacts_icesc_project_suggestions_1',
+              related_module_query: '',
+              related_fields: [
           'id',
           'name',
           'description',
           'project_brief',
           'problem_statement',
           'rationale_impact',
-          'strategic_goal',
-          'strategic_goal_id',
-          'pillar',
-          'pillar_id',
-          'service',
-          'service_id',
-          'subservices',
-          'subservices_name',
-          'subservice',
-          'subservice_name',
-          'subservice_id',
-          'subservice_code',
-          'ms_subservice_icesc_project_suggestions_1_name',
-          'ms_subservice_icesc_project_suggestions_1_id',
-          'ms_subservice_icesc_project_suggestions_1_code',
           'status_c',
           'date_entered',
           'date_modified',
-          'contact_name',
-          'contact_email',
-          'contact_phone',
-          'contact_role',
-          'budget_icesco',
-          'budget_member_state',
-          'budget_sponsorship',
+              'beneficiaries',
+              'beneficiaries_c',
+              'otherbeneficiary',
+              'documents_icesc_project_suggestions_1_name',
+              'document_c',
           'date_start',
           'date_end',
+              'project_frequency',
+              'currency_id',
           'frequency_duration',
-          'project_frequency',
-          'beneficiaries',
-          'beneficiaries_c',
-          'other_beneficiaries',
           'partner1',
           'partner2',
           'partner3',
           'partner4',
           'partner5',
           'delivery_modality',
+              'project_type',
           'geographic_scope',
-          'project_type',
+              'convening_method',
+              'convening_method_other',
+              'expected_outputs',
           'milestones1',
           'milestones2',
           'milestones3',
           'milestones4',
           'milestones5',
-          'expected_outputs',
           'kpis1',
           'kpis2',
           'kpis3',
           'kpis4',
           'kpis5',
           'comments',
-          'document_c',
-          'documents_icesc_project_suggestions_1_name',
-          'assigned_user_id',
-          'assigned_user_name',
-          'created_by',
-          'created_by_name',
-          'modified_user_id',
-          'modified_by_name'
-        ],
-        '', // No query filter
-        100, // Max 100 projects
-        [
-          {
-            name: 'contacts_icesc_project_suggestions_1',
-            value: ['id', 'name', 'email', 'phone']
-          }
-        ] // Include contact relationship data
-      );
+              'budget_icesco',
+              'budget_member_state',
+              'budget_sponsorship',
+              'contact_name',
+              'contact_email',
+              'contact_phone',
+              'contact_role',
+              'strategic_goal',
+              'strategic_goal_id',
+              'pillar',
+              'pillar_id',
+              'service',
+              'service_id',
+              'ms_subservice_icesc_project_suggestions_1_name',
+              'ms_subservice_icesc_project_suggestions_1_id',
+              'ms_subservice_icesc_project_suggestions_1_code'
+            ],
+            related_module_link_name_to_fields_array: [
+              {
+                name: 'ms_subservice_icesc_project_suggestions_1',
+                value: ['id', 'name', 'code', 'title']
+              }
+            ],
+            deleted: 0,
+            limit: 100
+          }),
+        }),
+        signal: AbortSignal.timeout(30000), // 30 second timeout
+        });
+        
+        if (!response.ok) {
+          throw new Error(`CRM API returned status ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Contact projects response:', {
+          hasEntryList: !!data.entry_list,
+          count: data.entry_list?.length || 0
+        });
+        
+        // Check if we got data
+        if (!data.entry_list || data.entry_list.length === 0) {
+          console.log('⚠️ No projects found for contact:', contactId);
+          return NextResponse.json({
+            success: true,
+            count: 0,
+            contact_id: contactId,
+            projects: [],
+            message: 'No projects found for this contact'
+          });
+        }
+        
+        projectEntries = data.entry_list || [];
+      }
     } catch (fetchError) {
       console.error('Failed to fetch project entries:', fetchError);
       
@@ -183,121 +296,23 @@ export async function GET(request: NextRequest) {
       throw fetchError;
     }
     
-    console.log('Projects fetched successfully from CRM:', projectEntries.length);
-    console.log('Sample project:', projectEntries[0] ? {
-      id: projectEntries[0].id,
-      name: projectEntries[0].name,
-      status: projectEntries[0].status
-    } : 'No projects found');
+    console.log('✅ Projects fetched successfully:', projectEntries.length);
     
-        // LOG ALL PROJECTS WITH ALL RELATIONSHIP DATA
-        console.log('=== COMPREHENSIVE PROJECT DATA LOG ===');
-        projectEntries.forEach((entry: any, index: number) => {
-          console.log(`\n--- PROJECT ${index + 1}: ${entry.id} ---`);
-          console.log('Project Name:', entry.name);
-          console.log('Project Status:', entry.status_c);
-          console.log('Created By:', entry.created_by);
-          console.log('Created By Name:', entry.created_by_name);
-          
-          // Log relationship data instead of form fields
-          console.log('--- RELATIONSHIP DATA ---');
-          if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
-            entry.link_list.contacts_icesc_project_suggestions_1.forEach((contact: any, contactIndex: number) => {
-              console.log(`  Contact ${contactIndex + 1}:`);
-              console.log(`    ID: ${contact.id?.value || contact.id}`);
-              console.log(`    Name: ${contact.name?.value || contact.name}`);
-              console.log(`    Email: ${contact.email?.value || contact.email}`);
-            });
-          } else {
-            console.log('  No relationship data found');
-          }
-      
-      // Log all available fields
-      console.log('All Project Fields:');
-      Object.keys(entry).forEach(key => {
-        if (key !== 'name_value_list' && key !== 'link_list') {
-          console.log(`  ${key}:`, entry[key]);
-        }
-      });
-      
-      // Log name_value_list if it exists
-      if (entry.name_value_list) {
-        console.log('Name Value List:');
-        Object.values(entry.name_value_list).forEach((field: any) => {
-          console.log(`  ${field.name}:`, field.value);
-        });
+    // Helper function to extract value from name_value_list format
+    const getValue = (entry: any, fieldName: string): any => {
+      if (entry.name_value_list && entry.name_value_list[fieldName]) {
+        return entry.name_value_list[fieldName].value || entry.name_value_list[fieldName];
       }
+      return entry[fieldName] || '';
+    };
+    
+    // Process projects and extract subservice data
+    const processedProjects = projectEntries.map((entry: any) => {
+      console.log(`\n🔍 Processing project ${entry.id}:`);
+      console.log('  Name from name_value_list:', getValue(entry, 'name'));
+      console.log('  Status:', getValue(entry, 'status_c'));
       
-      // Log link_list if it exists
-      if (entry.link_list) {
-        console.log('Link List:');
-        Object.keys(entry.link_list).forEach(linkName => {
-          console.log(`  ${linkName}:`, entry.link_list[linkName]);
-        });
-      } else {
-        console.log('No link_list found for this project');
-      }
-    });
-    
-    // LOG RELATIONSHIP DATA
-    console.log('\n=== RELATIONSHIP DATA LOG ===');
-    if (projectEntries.length > 0 && projectEntries[0].link_list && projectEntries[0].link_list.contacts_icesc_project_suggestions_1) {
-      const contactData = projectEntries[0].link_list.contacts_icesc_project_suggestions_1;
-      console.log('Relationship Data Found:');
-      contactData.forEach((contact: any, index: number) => {
-        console.log(`  Contact ${index + 1}:`);
-        console.log(`    ID: ${contact.id}`);
-        console.log(`    Name: ${contact.name?.value || contact.name}`);
-        console.log(`    Email: ${contact.email?.value || contact.email}`);
-        console.log(`    Phone: ${contact.phone?.value || contact.phone}`);
-      });
-    } else {
-      console.log('No relationship data found in projects');
-    }
-    
-    // Fetch subservice relationships for each project with retry logic
-    const projectsWithSubservices = await Promise.allSettled(
-      projectEntries.map(async (entry: any) => {
-        const maxRetries = 3;
-        let lastError = null;
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            console.log(`Attempt ${attempt}/${maxRetries} for project ${entry.id}`);
-            
-            // Fetch subservice relationship for this project with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-          
-            const subserviceResponse = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: new URLSearchParams({
-                method: 'get_relationships',
-                input_type: 'JSON',
-                response_type: 'JSON',
-                rest_data: JSON.stringify({
-                  session: sessionId,
-                  module_name: 'icesc_project_suggestions',
-                  module_id: entry.id,
-                  link_field_name: 'ms_subservice_icesc_project_suggestions_1',
-                  related_module_query: '',
-                  related_fields: ['id', 'name', 'code', 'title'],
-                  related_module_link_name_to_fields_array: [],
-                  deleted: 0
-                }),
-              }),
-              signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-
-            const subserviceData = await subserviceResponse.json();
-            console.log(`Subservice data for project ${entry.id} (attempt ${attempt}):`, subserviceData);
-
-            // Extract subservice information
+      // Extract subservice data from link_list
             let subserviceInfo = {
               sub_service: '',
               sub_service_id: '',
@@ -305,186 +320,126 @@ export async function GET(request: NextRequest) {
               subservice_name: ''
             };
 
-            if (subserviceData.entry_list && subserviceData.entry_list.length > 0) {
-              const subservice = subserviceData.entry_list[0];
-              subserviceInfo = {
-                sub_service: subservice.name_value_list?.name?.value || subservice.name || subservice.code || subservice.title || '',
-                sub_service_id: subservice.name_value_list?.id?.value || subservice.id || '',
-                subservice_code: subservice.name_value_list?.code?.value || subservice.code || subservice.name || '',
-                subservice_name: subservice.name_value_list?.name?.value || subservice.name || subservice.title || ''
-              };
-              console.log(`✅ Found subservice for project ${entry.id} (attempt ${attempt}):`, subserviceInfo);
-              
-              // Success! Return the data
-              return {
-                ...entry,
-                ...subserviceInfo
-              };
-            } else {
-              console.log(`❌ No subservice found for project ${entry.id} (attempt ${attempt}) - entry_list:`, subserviceData.entry_list);
-              
-              // Try to get subservice data from direct fields as fallback
-              const directSubserviceId = entry.ms_subservice_icesc_project_suggestions_1_id;
-              const directSubserviceName = entry.ms_subservice_icesc_project_suggestions_1_name;
-              
-              if (directSubserviceId || directSubserviceName) {
-                console.log(`🔄 Using direct fields as fallback for project ${entry.id} (attempt ${attempt}):`, {
-                  directSubserviceId,
-                  directSubserviceName
-                });
-                
-                subserviceInfo = {
-                  sub_service: directSubserviceName || '',
-                  sub_service_id: directSubserviceId || '',
-                  subservice_code: directSubserviceName || '',
-                  subservice_name: directSubserviceName || ''
-                };
-                
-                // Success with fallback! Return the data
-                return {
-                  ...entry,
-                  ...subserviceInfo
-                };
-              }
-            }
-            
-            // If we get here, no subservice was found, but no error occurred
-            // Continue to next attempt if we have retries left
-            if (attempt < maxRetries) {
-              console.log(`⏳ No subservice found, retrying... (${attempt}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
-              continue;
-            }
-            
-            // All attempts failed, return empty data
-            console.log(`❌ All attempts failed for project ${entry.id}, returning empty subservice data`);
-            return {
-              ...entry,
-              sub_service: '',
-              sub_service_id: '',
-              subservice_code: '',
-              subservice_name: ''
-            };
-            
-          } catch (error) {
-            lastError = error;
-            console.error(`❌ Error fetching subservice for project ${entry.id} (attempt ${attempt}):`, error);
-            console.error(`Error details:`, {
-              name: error instanceof Error ? error.name : 'Unknown',
-              message: error instanceof Error ? error.message : String(error),
-              cause: error instanceof Error ? error.cause : undefined
-            });
-            
-            // If this is not the last attempt, wait and retry
-            if (attempt < maxRetries) {
-              console.log(`⏳ Error occurred, retrying... (${attempt}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
-              continue;
-            }
-            
-            // All attempts failed, return empty data
-            console.error(`❌ All attempts failed for project ${entry.id}, returning empty subservice data`);
-            return {
-              ...entry,
-              sub_service: '',
-              sub_service_id: '',
-              subservice_code: '',
-              subservice_name: ''
-            };
-          }
-        }
-      })
-    );
-
-    // Process the results from Promise.allSettled
-    const processedProjects = projectsWithSubservices.map((result, index) => {
-      if (result.status === 'fulfilled') {
-        return result.value;
-      } else {
-        console.error(`❌ Project ${projectEntries[index].id} failed:`, result.reason);
-        return {
-          ...projectEntries[index],
-          sub_service: '',
-          sub_service_id: '',
-          subservice_code: '',
-          subservice_name: ''
-        };
-      }
-    });
-
-    // Filter projects by contact ID or fetch specific project
-    let filteredProjects = processedProjects;
-    console.log('🔍 Debug - contactId:', contactId, 'projectId:', projectId);
-    
-    if (contactId) {
-      console.log(`Filtering ${processedProjects.length} projects by contact ID: ${contactId}`);
-      
-      // Filter projects based on the contact ID in relationships
-      filteredProjects = processedProjects.filter((entry: any) => {
-        console.log(`\n--- CHECKING PROJECT: ${entry.id} ---`);
-        console.log(`Project Name: "${entry.name}"`);
-        console.log(`Created By: "${entry.created_by}"`);
-        console.log(`Contact Name: "${entry.contacts_icesc_project_suggestions_1_name}"`);
-        
-        // Check if the project was created by the contact
-        if (entry.created_by === contactId) {
-          console.log(`✅ CREATED BY MATCH: Project ${entry.id} was created by contact ${contactId}`);
-          return true;
-        }
-        
-        // Check if the contact ID appears in the relationship data
-        if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
-          const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
-          for (const contact of contactData) {
-            const contactIdFromRel = contact.id?.value || contact.id;
-            const contactName = contact.name?.value || contact.name;
-            
-            console.log(`  - Checking relationship contact: ${contactName} (ID: ${contactIdFromRel})`);
-            
-            if (contactIdFromRel === contactId) {
-              console.log(`✅ RELATIONSHIP MATCH: Project ${entry.id} has relationship with contact ${contactId}`);
-              return true;
-            }
-          }
-        }
-        
-        console.log(`❌ NO MATCH: Project ${entry.id} does not belong to contact ${contactId}`);
-        return false;
+      // Log the full entry structure for debugging
+      console.log(`  🔍 Entry structure:`, {
+        hasNameValueList: !!entry.name_value_list,
+        hasLinkList: !!entry.link_list,
+        linkListKeys: entry.link_list ? Object.keys(entry.link_list) : []
       });
       
-      console.log(`Filtered to ${filteredProjects.length} projects for contact ${contactId}`);
+      if (entry.link_list && entry.link_list.ms_subservice_icesc_project_suggestions_1) {
+        const subserviceData = entry.link_list.ms_subservice_icesc_project_suggestions_1;
+        console.log(`  📋 Subservice relationship found! Count:`, subserviceData.length);
+        console.log(`  📋 Full subservice data:`, JSON.stringify(subserviceData, null, 2).substring(0, 500));
+        
+        if (subserviceData.length > 0) {
+          const subservice = subserviceData[0];
+          console.log(`  📋 First subservice object:`, subservice);
+          
+          // The relationship data comes as an array of objects with link_value
+          // Structure: [{ link_value: { id: {...}, name: {...}, code: {...} } }]
+          
+          const extractValue = (field: any): string => {
+            if (!field) return '';
+            if (typeof field === 'string') return field;
+            // Check for link_value structure
+            if (field.link_value) {
+              if (typeof field.link_value === 'string') return field.link_value;
+              if (field.link_value.value) return field.link_value.value;
+            }
+            if (field.value) return field.value;
+            if (field.name && field.value !== undefined) return field.value;
+            return '';
+          };
+          
+          // Check if it's in link_value format
+          const linkValue = subservice.link_value || subservice;
+          
+          const subId = extractValue(linkValue.id) || (linkValue.id?.value) || '';
+          const subName = extractValue(linkValue.name) || (linkValue.name?.value) || extractValue(linkValue.title) || (linkValue.title?.value) || '';
+          const subCode = extractValue(linkValue.code) || (linkValue.code?.value) || '';
+          
+          subserviceInfo = {
+            sub_service: subName || subCode || '',
+            sub_service_id: subId || '',
+            subservice_code: subCode || subName || '',
+            subservice_name: subName || subCode || ''
+          };
+          
+          console.log(`  ✅ Extracted subservice:`, {
+            id: subId || '(none)',
+            name: subName || '(none)',
+            code: subCode || '(none)',
+            fullObject: subserviceInfo
+          });
+        } else {
+          console.log(`  ⚠️ Empty subservice array in link_list`);
+        }
+      } else {
+        console.log(`  ⚠️ No link_list, using direct fields`);
+        
+        // Get from direct fields - these contain the subservice code (like "1.1.3.1")
+        const directCode = getValue(entry, 'ms_subservice_icesc_project_suggestions_1_name');
+        const directId = getValue(entry, 'ms_subservice_icesc_project_suggestions_1_id');
+        const directCodeValue = getValue(entry, 'ms_subservice_icesc_project_suggestions_1_code');
+        
+        console.log(`  🔍 Direct fields:`, {
+          name: directCode,
+          id: directId,
+          code: directCodeValue
+        });
+        
+        // Check if we have a valid code (format: X.X.X.X)
+        const codeValue = (directCodeValue && directCodeValue.trim()) || (directCode && directCode.trim());
+        
+        if (codeValue && /^\d+\.\d+\.\d+\.\d+$/.test(codeValue)) {
+          // We have a valid subservice code!
+          subserviceInfo = {
+            sub_service: codeValue,  // Use the code as the name (will be looked up by hierarchy)
+            sub_service_id: directId || codeValue, // Use ID if available, otherwise use code
+            subservice_code: codeValue,
+            subservice_name: codeValue
+          };
+          console.log(`  ✅ Valid subservice code found:`, codeValue);
+        } else if (codeValue) {
+          // We have some value but it's not in the expected format
+          subserviceInfo = {
+            sub_service: codeValue,
+            sub_service_id: directId || '',
+            subservice_code: codeValue,
+            subservice_name: codeValue
+          };
+          console.log(`  ⚠️ Subservice value found but format unexpected:`, codeValue);
+        } else {
+          console.log(`  ❌ No subservice data found`);
+        }
+      }
       
-      // If no projects found, return empty array (security: don't show other users' projects)
-      if (filteredProjects.length === 0) {
-        console.log('⚠️ No projects found for contact ID, returning empty array for security');
-        return NextResponse.json({
-          success: true,
-          count: 0,
-          contact_id: contactId,
-          projects: [],
-          message: 'No projects found for this contact'
+      // Flatten the name_value_list structure for easier access
+      const flattenedEntry: any = { id: entry.id };
+      
+      if (entry.name_value_list) {
+        Object.keys(entry.name_value_list).forEach(key => {
+          const field = entry.name_value_list[key];
+          flattenedEntry[key] = field.value !== undefined ? field.value : field;
         });
       }
-    } else if (projectId) {
-      // If project ID provided, fetch specific project
-      console.log(`🔍 Fetching specific project: ${projectId}`);
-      console.log(`📊 Available projects: ${processedProjects.length}`);
-      console.log(`📋 Project IDs: ${processedProjects.map(p => p.id).join(', ')}`);
       
-      // Find the specific project by ID
-      const specificProject = processedProjects.find((p: any) => p.id === projectId);
-      if (specificProject) {
-        filteredProjects = [specificProject];
-        console.log(`✅ Found specific project: ${specificProject.name}`);
-      } else {
-        console.log(`❌ Project ${projectId} not found in ${processedProjects.length} available projects`);
-        filteredProjects = [];
+      // Preserve link_list
+      if (entry.link_list) {
+        flattenedEntry.link_list = entry.link_list;
       }
-    } else {
-      console.log('No contact ID or project ID provided, returning empty array for security');
-      console.log('Debug - contactId:', contactId, 'projectId:', projectId);
-      filteredProjects = [];
-    }
+      
+      return {
+        ...flattenedEntry,
+        ...subserviceInfo
+      };
+    });
+    
+    console.log(`📊 Final project count: ${processedProjects.length} for contact ${contactId}`);
+    
+    // No filtering needed - get_relationships already returned only this contact's projects
+    const filteredProjects = processedProjects;
 
     // Transform the data (subservice data is already fetched above)
     const transformedProjects = filteredProjects.map((entry: any) => {
@@ -517,29 +472,8 @@ export async function GET(request: NextRequest) {
         date_entered: entry.date_entered || '',
         date_modified: entry.date_modified || '',
         
-        // Contact information - include both form fields and relationship data
-        contact_id: (() => {
-          // Check for contact relationship data in link_list first
-          if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
-            const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
-            if (contactData.length > 0) {
-              const contactRecord = contactData[0];
-              // The contact data structure has id as { name: 'id', value: 'actual-id' }
-              if (contactRecord.id && contactRecord.id.value) {
-                return contactRecord.id.value;
-              } else if (contactRecord.id) {
-                return contactRecord.id;
-              }
-            }
-          }
-          
-          // Fallback to other contact fields
-          const hasValidContactRelationship = entry.contacts_icesc_project_suggestions_1 && 
-                                            entry.contacts_icesc_project_suggestions_1.trim() !== '';
-          return hasValidContactRelationship ? 
-                 entry.contacts_icesc_project_suggestions_1 : 
-                 entry.created_by || '';
-        })(),
+        // Contact information - since we used get_relationships, the contact_id is the one we queried with
+        contact_id: contactId || entry.created_by || '',
         
         // Contact form fields for display
         contact_name: entry.contact_name || '',

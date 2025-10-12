@@ -18,6 +18,7 @@ import {
   getSubServiceTitleFromCode
 } from '@/utils/codeMapping';
 import { useProjectSubmission } from '@/hooks/useProjectSubmission';
+import { useHierarchyCache } from '@/hooks/useHierarchyCache';
 
 // Union type for both project types
 type AnyProject = {
@@ -117,7 +118,91 @@ const ProjectDetailsPage = () => {
   // Use project submission hook for draft functionality
   const { saveAsDraft } = useProjectSubmission();
 
-  // Helper function to delay execution
+  // Get hierarchy data using the subservice code
+  const subserviceCode = project?.sub_service || project?.sub_service_id || null;
+  const { hierarchy, loading: hierarchyLoading, error: hierarchyError } = useHierarchyCache(subserviceCode);
+  
+  console.log('🔍 Project hierarchy data:', {
+    subserviceCode,
+    hasHierarchy: !!hierarchy,
+    hierarchyLoading,
+    hierarchyError
+  });
+
+  // Fetch project data on mount
+  useEffect(() => {
+    const fetchProject = async () => {
+      const projectId = params.id as string;
+      
+      if (!projectId) {
+        setError('No project ID provided');
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Get session ID and contact ID from localStorage
+        const sessionId = localStorage.getItem('session_id');
+        const contactInfo = localStorage.getItem('contactInfo');
+        const contactId = contactInfo ? JSON.parse(contactInfo).id : null;
+        
+        console.log('📋 Fetching project details:', {
+          projectId,
+          sessionId: sessionId ? `${sessionId.substring(0, 10)}...` : 'none',
+          contactId: contactId || 'none'
+        });
+        
+        if (!sessionId) {
+          setError('Please log in again');
+          setLoading(false);
+          return;
+        }
+        
+        // Build URL with project ID and session ID
+        const params = new URLSearchParams();
+        params.append('project_id', projectId);
+        params.append('session_id', sessionId);
+        if (contactId) params.append('contact_id', contactId);
+        
+        const url = `/api/crm/projects?${params.toString()}`;
+        
+        console.log('📤 Fetching from:', url.replace(sessionId, sessionId.substring(0, 10) + '...'));
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        console.log('📥 Response:', {
+          success: data.success,
+          count: data.count,
+          hasProjects: data.projects?.length > 0
+        });
+        
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to fetch project');
+        }
+        
+        if (data.projects && data.projects.length > 0) {
+          const projectData = data.projects[0];
+          console.log('✅ Project loaded:', projectData.name);
+          setProject(projectData);
+        } else {
+          setError('Project not found');
+        }
+      } catch (err) {
+        console.error('❌ Error fetching project:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load project');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProject();
+  }, [params.id]);
+
+    // Helper function to delay execution
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   // Function to parse documents from CRM fields
@@ -2706,10 +2791,10 @@ const ProjectDetailsPage = () => {
                   </h2>
                 </div>
                 <div className="p-6 space-y-6">
-                  {hierarchyData ? (
+                  {hierarchy ? (
                     <>
                       {/* Goal */}
-                      {hierarchyData.goal.code && (
+                      {hierarchy.goal.code && (
                     <div className="group relative overflow-hidden rounded-xl border border-blue-200/60 bg-gradient-to-r from-blue-50 to-blue-100/50 p-4 hover:shadow-md transition-all duration-200">
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
@@ -2719,11 +2804,11 @@ const ProjectDetailsPage = () => {
                           <div className="flex items-center space-x-2 mb-2">
                             <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide mx-2">{t('goal')}</span>
                             <span className="text-xs font-mono font-bold text-blue-800 bg-blue-200 px-2 py-0.5 rounded">
-                              {hierarchyData.goal.code}
+                              {hierarchy.goal.code}
                             </span>
                           </div>
                           <p className="text-xs text-blue-700 leading-relaxed font-medium">
-                            {hierarchyData.goal.title}
+                            {hierarchy.goal.title[currentLanguage as keyof typeof hierarchy.goal.title] || hierarchy.goal.title.en}
                           </p>
                         </div>
                       </div>
@@ -2731,7 +2816,7 @@ const ProjectDetailsPage = () => {
                   )}
 
                   {/* Pillar */}
-                  {hierarchyData.pillar.code && (
+                  {hierarchy.pillar.code && (
                     <div className="group relative overflow-hidden rounded-xl border border-emerald-200/60 bg-gradient-to-r from-emerald-50 to-emerald-100/50 p-4 hover:shadow-md transition-all duration-200">
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
@@ -2741,11 +2826,11 @@ const ProjectDetailsPage = () => {
                           <div className="flex items-center space-x-2 mb-2">
                             <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mx-2">{t('pillar')}</span>
                             <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-200 px-2 py-0.5 rounded">
-                              {hierarchyData.pillar.code}
+                              {hierarchy.pillar.code}
                             </span>
                           </div>
                           <p className="text-xs text-emerald-700 leading-relaxed font-medium">
-                            {hierarchyData.pillar.title}
+                            {hierarchy.pillar.title[currentLanguage as keyof typeof hierarchy.pillar.title] || hierarchy.pillar.title.en}
                           </p>
                         </div>
                       </div>
@@ -2753,7 +2838,7 @@ const ProjectDetailsPage = () => {
                   )}
 
                   {/* Service */}
-                  {hierarchyData.service.code && (
+                  {hierarchy.service.code && (
                     <div className="group relative overflow-hidden rounded-xl border border-violet-200/60 bg-gradient-to-r from-violet-50 to-violet-100/50 p-4 hover:shadow-md transition-all duration-200">
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-violet-500 flex items-center justify-center">
@@ -2763,11 +2848,15 @@ const ProjectDetailsPage = () => {
                           <div className="flex items-center space-x-2 mb-2">
                             <span className="text-xs font-semibold text-violet-600 uppercase tracking-wide mx-2">{t('service')}</span>
                             <span className="text-xs font-mono font-bold text-violet-800 bg-violet-200 px-2 py-0.5 rounded">
-                              {hierarchyData.service.code}
+                              {hierarchy.service.code}
                             </span>
                           </div>
                           <p className="text-xs text-violet-700 leading-relaxed font-medium">
-                            {hierarchyData.service.title}
+                            {currentLanguage === 'ar' 
+                              ? hierarchy.service.name_service_ar_c 
+                              : currentLanguage === 'fr' 
+                              ? hierarchy.service.name_service_fr_c 
+                              : hierarchy.service.description_service}
                           </p>
                         </div>
                       </div>
@@ -2775,7 +2864,7 @@ const ProjectDetailsPage = () => {
                   )}
 
                   {/* Subservice */}
-                  {hierarchyData.subservice.code && (
+                  {hierarchy.subservice.name && (
                     <div className="group relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-r from-amber-50 to-amber-100/50 p-4 hover:shadow-md transition-all duration-200">
                       <div className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
@@ -2785,11 +2874,15 @@ const ProjectDetailsPage = () => {
                           <div className="flex items-center space-x-2 mb-2">
                             <span className="text-xs font-semibold text-amber-600 mx-2 uppercase tracking-wide">{t('subService')}</span>
                             <span className="text-xs font-mono font-bold text-amber-800 bg-amber-200 px-2 py-0.5 rounded">
-                              {hierarchyData.subservice.code}
+                              {hierarchy.subservice.name}
                             </span>
                           </div>
                           <p className="text-xs text-amber-700 leading-relaxed font-medium">
-                            {hierarchyData.subservice.title}
+                            {currentLanguage === 'ar' 
+                              ? hierarchy.subservice.name_ar_c 
+                              : currentLanguage === 'fr' 
+                              ? hierarchy.subservice.name_fr_c 
+                              : hierarchy.subservice.description_subservice}
                           </p>
                         </div>
                       </div>

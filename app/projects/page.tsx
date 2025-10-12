@@ -3,69 +3,23 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Calendar, 
   User, 
   Mail, 
   Phone, 
-  MapPin, 
-  Clock, 
-  DollarSign, 
-  FileText, 
-  Trash2, 
-  Eye,
-  Edit,
-  Users,
-  Target,
+  FileText,
   Building,
-  Globe,
-  CheckCircle,
   AlertCircle
 } from 'lucide-react';
 // Removed local storage imports - only using CRM projects
 import ProjectsPageHeader from '@/components/ProjectsPageHeader';
 import { useRouter } from 'next/navigation';
-import { goals as goalsData } from '@/Data/goals/data';
-import { pillarsByGoal, servicesByPillar, subServicesByService } from '@/Data/index';
 import { useContactProjects, CRMProject } from '@/hooks/useContactProjects';
-import { useProjectHierarchy } from '@/hooks/useProjectHierarchy';
-import { ProjectHierarchyBadges } from '@/components/ProjectHierarchyBadges';
 import { ProjectCard } from '@/components/ProjectCard';
-import { 
-  getGoalCodeFromSubserviceId, 
-  getPillarCodeFromSubserviceId, 
-  getServiceCodeFromSubserviceId, 
-  getSubServiceCodeFromId,
-  getSubServiceCodeFromName,
-  getSubServiceCodeFromProject,
-  getGoalTitleFromCode,
-  getPillarTitleFromCode,
-  getServiceTitleFromCode,
-  getSubServiceTitleFromCode
-} from '@/utils/codeMapping';
+
 
 // Only using CRM projects now
 type AnyProject = CRMProject;
 
-// Tooltip component
-const Tooltip = ({ children, content, className = "" }: { children: React.ReactNode; content: string | any; className?: string }) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  return (
-    <div 
-      className={`relative inline-block ${className}`}
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-    >
-      {children}
-      {isVisible && content && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-40 max-w-xl whitespace-normal break-words leading-relaxed">
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-          {content}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const ProjectsPage = () => {
   const { t, i18n } = useTranslation('common');
@@ -101,7 +55,6 @@ const ProjectsPage = () => {
   useEffect(() => {
     let filtered = [...crmProjects];
 
-
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(project =>
@@ -110,7 +63,6 @@ const ProjectsPage = () => {
         project.brief?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-
     // Status filter based on project status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(project => {
@@ -124,43 +76,24 @@ const ProjectsPage = () => {
         }
         return true;
       });
-    }
-
-    
+    } 
     setFilteredProjects(filtered);
     setCurrentPage(1); // Reset to first page when filters change
   }, [crmProjects, searchTerm, statusFilter]);
 
-  // CRM projects are read-only, no delete functionality
-  const handleDeleteProject = (projectId: string) => {
-    // CRM projects cannot be deleted from the frontend
-    alert(t('crmProjectsReadOnly') || 'CRM projects are read-only and cannot be deleted from this interface.');
-  };
-
-  const handleViewProject = (project: AnyProject) => {
-    setSelectedProject(project);
-    setShowModal(true);
-  };
-
   const handleCardClick = (project: AnyProject) => {
-    console.log('Card clicked:', project);
-    console.log('Project ID:', project.id);
-    console.log('Project ID type:', typeof project.id);
+   
     
     if (!project.id) {
-      console.error('Project ID is missing!');
       return;
     }
     
     const projectUrl = `/projects/${project.id}`;
-    console.log('Navigating to:', projectUrl);
     
-    // Use push for navigation
     router.push(projectUrl);
   };
 
   const handleCardHover = (project: AnyProject) => {
-    // Prefetch the route on hover for faster navigation
     router.prefetch(`/projects/${project.id}`);
   };
 
@@ -184,163 +117,6 @@ const ProjectsPage = () => {
     return new Date(dateString).toLocaleDateString(currentLanguage === 'en-US' ? 'ar-SA' : currentLanguage === 'fr' ? 'fr-FR' : 'en-US');
   };
 
-  const getStatusColor = (project: AnyProject) => {
-    // Status logic based on project status field
-    const projectStatus = project.status || 'Draft';
-    
-    if (projectStatus === 'Draft') {
-      return 'bg-yellow-100 text-yellow-800';
-    }
-    return 'bg-green-100 text-green-800'; // Default to published
-  };
-
-  const getStatusText = (project: AnyProject) => {
-    // Status text based on project status field
-    const projectStatus = project.status || 'Draft';
-    
-    if (projectStatus === 'Draft') {
-      return t('drafted');
-    }
-    return t('published'); // Default to published
-  };
-
-  // Helper function to get code from title or return the value as is
-  const getCode = (value: string | any) => {
-    if (typeof value === 'string') {
-      // If it's already a code (like "1.1", "2.3"), return it
-      if (/^\d+\.\d+$/.test(value)) {
-        return value;
-      }
-      // If it's a title, try to extract code or return as is
-      return value;
-    }
-    if (typeof value === 'object' && value !== null) {
-      // If it's a multilingual object, return the first available value
-      const currentLang = currentLanguage as 'en' | 'fr' | 'ar';
-      const titleValue = value[currentLang] || value.en || value;
-      return titleValue;
-    }
-    return value || '';
-  };
-
-  // Helper function to get title from value (for tooltips)
-  const getTitle = (value: string | any) => {
-    if (typeof value === 'string') {
-      return value;
-    }
-    if (typeof value === 'object' && value !== null) {
-      const currentLang = currentLanguage as 'en' | 'fr' | 'ar';
-      return value[currentLang] || value.en || value;
-    }
-    return value || '';
-  };
-
-  // Helper functions to get titles from codes
-  const getGoalTitle = (code: string | any) => {
-    const codeStr = typeof code === 'string' ? code : '';
-    const goal = goalsData.find(g => g.code === codeStr);
-    if (goal) {
-      const currentLang = currentLanguage as 'en' | 'fr' | 'ar';
-      return goal.title[currentLang] || goal.title.en || goal.title;
-    }
-    return codeStr;
-  };
-
-  const getPillarTitle = (code: string) => {
-    // Find the goal first, then find the pillar
-    for (const goalCode in pillarsByGoal) {
-      const pillars = pillarsByGoal[goalCode];
-      const pillar = pillars.find(p => p.id === code);
-      if (pillar) {
-        return pillar.title;
-      }
-    }
-    return code;
-  };
-
-  const getServiceTitle = (code: string) => {
-    // Find the pillar first, then find the service
-    for (const pillarCode in servicesByPillar) {
-      const services = servicesByPillar[pillarCode];
-      const service = services.find(s => s.id === code);
-      if (service) {
-        return service.title;
-      }
-    }
-    return code;
-  };
-
-  const getSubServiceTitle = (code: string) => {
-    // Find the service first, then find the sub-service
-    for (const serviceCode in subServicesByService) {
-      const subServices = subServicesByService[serviceCode];
-      const subService = subServices.find(s => s.id === code);
-      if (subService) {
-        return subService.title;
-      }
-    }
-    return code;
-  };
-
-  // Helper function to translate frequency values
-  const getTranslatedFrequency = (frequency: string) => {
-    switch (frequency) {
-      case 'Onetime':
-        return t('frequencyOneTime');
-      case 'Continuous':
-        return t('frequencyContinuous');
-      default:
-        return frequency; // Return as-is if no translation found
-    }
-  };
-
-  // Helper function to translate delivery modality values
-  const getTranslatedDeliveryModality = (modality: string) => {
-    if (!modality) return modality;
-    
-    // Normalize to handle case-insensitive matching
-    const normalizedModality = modality.charAt(0).toUpperCase() + modality.slice(1).toLowerCase();
-    
-    switch (normalizedModality) {
-      case 'Physical':
-        return t('modalityPhysical');
-      case 'Virtual':
-        return t('modalityVirtual');
-      case 'Hybrid':
-        return t('hybrid');
-      case 'Online':
-        return t('online');
-      case 'Offline':
-        return t('offline');
-      case 'In-person':
-        return t('inPerson');
-      default:
-        return modality; // Return as-is if no translation found
-    }
-  };
-
-  // Helper function to translate geographic scope values
-  const getTranslatedGeographicScope = (scope: string) => {
-    if (!scope) return scope;
-    
-    // Normalize to handle case-insensitive matching
-    const normalizedScope = scope.charAt(0).toUpperCase() + scope.slice(1).toLowerCase();
-    
-    switch (normalizedScope) {
-      case 'Local':
-        return t('local');
-      case 'National':
-        return t('scopeNational');
-      case 'Regional':
-        return t('scopeRegional');
-      case 'International':
-        return t('scopeInternational');
-      case 'Global':
-        return t('global');
-      default:
-        return scope; // Return as-is if no translation found
-    }
-  };
 
   // Loading component for project cards
   const LoadingCard = () => (

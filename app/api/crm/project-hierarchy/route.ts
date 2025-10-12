@@ -9,26 +9,31 @@ import { goals } from '@/Data/goals/data';
 function findSubserviceHierarchy(subserviceId: string) {
   try {
     console.log('=== Finding subservice hierarchy ===');
-    console.log('Looking for subservice ID:', subserviceId);
+    console.log('Looking for subservice ID or code:', subserviceId);
     console.log('ServiceSubservicesData keys:', Object.keys(serviceSubservicesData).length);
     
     // Step 1: Find the subservice in serviceSubservicesData
+    // Search by both ID (UUID) and name (code like "1.1.3.1")
     let subservice = null;
     let serviceId = null;
     
     for (const [serviceIdKey, subservices] of Object.entries(serviceSubservicesData)) {
-      const foundSubservice = subservices.find(sub => sub.id === subserviceId);
+      const foundSubservice = subservices.find(sub => 
+        sub.id === subserviceId || sub.name === subserviceId  // ✅ Search by ID OR name
+      );
       if (foundSubservice) {
         subservice = foundSubservice;
         serviceId = serviceIdKey;
-        console.log('✅ Found subservice:', subservice);
+        console.log('✅ Found subservice by', foundSubservice.id === subserviceId ? 'ID' : 'code');
+        console.log('Subservice:', subservice);
         console.log('Service ID:', serviceId);
         break;
       }
     }
     
     if (!subservice || !serviceId) {
-      console.log('❌ Subservice not found');
+      console.log('❌ Subservice not found with ID/code:', subserviceId);
+      console.log('Tried searching by both UUID and code format');
       return null;
     }
     

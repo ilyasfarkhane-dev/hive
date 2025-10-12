@@ -104,25 +104,45 @@ export function useContactProjects(): UseContactProjectsReturn {
           if (contactInfo) {
             const parsedContact = JSON.parse(contactInfo);
             contactId = parsedContact.id;
-            console.log('Contact ID from localStorage:', contactId);
+            console.log('✅ Contact ID from localStorage:', contactId);
           } else {
-            console.log('No contactInfo found in localStorage');
+            console.log('⚠️ No contactInfo found in localStorage');
           }
         } catch (error) {
           console.error('Error parsing contactInfo from localStorage:', error);
         }
         
-        // Add a small delay on first attempt to allow serverless function to warm up
-        if (attempt === 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        // Get session ID from localStorage
+        let sessionId = null;
+        try {
+          sessionId = localStorage.getItem('session_id');
+          console.log('✅ Session ID from localStorage:', sessionId ? `${sessionId.substring(0, 10)}...` : 'not found');
+        } catch (error) {
+          console.error('Error getting session_id from localStorage:', error);
         }
         
-        // Build URL with contact ID parameter
-        const url = contactId 
-          ? `/api/crm/projects?contact_id=${encodeURIComponent(contactId)}`
-          : '/api/crm/projects';
+        // Validate session ID
+        if (!sessionId) {
+          console.error('❌ No session ID found in localStorage - user needs to log in');
+          setError('Please log in again');
+          setErrorType('AUTH_ERROR');
+          setProjects([]);
+          setLoading(false);
+          return;
+        }
         
-        console.log('Fetching projects from URL:', url);
+        // Build URL with contact ID and session ID parameters
+        const params = new URLSearchParams();
+        if (contactId) params.append('contact_id', contactId);
+        if (sessionId) params.append('session_id', sessionId);
+        
+        const url = `/api/crm/projects?${params.toString()}`;
+        
+        console.log('📤 Fetching projects from URL:', url.replace(sessionId || '', sessionId ? sessionId.substring(0, 10) + '...' : ''));
+        console.log('📋 Request will include:', {
+          contactId: contactId || 'none',
+          sessionId: sessionId ? 'included' : 'missing'
+        });
         
         // Fetch projects from our API route (which handles CORS)
         const response = await fetch(url, {

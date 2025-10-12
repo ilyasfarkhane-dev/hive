@@ -22,6 +22,53 @@ export async function POST(request: NextRequest) {
     
     const projectData = await request.json();
     
+  console.log('📥 Incoming project data:', projectData);
+    
+    // CLEANUP: Remove document URLs from text fields if they were added by old code
+    const cleanTextField = (text: string | undefined): string => {
+      if (!text) return '';
+      
+      // Remove patterns like "Document URL: https://..."
+      let cleaned = text
+        .replace(/Document URL:\s*https?:\/\/[^\s\n]+/gi, '')
+        .replace(/Full Document URL:\s*https?:\/\/[^\s\n]+/gi, '')
+        .replace(/Project document uploaded via Hive platform\s*/gi, '')
+        .trim();
+      
+      // Remove empty lines
+      cleaned = cleaned.replace(/\n\n+/g, '\n').trim();
+      
+      return cleaned;
+    };
+    
+    // Clean all text fields
+    if (projectData.description) {
+      const original = projectData.description;
+      projectData.description = cleanTextField(projectData.description);
+      if (original !== projectData.description) {
+        console.log('🧹 Cleaned description field - removed document URL');
+      }
+    }
+    
+    if (projectData.problem_statement) {
+      const original = projectData.problem_statement;
+      projectData.problem_statement = cleanTextField(projectData.problem_statement);
+     
+    }
+    
+    if (projectData.expected_outputs) {
+      const original = projectData.expected_outputs;
+      projectData.expected_outputs = cleanTextField(projectData.expected_outputs);
+      
+    }
+    
+    if (projectData.comments) {
+      const original = projectData.comments;
+      projectData.comments = cleanTextField(projectData.comments);
+     
+    }
+    
+   
     // Validate project data - use different validation for drafts
     const isDraft = projectData.status === 'Draft';
     const validation = validateProjectData(projectData, isDraft);
@@ -329,66 +376,12 @@ export async function POST(request: NextRequest) {
 
    
     
-    // Create detailed relationship log
-    const relationshipLog = {
-      projectName: projectData.name,
-      submissionDate: new Date().toISOString(),
-      strategicFramework: {
-        goal: {
-          id: strategicInfo.goal.id,
-          name: strategicInfo.goal.name,
-          level: 'Strategic Goal'
-        },
-        pillar: {
-          id: strategicInfo.pillar.id,
-          name: strategicInfo.pillar.name,
-          level: 'Strategic Pillar',
-          parent: strategicInfo.goal.name
-        },
-        service: {
-          id: strategicInfo.service.id,
-          name: strategicInfo.service.name,
-          level: 'Service',
-          parent: strategicInfo.pillar.name
-        },
-        subservice: {
-          id: strategicInfo.subservice.id,
-          name: strategicInfo.subservice.name,
-          level: 'Sub-Service',
-          parent: strategicInfo.service.name
-        }
-      }
-    };
-    
+   
    
     
    
-        // Log all projects for this session after successful submission
-        try {
-         
-          const sessionQuery = `session_id='${projectData.session_id}'`;
-          const allSessionProjects = await getModuleEntries(
-            sessionId,
-            "icesc_suggestion",
-            ["id", "name", "strategic_goal", "pillar", "service", "sub_service", "budget_icesco", "budget_member_state", "budget_sponsorship", "submission_date"],
-            sessionQuery
-          );
-          
-       
-          let totalBudget = 0;
-          allSessionProjects.forEach((project: any, index: number) => {
-            const projectBudget = (parseFloat(project.budget_icesco) || 0) + 
-                                 (parseFloat(project.budget_member_state) || 0) + 
-                                 (parseFloat(project.budget_sponsorship) || 0);
-            totalBudget += projectBudget;
-            
-           
-          });
-          
-        
-        } catch (error) {
-          console.error('Error fetching session projects:', error);
-        }
+        // Session projects logging skipped for performance
+        console.log('✅ Project created successfully - skipping session projects query for speed');
 
     
     const submissionData = {
@@ -819,9 +812,9 @@ export async function POST(request: NextRequest) {
         // Don't fail the submission if relationships fail
       }
       
-      // First, try to set the relationship field directly with the Azure URL
-      if (projectData._documentInfo) {
-        console.log('🔗 Setting relationship field directly with Azure URL...');
+      // Document already set in initial creation - skip redundant updates
+      if (false && projectData._documentInfo) {
+        console.log('🔗 SKIPPED: Document already set in initial creation');
         console.log('🔍 Full Azure URL being sent:', projectData._documentInfo.url);
         console.log('🔍 URL length:', projectData._documentInfo.url.length);
         console.log('🔍 URL exceeds 255 chars:', projectData._documentInfo.url.length > 255);
@@ -839,24 +832,8 @@ export async function POST(request: NextRequest) {
                 value: projectData._documentInfo.url
               },
               {
-                name: 'comments',
-                value: `Document URL: ${projectData._documentInfo.url}`
-              },
-              {
-                name: 'description',
-                value: `${projectData._documentInfo.description}\n\nDocument URL: ${projectData._documentInfo.url}`
-              },
-              {
                 name: 'documents_icesc_project_suggestions_1_name',
-                value: projectData._documentInfo.url.substring(0, 250) + '...'
-              },
-              {
-                name: 'problem_statement',
-                value: `Document URL: ${projectData._documentInfo.url}`
-              },
-              {
-                name: 'expected_outputs',
-                value: `Full Document URL: ${projectData._documentInfo.url}`
+                value: projectData._documentInfo.name || 'document'
               }
             ]
           };
@@ -933,11 +910,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create Document record if document info is available
+      // Skip Document record creation - not needed, document URL already in document_c field
       let documentId = null;
-      if (projectData._documentInfo) {
+      if (false && projectData._documentInfo) {
         try {
-          console.log('📄 Creating Document record in CRM...');
+          console.log('📄 SKIPPED: Document record creation not needed');
           const documentData = {
             session: sessionId,
             module_name: 'Documents',

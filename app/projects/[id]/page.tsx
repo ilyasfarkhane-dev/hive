@@ -144,32 +144,24 @@ const ProjectDetailsPage = () => {
         setLoading(true);
         setError(null);
         
-        // Get session ID and contact ID from localStorage
-        const sessionId = localStorage.getItem('session_id');
+        // Get contact ID from localStorage (backend will get fresh session)
         const contactInfo = localStorage.getItem('contactInfo');
         const contactId = contactInfo ? JSON.parse(contactInfo).id : null;
         
         console.log('📋 Fetching project details:', {
           projectId,
-          sessionId: sessionId ? `${sessionId.substring(0, 10)}...` : 'none',
-          contactId: contactId || 'none'
+          contactId: contactId || 'none',
+          sessionId: 'Backend will get fresh session from CRM'
         });
         
-        if (!sessionId) {
-          setError('Please log in again');
-          setLoading(false);
-          return;
-        }
-        
-        // Build URL with project ID and session ID
+        // Build URL with project ID (backend will get fresh session)
         const params = new URLSearchParams();
         params.append('project_id', projectId);
-        params.append('session_id', sessionId);
         if (contactId) params.append('contact_id', contactId);
         
         const url = `/api/crm/projects?${params.toString()}`;
         
-        console.log('📤 Fetching from:', url.replace(sessionId, sessionId.substring(0, 10) + '...'));
+        console.log('📤 Fetching from:', url);
         
         const response = await fetch(url);
         const data = await response.json();
@@ -187,6 +179,17 @@ const ProjectDetailsPage = () => {
         if (data.projects && data.projects.length > 0) {
           const projectData = data.projects[0];
           console.log('✅ Project loaded:', projectData.name);
+          console.log('👤 Contact info in project:', {
+            contact_id: projectData.contact_id,
+            contact_name: projectData.contact_name,
+            contact_email: projectData.contact_email,
+            contact_phone: projectData.contact_phone,
+            contact_role: projectData.contact_role
+          });
+          console.log('📄 Document info in project:', {
+            document_c: projectData.document_c,
+            documents_icesc_project_suggestions_1_name: projectData.documents_icesc_project_suggestions_1_name
+          });
           setProject(projectData);
         } else {
           setError('Project not found');
@@ -2379,12 +2382,14 @@ const ProjectDetailsPage = () => {
               </div>
             </motion.div>
 
+            
+                    
           
             {/* Monitoring & Evaluation */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
+                transition={{ delay: 0.7 }}
                 className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
               >
                 <div className="bg-gradient-to-r from-yellow-50 to-orange-50 px-8 py-6 border-b border-gray-100">
@@ -2906,7 +2911,73 @@ const ProjectDetailsPage = () => {
               </motion.div>
             )}
 
-          
+            {/* Contact Information */}
+            {!loading && !error && project && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-lg font-sans font-bold text-gray-900 flex items-center">
+                    <div className={`w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-3' : 'mr-3'}`}>
+                      <User className="w-4 h-4 text-white" />
+                    </div>
+                    {t('contactInformation') || 'Contact Information'}
+                  </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  {/* Contact Name */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {t('contactName') || 'Name'}
+                    </label>
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                      <p className="text-sm text-gray-900 font-medium">
+                        {project.contact_name || t('notSpecified')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Contact Email */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {t('contactEmail') || 'Email'}
+                    </label>
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                      <p className="text-sm text-gray-900 font-medium">
+                        {project.contact_email || t('notSpecified')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Contact Phone */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {t('contactPhone') || 'Phone'}
+                    </label>
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                      <p className="text-sm text-gray-900 font-medium">
+                        {project.contact_phone || t('notSpecified')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Contact Role */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {t('contactRole') || 'Role'}
+                    </label>
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                      <p className="text-sm text-gray-900 font-medium">
+                        {project.contact_role || t('notSpecified')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
             
           </div>
 

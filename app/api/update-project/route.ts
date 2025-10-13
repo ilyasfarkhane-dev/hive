@@ -140,14 +140,26 @@ export async function POST(request: NextRequest) {
     console.log('Project data keys:', Object.keys(projectData));
     console.log('Project data:', JSON.stringify(projectData, null, 2));
     
+    // Validate project ID is present
+    if (!projectData.id) {
+      console.error('❌ No project ID provided in request');
+      return NextResponse.json({
+        success: false,
+        error: 'Project ID is required for updates'
+      }, { status: 400 });
+    }
+    
+    console.log('✅ Project ID validated:', projectData.id);
+    
     // Validate required fields - check if this is a draft
     const isDraft = projectData.status === 'Draft';
     
     if (!isDraft) {
-      // For non-drafts, validate all required fields
+      // For non-drafts, validate essential fields only
+      // Contact fields are optional since they're stored in related Contact record
       const requiredFields = [
         'id', 'name', 'description', 'strategic_goal', 'pillar', 'service', 'sub_service',
-        'contact_name', 'contact_email', 'contact_phone', 'session_id'
+        'session_id'
       ];
 
       const missingFields = requiredFields.filter(field => !projectData[field as keyof typeof projectData]);
@@ -158,6 +170,18 @@ export async function POST(request: NextRequest) {
           { 
             success: false, 
             error: `Missing required fields: ${missingFields.join(', ')}` 
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Validate contact_id is present (contact info is in related record)
+      if (!projectData.contact_id) {
+        console.log('Missing contact_id for project update');
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Missing required field: contact_id' 
           },
           { status: 400 }
         );
@@ -180,11 +204,31 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Get a fresh session ID for CRM authentication
-    const sessionId = await getFreshSessionId();
-    console.log('=== DEBUG: Session ID ===');
-    console.log('Fresh session ID obtained:', sessionId);
-    console.log('Session ID length:', sessionId?.length);
+    // Get a fresh session ID from CRM (admin credentials) 
+    console.log('=== DEBUG: Getting fresh session ID from CRM ===');
+    let sessionId: string;
+    try {
+      sessionId = await getSessionId();
+      console.log('✅ Fresh session ID obtained:', sessionId ? `${sessionId.substring(0, 10)}...` : 'none');
+      console.log('Session ID length:', sessionId?.length);
+    } catch (sessionError) {
+      console.error('❌ Failed to get session ID:', sessionError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to authenticate with CRM: ' + (sessionError instanceof Error ? sessionError.message : 'Unknown error')
+      }, { status: 500 });
+    }
+    
+    if (!sessionId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to authenticate with CRM - no session ID returned'
+      }, { status: 500 });
+    }
+    
+    // Remove old session_id from projectData to avoid sending it as a field
+    delete projectData.session_id;
+    console.log('✅ Removed old session_id from project data');
     
     // Validate session ID format
     if (!sessionId || typeof sessionId !== 'string' || sessionId.length < 10) {
@@ -271,11 +315,61 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    // Include all fields for updates - don't filter out important fields
-    const filteredCrmData = crmData;
-    console.log('=== DEBUG: Using all mapped fields ===');
-    console.log('Total fields:', crmData.length);
-    console.log('Field names:', crmData.map(f => f.name));
+    // Filter out problematic fields that cause CRM 500 errors
+    // Keep only essential, safe fields for updates
+    const allowedFields = [
+      'name',
+      'description', 
+      'project_brief',
+      'problem_statement',
+      'rationale_impact',
+      'beneficiaries',
+      'budget_icesco',
+      'budget_member_state',
+      'budget_sponsorship',
+      'date_start',
+      'date_end',
+      'project_frequency',
+      'frequency_duration',
+      'partner1', 'partner2', 'partner3', 'partner4', 'partner5',
+      'delivery_modality',
+      'geographic_scope',
+      'project_type',
+      'convening_method',
+      'convening_method_other',
+      'expected_outputs',
+      'milestones1', 'milestones2', 'milestones3', 'milestones4', 'milestones5',
+      'kpis1', 'kpis2', 'kpis3', 'kpis4', 'kpis5',
+      'comments',
+      'status_c',
+      'sub_service_id',
+      'sub_service',
+      'otherbeneficiary',
+      // Contact fields (stored in project record)
+      'contact_name',
+      'contact_email',
+      'contact_phone',
+      'contact_role',
+      'contact_id'
+    ];
+    
+    // Keep contact fields even if empty (to allow clearing them)
+    const contactFields = ['contact_name', 'contact_email', 'contact_phone', 'contact_role', 'contact_id'];
+    
+    const filteredCrmData = crmData.filter(field => {
+      if (!allowedFields.includes(field.name)) return false;
+      
+      // Always include contact fields (even if empty)
+      if (contactFields.includes(field.name)) {
+        return field.value !== null && field.value !== undefined;
+      }
+      
+      // For other fields, exclude empty values
+      return field.value !== '' && field.value !== null && field.value !== undefined;
+    });
+    console.log('=== DEBUG: Filtered CRM fields ===');
+    console.log('Total fields:', filteredCrmData.length);
+    console.log('Field names:', filteredCrmData.map(f => f.name));
     
     // Additional validation - ensure all values are clean
     filteredCrmData.forEach(field => {
@@ -295,14 +389,14 @@ export async function POST(request: NextRequest) {
     console.log('CRM data length:', crmData.length);
     console.log('CRM data:', JSON.stringify(crmData, null, 2));
 
-    // Try the same structure as submit method, but add id to name_value_list at the beginning
+    // Use the SAME format as submit-project-simple (id in name_value_list, not at root)
     const updateData = {
       session: sessionId,
       module_name: 'icesc_project_suggestions',
       name_value_list: [
-        { name: 'id', value: projectData.id },
+        { name: 'id', value: projectData.id },  // ID inside name_value_list (same as submit)
         ...filteredCrmData
-      ],
+      ]
     };
     
     console.log('=== DEBUG: Final update data ===');
@@ -337,47 +431,22 @@ export async function POST(request: NextRequest) {
     
     console.log('=== DEBUG: Request body ===');
     console.log('Request body:', requestBody.toString());
-
-    // First, let's verify the project exists by getting it
-    console.log('=== DEBUG: Verifying project exists ===');
-    try {
-      const verifyData = {
-        session: sessionId,
-        module_name: 'icesc_project_suggestions',
-        id: projectData.id,
-        select_fields: ['id', 'name']
-      };
-      
-      const verifyResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          method: 'get_entry',
-          input_type: 'JSON',
-          response_type: 'JSON',
-          rest_data: JSON.stringify(verifyData),
-        }),
-        signal: AbortSignal.timeout(30000), // 30 second timeout
-      });
-      
-      if (verifyResponse.ok) {
-        const verifyResult = await verifyResponse.text();
-        console.log('=== DEBUG: Project verification result ===');
-        console.log('Verify response:', verifyResult);
-        
-        if (verifyResult.includes('"id":"' + projectData.id + '"')) {
-          console.log('✅ Project exists and can be updated');
-        } else {
-          console.log('❌ Project not found or verification failed');
-        }
-      } else {
-        console.log('❌ Project verification failed with status:', verifyResponse.status);
+    
+    // Decode and log the actual rest_data being sent
+    const restDataParam = requestBody.get('rest_data');
+    if (restDataParam) {
+      try {
+        const parsedRestData = JSON.parse(restDataParam);
+        console.log('=== DEBUG: Decoded rest_data ===');
+        console.log(JSON.stringify(parsedRestData, null, 2));
+      } catch (e) {
+        console.log('Could not parse rest_data:', e);
       }
-    } catch (verifyError) {
-      console.log('❌ Project verification error:', verifyError);
     }
+
+    // Skip verification - get_entry seems to have issues with this CRM
+    // Proceed directly with update using set_entry
+    console.log('⚠️ Skipping verification, proceeding directly with update');
     
     console.log('=== DEBUG: Making CRM request ===');
     
@@ -432,15 +501,25 @@ export async function POST(request: NextRequest) {
       console.error('=== DEBUG: Non-200 Response Status ===');
       console.error('Status:', response.status, response.statusText);
       const errorText = await response.text();
-      console.error('Error response:', errorText.substring(0, 500));
+      console.error('Error response length:', errorText.length);
+      console.error('Error response:', errorText.substring(0, 1000));
+      console.error('Error response (full):', errorText);
+      
+      // Try to parse as JSON to see if there's a structured error
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('Parsed error JSON:', errorJson);
+      } catch (e) {
+        console.error('Error response is not JSON');
+      }
       
       return NextResponse.json(
         { 
           success: false, 
-          error: `CRM server returned error status ${response.status}: ${response.statusText}`,
+          error: `CRM server returned error status ${response.status}: ${response.statusText}. ${errorText ? 'Error: ' + errorText.substring(0, 200) : 'No error message provided.'}`,
           errorType: 'HTTP_ERROR',
           statusCode: response.status,
-          rawResponse: errorText.substring(0, 1000)
+          rawResponse: errorText || '(empty response)'
         },
         { status: 500 }
       );
@@ -506,8 +585,15 @@ export async function POST(request: NextRequest) {
               console.log('Project updated successfully with ID:', data.id);
               console.log('Full CRM response data:', JSON.stringify(data, null, 2));
               
-              // Set contact relationship if contact_id is provided
-              if (projectData.contact_id) {
+              // Set contact relationship (same as submit-project-simple)
+              // Don't try to update the Contact record - just maintain the relationship
+              const contactIdToLink = projectData.contact_id || (typeof window === 'undefined' && projectData.contact?.id);
+              
+              console.log('=== DEBUG: Contact Relationship ===');
+              console.log('Contact ID from projectData:', projectData.contact_id);
+              console.log('Contact ID to link:', contactIdToLink);
+              
+              if (contactIdToLink) {
                 console.log('=== DEBUG: Setting Contact Relationship ===');
                 try {
                   const contactResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
@@ -522,22 +608,22 @@ export async function POST(request: NextRequest) {
                         module_name: 'icesc_project_suggestions',
                         module_id: data.id,
                         link_field_name: 'contacts_icesc_project_suggestions_1',
-                        related_ids: [projectData.contact_id]
+                        related_ids: [contactIdToLink]
                       }),
                     }),
                   });
                   const contactResult = await contactResponse.json();
                   console.log('Contact relationship result:', JSON.stringify(contactResult, null, 2));
-                  if (contactResult.id) {
+                  if (contactResult.created === 1 || contactResult.created === 0) {
                     console.log('✅ Contact relationship set successfully');
                   } else {
-                    console.log('❌ Contact relationship may have failed:', contactResult);
+                    console.log('⚠️ Contact relationship response:', contactResult);
                   }
                 } catch (contactError) {
                   console.error('Error setting contact relationship:', contactError);
                 }
               } else {
-                console.log('No contact ID provided, skipping contact relationship');
+                console.log('⚠️ No contact ID available to link');
               }
               
               // Create and link documents if any

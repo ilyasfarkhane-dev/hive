@@ -112,37 +112,13 @@ export function useContactProjects(): UseContactProjectsReturn {
           console.error('Error parsing contactInfo from localStorage:', error);
         }
         
-        // Get session ID from localStorage
-        let sessionId = null;
-        try {
-          sessionId = localStorage.getItem('session_id');
-          console.log('✅ Session ID from localStorage:', sessionId ? `${sessionId.substring(0, 10)}...` : 'not found');
-        } catch (error) {
-          console.error('Error getting session_id from localStorage:', error);
-        }
-        
-        // Validate session ID
-        if (!sessionId) {
-          console.error('❌ No session ID found in localStorage - user needs to log in');
-          setError('Please log in again');
-          setErrorType('AUTH_ERROR');
-          setProjects([]);
-          setLoading(false);
-          return;
-        }
-        
-        // Build URL with contact ID and session ID parameters
+        // Build URL with contact ID parameter only (backend will get fresh session)
         const params = new URLSearchParams();
         if (contactId) params.append('contact_id', contactId);
-        if (sessionId) params.append('session_id', sessionId);
         
         const url = `/api/crm/projects?${params.toString()}`;
         
-        console.log('📤 Fetching projects from URL:', url.replace(sessionId || '', sessionId ? sessionId.substring(0, 10) + '...' : ''));
-        console.log('📋 Request will include:', {
-          contactId: contactId || 'none',
-          sessionId: sessionId ? 'included' : 'missing'
-        });
+      
         
         // Fetch projects from our API route (which handles CORS)
         const response = await fetch(url, {

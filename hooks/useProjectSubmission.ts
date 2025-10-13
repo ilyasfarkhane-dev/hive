@@ -50,10 +50,10 @@ export interface ProjectSubmissionData {
   kpis: string[];
   
   // Contact information
-  contact_name: string;
-  contact_email: string;
-  contact_phone: string;
-  contact_role: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  contact_role?: string;
   contact_id?: string;
   
   // Account information

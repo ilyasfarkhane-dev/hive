@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
     
     const projectData = await request.json();
     
-  console.log('📥 Incoming project data:', projectData);
     
     // CLEANUP: Remove document URLs from text fields if they were added by old code
     const cleanTextField = (text: string | undefined): string => {
@@ -105,13 +104,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Debug: Log incoming project data document fields
-    console.log('🔍 DEBUG: Incoming project data document fields:', {
-      document_c: projectData.document_c || 'EMPTY',
-      documents_icesc_project_suggestions_1_name: projectData.documents_icesc_project_suggestions_1_name || 'EMPTY',
-      hasDocument_c: !!projectData.document_c,
-      hasDocuments_icesc_project_suggestions_1_name: !!projectData.documents_icesc_project_suggestions_1_name
-    });
+ 
 
     // Convert document paths to Azure URLs before mapping to CRM
     if (projectData.documents_icesc_project_suggestions_1_name) {
@@ -150,44 +143,24 @@ export async function POST(request: NextRequest) {
       projectData.document_url_c = finalUrls;
       projectData.document_name = finalUrls;
       projectData.document_url = finalUrls;
-      console.log('✅ Updated document fields with full Azure URLs');
-      console.log('📏 Total length of URLs:', finalUrls.length, 'characters');
-      console.log('🔗 Final URLs:', finalUrls);
+      
     } else {
       console.log('⚠️ No document fields found in project data');
     }
    
     const crmData = mapProjectDataToCRM(projectData);
-    console.log('=== DEBUG: CRM Data after mapping ===');
-    console.log('CRM data fields:', crmData.map(field => ({ name: field.name, value: field.value })));
-    console.log('Account fields in CRM data:', crmData.filter(field => 
-      field.name.includes('account') || field.name.includes('icesc_project_suggestions_1')
-    ));
+   
     
     // Debug: Check if document fields are in CRM data
     const documentFields = crmData.filter(field => 
       field.name.includes('document') || field.name.includes('documents_icesc')
     );
-    console.log('🔍 DEBUG: Document fields in CRM data:', documentFields);
+
     
-    // Additional debug for specific document field
-    const specificDocField = crmData.find(field => field.name === 'documents_icesc_project_suggestions_1_name');
-    console.log('🔍 Specific documents_icesc_project_suggestions_1_name field:', specificDocField);
+ 
+   
     
-    // Debug: Check if we should use a different field name
-    console.log('🔍 DEBUG: All field names being sent to CRM:');
-    crmData.forEach(field => {
-      if (field.name.includes('document') || field.name.includes('documents')) {
-        console.log(`  Document field: ${field.name} = ${field.value.substring(0, 100)}...`);
-      }
-    });
-    
-    // Debug: Show all CRM fields being sent
-    console.log('🔍 DEBUG: All CRM fields being sent to CRM:');
-    crmData.forEach(field => {
-      console.log(`  ${field.name}: ${field.value}`);
-    });
-    console.log('=====================================');
+   
     
     // Try to get account ID if we have account name but no ID
     if (projectData.account_name && !projectData.account_id) {
@@ -333,9 +306,7 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Special handling for document fields
-    // Note: documents_icesc_project_suggestions_1_name is a relationship field that expects Document record ID
-    // We'll create the Document record after the project is created
+    
     if (projectData.document_c || projectData.documents_icesc_project_suggestions_1_name) {
       const documentUrl = projectData.document_c || projectData.documents_icesc_project_suggestions_1_name;
       
@@ -344,7 +315,6 @@ export async function POST(request: NextRequest) {
         name: 'document_c',
         value: documentUrl
       });
-      console.log(`📄 Added document_c field:`, documentUrl);
       
       // Store document info for later Document record creation
       projectData._documentInfo = {
@@ -380,9 +350,6 @@ export async function POST(request: NextRequest) {
    
     
    
-        // Session projects logging skipped for performance
-        console.log('✅ Project created successfully - skipping session projects query for speed');
-
     
     const submissionData = {
       session: sessionId,
@@ -390,20 +357,12 @@ export async function POST(request: NextRequest) {
       name_value_list: crmData,
     };
     
-    // Debug: Log the final submission data
-    console.log('🔍 DEBUG: Final submission data being sent to CRM:');
-    console.log('Session ID:', submissionData.session);
-    console.log('Module:', submissionData.module_name);
-    console.log('Name-value list length:', submissionData.name_value_list.length);
-    console.log('Document fields in submission:', submissionData.name_value_list.filter(field => 
-      field.name.includes('document') || field.name.includes('documents_icesc')
-    ));
+  
     
    
     // Validate submission data
     if (!submissionData.session || !submissionData.module_name || !submissionData.name_value_list) {
-      console.error('=== DEBUG: Invalid Submission Data ===');
-      console.error('Missing required fields in submission data');
+     
       return NextResponse.json(
         { 
           success: false, 

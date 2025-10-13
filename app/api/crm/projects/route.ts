@@ -8,22 +8,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const contactId = searchParams.get('contact_id');
     const projectId = searchParams.get('project_id');
-    const sessionId = searchParams.get('session_id'); // Get from URL parameter sent by frontend
-
-    console.log('📋 Request Parameters:', {
-      contactId: contactId || 'none',
-      projectId: projectId || 'none',
-      sessionId: sessionId ? `${sessionId.substring(0, 10)}...` : 'none'
-    });
     
-    // Validate session ID
+    // Get fresh session ID from CRM instead of using localStorage
+    console.log('🔐 Getting fresh session ID from CRM...');
+    const sessionId = await getSessionId();
+   
     if (!sessionId) {
-      console.error('❌ No session ID provided');
-        return NextResponse.json({
-          success: false,
-        error: 'Session ID is required. Please log in again.',
-        errorType: 'MISSING_SESSION_ID',
-          projects: [],
+      console.log('❌ Failed to get session ID from CRM');
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to authenticate with CRM',
+        errorType: 'AUTH_ERROR',
+        projects: [],
         count: 0
       }, { status: 401 });
     }
@@ -31,11 +27,11 @@ export async function GET(request: NextRequest) {
     // Validate contact ID is provided
     if (!contactId && !projectId) {
       console.log('❌ No contact ID or project ID provided');
-      return NextResponse.json({
-        success: false,
+        return NextResponse.json({
+          success: false,
         error: 'Contact ID or Project ID is required',
         errorType: 'MISSING_PARAMETERS',
-        projects: [],
+          projects: [],
         count: 0
       }, { status: 400 });
     }
@@ -43,15 +39,10 @@ export async function GET(request: NextRequest) {
     // Fetch projects using appropriate method based on parameters
     let projectEntries: any[] = [];
     try {
-      console.log('📋 Fetch parameters:', {
-        sessionId: sessionId ? `${sessionId.substring(0, 10)}...` : 'none',
-        contactId: contactId || 'none',
-        projectId: projectId || 'none'
-      });
       
       // If project ID is provided, fetch single project using get_entry
       if (projectId) {
-        console.log('⚡ Fetching single project by ID using get_entry');
+    
         
         const response = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
           method: 'POST',
@@ -128,7 +119,7 @@ export async function GET(request: NextRequest) {
               link_name_to_fields_array: [
                 {
                   name: 'contacts_icesc_project_suggestions_1',
-                  value: ['id', 'name', 'email']
+                  value: ['id', 'name', 'first_name', 'last_name', 'email', 'email1', 'phone_mobile', 'phone_work', 'title']
                 },
                 {
                   name: 'ms_subservice_icesc_project_suggestions_1',
@@ -145,10 +136,6 @@ export async function GET(request: NextRequest) {
         }
         
         const data = await response.json();
-        console.log('✅ Single project response:', {
-          hasEntryList: !!data.entry_list,
-          hasId: !!data.id
-        });
         
         // get_entry returns a single object, not an array
         if (data.id) {
@@ -161,7 +148,6 @@ export async function GET(request: NextRequest) {
       }
       // Otherwise, fetch projects by contact ID using get_relationships
       else if (contactId) {
-        console.log('⚡ Fetching projects by contact using get_relationships');
         
         const response = await fetch('https://crm.icesco.org/service/v4_1/rest.php', {
           method: 'POST',
@@ -255,14 +241,9 @@ export async function GET(request: NextRequest) {
         }
         
         const data = await response.json();
-        console.log('✅ Contact projects response:', {
-          hasEntryList: !!data.entry_list,
-          count: data.entry_list?.length || 0
-        });
         
         // Check if we got data
         if (!data.entry_list || data.entry_list.length === 0) {
-          console.log('⚠️ No projects found for contact:', contactId);
           return NextResponse.json({
             success: true,
             count: 0,
@@ -296,23 +277,30 @@ export async function GET(request: NextRequest) {
       throw fetchError;
     }
     
-    console.log('✅ Projects fetched successfully:', projectEntries.length);
-    
     // Helper function to extract value from name_value_list format
     const getValue = (entry: any, fieldName: string): any => {
       if (entry.name_value_list && entry.name_value_list[fieldName]) {
-        return entry.name_value_list[fieldName].value || entry.name_value_list[fieldName];
+        const field = entry.name_value_list[fieldName];
+        // If it has a value property, return that
+        if (field.value !== undefined) {
+          return field.value;
+        }
+        // If it's an object with name and value, return the value
+        if (field.name && field.value !== undefined) {
+          return field.value;
+        }
+        // Otherwise return the field itself (might be a primitive)
+        if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
+          return field;
+        }
+        // If it's still an object, return empty string to avoid rendering errors
+        return '';
       }
       return entry[fieldName] || '';
     };
     
     // Process projects and extract subservice data
     const processedProjects = projectEntries.map((entry: any) => {
-      console.log(`\n🔍 Processing project ${entry.id}:`);
-      console.log('  Name from name_value_list:', getValue(entry, 'name'));
-      console.log('  Status:', getValue(entry, 'status_c'));
-      
-      // Extract subservice data from link_list
             let subserviceInfo = {
               sub_service: '',
               sub_service_id: '',
@@ -320,21 +308,24 @@ export async function GET(request: NextRequest) {
               subservice_name: ''
             };
 
+      // Extract contact data from link_list
+      let contactInfo = {
+        contact_id: '',
+        contact_name: '',
+        contact_email: '',
+        contact_phone: '',
+        contact_role: ''
+      };
+
       // Log the full entry structure for debugging
-      console.log(`  🔍 Entry structure:`, {
-        hasNameValueList: !!entry.name_value_list,
-        hasLinkList: !!entry.link_list,
-        linkListKeys: entry.link_list ? Object.keys(entry.link_list) : []
-      });
+    
       
       if (entry.link_list && entry.link_list.ms_subservice_icesc_project_suggestions_1) {
         const subserviceData = entry.link_list.ms_subservice_icesc_project_suggestions_1;
-        console.log(`  📋 Subservice relationship found! Count:`, subserviceData.length);
-        console.log(`  📋 Full subservice data:`, JSON.stringify(subserviceData, null, 2).substring(0, 500));
-        
+       
         if (subserviceData.length > 0) {
           const subservice = subserviceData[0];
-          console.log(`  📋 First subservice object:`, subservice);
+        
           
           // The relationship data comes as an array of objects with link_value
           // Structure: [{ link_value: { id: {...}, name: {...}, code: {...} } }]
@@ -366,12 +357,6 @@ export async function GET(request: NextRequest) {
             subservice_name: subName || subCode || ''
           };
           
-          console.log(`  ✅ Extracted subservice:`, {
-            id: subId || '(none)',
-            name: subName || '(none)',
-            code: subCode || '(none)',
-            fullObject: subserviceInfo
-          });
         } else {
           console.log(`  ⚠️ Empty subservice array in link_list`);
         }
@@ -383,12 +368,7 @@ export async function GET(request: NextRequest) {
         const directId = getValue(entry, 'ms_subservice_icesc_project_suggestions_1_id');
         const directCodeValue = getValue(entry, 'ms_subservice_icesc_project_suggestions_1_code');
         
-        console.log(`  🔍 Direct fields:`, {
-          name: directCode,
-          id: directId,
-          code: directCodeValue
-        });
-        
+      
         // Check if we have a valid code (format: X.X.X.X)
         const codeValue = (directCodeValue && directCodeValue.trim()) || (directCode && directCode.trim());
         
@@ -400,7 +380,6 @@ export async function GET(request: NextRequest) {
             subservice_code: codeValue,
             subservice_name: codeValue
           };
-          console.log(`  ✅ Valid subservice code found:`, codeValue);
         } else if (codeValue) {
           // We have some value but it's not in the expected format
           subserviceInfo = {
@@ -415,13 +394,76 @@ export async function GET(request: NextRequest) {
         }
       }
       
+      // Extract contact information from link_list
+      console.log(`  👤 Checking for contact relationship...`);
+      if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
+        const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
+        console.log(`  👤 Contact relationship found! Count:`, contactData.length);
+        
+        if (contactData.length > 0) {
+          const contact = contactData[0];
+          console.log(`  👤 First contact:`, contact);
+          
+          const extractContactValue = (field: any): string => {
+            if (!field) return '';
+            if (typeof field === 'string') return field;
+            if (field.link_value) {
+              if (typeof field.link_value === 'string') return field.link_value;
+              if (field.link_value.value) return String(field.link_value.value);
+            }
+            if (field.value !== undefined) return String(field.value);
+            if (field.name && field.value !== undefined) return String(field.value);
+            return '';
+          };
+          
+          const linkValue = contact.link_value || contact;
+          
+          // Extract each field carefully and ensure they're strings
+          const contactId = extractContactValue(linkValue.id);
+          const contactName = extractContactValue(linkValue.name) || extractContactValue(linkValue.first_name);
+          const contactEmail = extractContactValue(linkValue.email) || extractContactValue(linkValue.email1);
+          const contactPhone = extractContactValue(linkValue.phone_mobile) || extractContactValue(linkValue.phone_work);
+          const contactRole = extractContactValue(linkValue.title);
+          
+          contactInfo = {
+            contact_id: contactId || '',
+            contact_name: contactName || '',
+            contact_email: contactEmail || '',
+            contact_phone: contactPhone || '',
+            contact_role: contactRole || ''
+          };
+          
+          console.log(`  ✅ Extracted contact info:`, contactInfo);
+        }
+      } else {
+        console.log(`  ⚠️ No contact link_list, using direct fields`);
+        
+        // Fallback to direct contact fields if available
+        // Ensure all values are strings
+        contactInfo = {
+          contact_id: String(getValue(entry, 'contact_id') || ''),
+          contact_name: String(getValue(entry, 'contact_name') || ''),
+          contact_email: String(getValue(entry, 'contact_email') || ''),
+          contact_phone: String(getValue(entry, 'contact_phone') || ''),
+          contact_role: String(getValue(entry, 'contact_role') || '')
+        };
+      }
+      
       // Flatten the name_value_list structure for easier access
       const flattenedEntry: any = { id: entry.id };
       
       if (entry.name_value_list) {
         Object.keys(entry.name_value_list).forEach(key => {
           const field = entry.name_value_list[key];
-          flattenedEntry[key] = field.value !== undefined ? field.value : field;
+          // Ensure we extract the actual value, not an object
+          if (field && typeof field === 'object' && field.value !== undefined) {
+            flattenedEntry[key] = field.value;
+          } else if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
+            flattenedEntry[key] = field;
+          } else {
+            // If it's still an object or null/undefined, set to empty string
+            flattenedEntry[key] = field || '';
+          }
         });
       }
       
@@ -432,12 +474,12 @@ export async function GET(request: NextRequest) {
       
       return {
         ...flattenedEntry,
-        ...subserviceInfo
+        ...subserviceInfo,
+        ...contactInfo
       };
     });
     
-    console.log(`📊 Final project count: ${processedProjects.length} for contact ${contactId}`);
-    
+
     // No filtering needed - get_relationships already returned only this contact's projects
     const filteredProjects = processedProjects;
 
@@ -618,52 +660,8 @@ export async function GET(request: NextRequest) {
       }
     };
     
-    console.log('=== CRM PROJECTS API RESULT ===');
-    console.log('Success:', result.success);
-    console.log('Count:', result.count);
-    console.log('Contact ID used for filtering:', contactId);
-    console.log('Projects sample:', result.projects.slice(0, 2).map(p => ({
-      id: p.id,
-      name: p.name,
-      status: p.status,
-      contact_id: p.contact_id,
-      sub_service: p.sub_service,
-      sub_service_id: p.sub_service_id,
-      subservices: p.sub_service || [],
-      subservice: p.sub_service || '',
-      subservice_code: p.sub_service || '',
-      subservice_id: p.sub_service_id || ''
-    })));
     
-    // Log raw CRM data to see what fields actually exist
-    console.log('=== RAW CRM DATA SAMPLE ===');
-    if (projectEntries.length > 0) {
-      const rawEntry = projectEntries[0];
-     
-      
-      if (rawEntry.link_list) {
-        console.log('Available link_list keys:', Object.keys(rawEntry.link_list));
-        
-        // Check for the specific subservice relationship
-        if (rawEntry.link_list.ms_subservice_icesc_project_suggestions_1) {
-          console.log('Subservice relationship data found:', rawEntry.link_list.ms_subservice_icesc_project_suggestions_1);
-          console.log('Subservice relationship type:', typeof rawEntry.link_list.ms_subservice_icesc_project_suggestions_1);
-          console.log('Subservice relationship length:', Array.isArray(rawEntry.link_list.ms_subservice_icesc_project_suggestions_1) ? rawEntry.link_list.ms_subservice_icesc_project_suggestions_1.length : 'not an array');
-        } else {
-          console.log('No ms_subservice_icesc_project_suggestions_1 relationship found');
-        }
-        
-        // Check for other possible subservice relationships
-        Object.keys(rawEntry.link_list).forEach(key => {
-          console.log(`All relationship keys: ${key}`, rawEntry.link_list[key]);
-          if (key.toLowerCase().includes('subservice') || key.toLowerCase().includes('service')) {
-            console.log(`Found potential subservice relationship: ${key}`, rawEntry.link_list[key]);
-          }
-        });
-      } else {
-        console.log('No link_list found in raw entry');
-      }
-    }
+  
     
     return NextResponse.json(result, {
       headers: {

@@ -1481,7 +1481,7 @@ useEffect(() => {
         name: currentProjectDetails.title || '',
         description: currentProjectDetails.brief || '',
         project_brief: currentProjectDetails.brief || '',
-        problem_statement: currentProjectDetails.rationale || '',
+        problem_statement1_c: currentProjectDetails.rationale || '',
         rationale_impact: currentProjectDetails.rationale || '',
         
         // Strategic selections - get codes from selectedCards
@@ -1885,7 +1885,7 @@ useEffect(() => {
         name: projectDetails.title || '',
         description: projectDetails.brief || '',
         project_brief: projectDetails.brief || '',
-        problem_statement: projectDetails.rationale || '',
+        problem_statement1_c: projectDetails.rationale || '',
         rationale_impact: projectDetails.rationale || '',
         
         // Strategic selections - get codes from selectedCards (ensure they are strings)

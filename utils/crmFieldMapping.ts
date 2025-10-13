@@ -30,11 +30,12 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     type: 'text',
     required: false // Made optional for drafts
   },
-  problem_statement: {
-    crmField: 'problem_statement',
-    type: 'string',
-    maxLength: 255,
-    required: true
+  problem_statement1_c: {
+    crmField: 'problem_statement1_c',
+    type: 'text',  // Changed from 'string' to 'text' to allow longer content
+    required: true,
+    // Note: If CRM field is VARCHAR(255), long text will be truncated by database
+    // Consider using 'description' field for longer text or changing CRM schema to TEXT type
   },
 
   // Beneficiaries
@@ -396,6 +397,11 @@ export function mapProjectDataToCRM(projectData: any): any[] {
         isEmpty: value === '',
         willSkip: value === undefined || value === null || value === ''
       });
+    }
+    
+    // Debug: Log text field lengths
+    if (projectField === 'problem_statement1_c' || projectField === 'description' || projectField === 'project_brief') {
+      console.log(`📏 DEBUG: ${projectField} length:`, typeof value === 'string' ? value.length : 'N/A', 'characters');
     }
     
     if (value === undefined || value === null || value === '') {

@@ -6,7 +6,7 @@ export interface CRMProject {
   description: string;
   project_brief: string;
   brief?: string; // Alternative name for project_brief
-  problem_statement: string;
+  problem_statement1_c: string;
   rationale_impact: string;
   
   // Strategic information

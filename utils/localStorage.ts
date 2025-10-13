@@ -7,7 +7,7 @@ export interface ProjectData {
   name: string;
   description: string;
   project_brief: string;
-  problem_statement: string;
+  problem_statement1_c: string;
   rationale_impact: string;
   strategic_goal: string;
   strategic_goal_id: string;

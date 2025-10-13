@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
       'name',
       'description', 
       'project_brief',
-      'problem_statement',
+      'problem_statement1_c',
       'rationale_impact',
       'beneficiaries',
       'budget_icesco',

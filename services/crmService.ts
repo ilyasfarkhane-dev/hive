@@ -18,7 +18,7 @@ export interface ProjectSubmissionData {
   name: string;
   description: string;
   project_brief: string;
-  problem_statement: string;
+  problem_statement1_c: string;
   rationale_impact: string;
   
   // Strategic selections

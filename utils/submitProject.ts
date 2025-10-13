@@ -20,7 +20,7 @@ export const submitProject = async (projectData: any) => {
       // BASIC FIELDS (using field names that match CRM validation)
       name: projectData.title || 'Project Proposal',
       description: projectData.description || '', // ✅ Use your actual data, no fallback
-      problem_statement: projectData.problem_statement || '', // ✅ Use your actual data, no fallback
+      problem_statement1_c: projectData.problem_statement1_c || '', // ✅ Use your actual data, no fallback
       status: 'Published', // ✅ Fixed: use 'status' not 'status_c'
       
       // BENEFICIARIES

@@ -27,6 +27,9 @@ type AnyProject = {
   description?: string;
   brief?: string;
   rationale?: string;
+  problem_statement?: string;
+  problem_statement1_c?: string;
+  rationale_impact?: string;
   start_date?: string;
   end_date?: string;
   budget?: {
@@ -171,6 +174,18 @@ const ProjectDetailsPage = () => {
           count: data.count,
           hasProjects: data.projects?.length > 0
         });
+        
+        if (data.projects && data.projects.length > 0) {
+          const projectData = data.projects[0];
+          console.log('📋 Project data received:', {
+            id: projectData.id,
+            name: projectData.name,
+            problem_statement1_c: projectData.problem_statement1_c,
+            problem_statement: projectData.problem_statement,
+            rationale: projectData.rationale,
+            description: projectData.description
+          });
+        }
         
         if (!response.ok || !data.success) {
           throw new Error(data.error || 'Failed to fetch project');
@@ -490,7 +505,7 @@ const ProjectDetailsPage = () => {
               },
               // Map other fields with fallbacks
               brief: getFieldValue('description', 'brief', 'project_description', 'summary'),
-              rationale: getFieldValue('problem_statement', 'rationale', 'justification', 'background'),
+              rationale: getFieldValue('problem_statement1_c1_c', 'rationale', 'justification', 'background'),
               start_date: getFieldValue('start_date', 'date_start', 'project_start', 'begin_date'),
               end_date: getFieldValue('end_date', 'date_end', 'project_end', 'completion_date'),
               project_frequency: (() => {
@@ -849,14 +864,26 @@ const ProjectDetailsPage = () => {
         documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || ''
       });
       
+      // Get contact ID from localStorage if not available in project data
+      const contactInfo = localStorage.getItem('contactInfo');
+      const contactIdFromStorage = contactInfo ? JSON.parse(contactInfo).id : null;
+      
+      console.log('👤 Contact ID debugging:', {
+        editedProject_contact_id: editedProject.contact_id,
+        project_contact_id: project?.contact_id,
+        contactIdFromStorage: contactIdFromStorage,
+        editedProject_contact: editedProject.contact,
+        final_contact_id: editedProject.contact_id || project?.contact_id || contactIdFromStorage || ''
+      });
+      
       // Prepare the data for CRM update
       const updateData = {
         id: editedProject.id,
         name: editedProject.name,
         description: editedProject.description || editedProject.brief || '',
         project_brief: editedProject.brief || editedProject.description || '',
-        problem_statement: editedProject.rationale || '',
-        rationale_impact: editedProject.rationale || '',
+        problem_statement: editedProject.problem_statement1_c || editedProject.problem_statement || '',
+        rationale_impact: editedProject.rationale_impact || editedProject.rationale || '',
         
         // Strategic selections (preserve existing values if not changed)
         strategic_goal: editedProject.strategic_goal || project?.strategic_goal || 'Strategic Goal',
@@ -900,7 +927,7 @@ const ProjectDetailsPage = () => {
         contact_email: editedProject.contact?.email || '',
         contact_phone: editedProject.contact?.phone || '',
         contact_role: editedProject.contact?.role || '',
-        contact_id: editedProject.contact_id || project?.contact_id || '',
+        contact_id: editedProject.contact_id || project?.contact_id || contactIdFromStorage || '',
         
         // Account information
         account_id: editedProject.account_id || project?.account_id || '',
@@ -1092,13 +1119,17 @@ const ProjectDetailsPage = () => {
         documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || ''
       });
       
+      // Get contact ID from localStorage if not available in project data
+      const contactInfo = localStorage.getItem('contactInfo');
+      const contactIdFromStorage = contactInfo ? JSON.parse(contactInfo).id : null;
+      
       // Prepare the data for draft update (same as save changes but with Draft status)
       const draftData = {
         id: editedProject.id,
         name: editedProject.name,
         description: editedProject.description || editedProject.brief || '',
         project_brief: editedProject.brief || editedProject.description || '',
-        problem_statement: editedProject.rationale || '',
+        problem_statement1_c1_c: editedProject.rationale || '',
         rationale_impact: editedProject.rationale || '',
         
         // Strategic selections (preserve existing values if not changed)
@@ -1143,7 +1174,7 @@ const ProjectDetailsPage = () => {
         contact_email: editedProject.contact?.email || '',
         contact_phone: editedProject.contact?.phone || '',
         contact_role: editedProject.contact?.role || '',
-        contact_id: editedProject.contact_id || project?.contact_id || '',
+        contact_id: editedProject.contact_id || project?.contact_id || contactIdFromStorage || '',
         
         // Account information
         account_id: editedProject.account_id || project?.account_id || '',
@@ -1779,14 +1810,14 @@ const ProjectDetailsPage = () => {
                   <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                     {isEditing ? (
                       <textarea
-                        value={editedProject?.rationale || ('problem_statement' in (editedProject || {}) ? (editedProject as any).problem_statement : '') || ''}
-                        onChange={(e) => handleFieldChange('rationale', e.target.value)}
+                        value={editedProject?.problem_statement1_c || editedProject?.problem_statement || ''}
+                        onChange={(e) => handleFieldChange('problem_statement1_c', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent text-gray-700 leading-relaxed min-h-[120px] bg-white"
                         placeholder="Problem statement"
                       />
                     ) : (
-                      <p className="text-gray-700 leading-relaxed">
-                        {project.rationale || ('problem_statement' in project ? (project as any).problem_statement : '') || t('problemStatement')}
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {project.problem_statement1_c || project.problem_statement || t('notSpecified')}
                       </p>
                     )}
                   </div>

@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
                 'description',
                 'project_brief',
                 'problem_statement',
+                'problem_statement1_c',
                 'rationale_impact',
                 'status_c',
                 'date_entered',
@@ -170,6 +171,7 @@ export async function GET(request: NextRequest) {
           'description',
           'project_brief',
           'problem_statement',
+          'problem_statement1_c',
           'rationale_impact',
           'status_c',
           'date_entered',
@@ -396,8 +398,8 @@ export async function GET(request: NextRequest) {
       
       // Extract contact information from link_list
       console.log(`  👤 Checking for contact relationship...`);
-      if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
-        const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
+        if (entry.link_list && entry.link_list.contacts_icesc_project_suggestions_1) {
+          const contactData = entry.link_list.contacts_icesc_project_suggestions_1;
         console.log(`  👤 Contact relationship found! Count:`, contactData.length);
         
         if (contactData.length > 0) {
@@ -491,7 +493,7 @@ export async function GET(request: NextRequest) {
         name: entry.name || '',
         description: entry.description || '',
         project_brief: entry.project_brief || '',
-        problem_statement: entry.problem_statement || '',
+        problem_statement1_c: entry.problem_statement1_c || '',
         rationale_impact: entry.rationale_impact || '',
         
         // Strategic information

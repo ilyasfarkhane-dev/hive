@@ -2,7 +2,7 @@
  * Cleanup Script: Remove Document URLs from Text Fields
  * 
  * This script cleans up old projects that have document URLs in text fields
- * (description, problem_statement, expected_outputs, comments)
+ * (description, problem_statement1_c, expected_outputs, comments)
  * 
  * Run with: node scripts/cleanup-document-urls.js
  */
@@ -67,7 +67,7 @@ async function getAllProjects(sessionId) {
           'id',
           'name',
           'description',
-          'problem_statement',
+          'problem_statement1_c',
           'expected_outputs',
           'comments'
         ],
@@ -109,7 +109,7 @@ function needsCleaning(project) {
   };
   
   const description = getValue(project.name_value_list?.description);
-  const problemStatement = getValue(project.name_value_list?.problem_statement);
+  const problemStatement = getValue(project.name_value_list?.problem_statement1_c);
   const expectedOutputs = getValue(project.name_value_list?.expected_outputs);
   const comments = getValue(project.name_value_list?.comments);
   
@@ -133,7 +133,7 @@ async function cleanProject(sessionId, project) {
   console.log(`\n🧹 Cleaning project: ${projectName} (${projectId})`);
   
   const description = getValue(project.name_value_list?.description);
-  const problemStatement = getValue(project.name_value_list?.problem_statement);
+  const problemStatement = getValue(project.name_value_list?.problem_statement1_c);
   const expectedOutputs = getValue(project.name_value_list?.expected_outputs);
   const comments = getValue(project.name_value_list?.comments);
   
@@ -151,8 +151,8 @@ async function cleanProject(sessionId, project) {
   }
   
   if (problemStatement !== cleanedProblemStatement) {
-    updates.push({ name: 'problem_statement', value: cleanedProblemStatement });
-    console.log('  - Cleaning problem_statement');
+    updates.push({ name: 'problem_statement1_c', value: cleanedProblemStatement });
+    console.log('  - Cleaning problem_statement1_c');
   }
   
   if (expectedOutputs !== cleanedExpectedOutputs) {

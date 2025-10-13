@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    if (projectData.problem_statement) {
-      const original = projectData.problem_statement;
-      projectData.problem_statement = cleanTextField(projectData.problem_statement);
+    if (projectData.problem_statement1_c) {
+      const original = projectData.problem_statement1_c1_c;
+      projectData.problem_statement1_c1_c = cleanTextField(projectData.problem_statement1_c1_c);
      
     }
     
@@ -107,6 +107,13 @@ export async function POST(request: NextRequest) {
  
 
     // Convert document paths to Azure URLs before mapping to CRM
+    console.log('📄 Checking for documents in project data:', {
+      documents_icesc_project_suggestions_1_name: projectData.documents_icesc_project_suggestions_1_name,
+      document_c: projectData.document_c,
+      supporting_documents: projectData.supporting_documents,
+      hasDocuments: !!(projectData.documents_icesc_project_suggestions_1_name || projectData.document_c)
+    });
+    
     if (projectData.documents_icesc_project_suggestions_1_name) {
       console.log('🔄 Converting document paths to Azure URLs...');
       const documentPaths = projectData.documents_icesc_project_suggestions_1_name.split('; ').filter((path: string) => path.trim());
@@ -838,7 +845,7 @@ export async function POST(request: NextRequest) {
                       'document_c',
                       'comments',
                       'description',
-                      'problem_statement',
+                      'problem_statement1_c1_c',
                       'expected_outputs'
                     ]
                   }),
@@ -853,7 +860,7 @@ export async function POST(request: NextRequest) {
                 console.log('  document_c:', verifyData.entry_list?.document_c?.value || 'EMPTY');
                 console.log('  comments:', verifyData.entry_list?.comments?.value || 'EMPTY');
                 console.log('  description:', verifyData.entry_list?.description?.value || 'EMPTY');
-                console.log('  problem_statement:', verifyData.entry_list?.problem_statement?.value || 'EMPTY');
+                console.log('  problem_statement1_c:', verifyData.entry_list?.problem_statement1_c?.value || 'EMPTY');
                 console.log('  expected_outputs:', verifyData.entry_list?.expected_outputs?.value || 'EMPTY');
               }
             } catch (verifyError) {

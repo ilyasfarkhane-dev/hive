@@ -241,5 +241,8 @@
   "maxMilestonesReached": "Maximum 5 milestones allowed",
   "maxMilestonesLimitReached": "Maximum 5 milestones limit reached",
   "maxKPIsReached": "Maximum 5 KPIs allowed",
-  "maxKPIsLimitReached": "Maximum 5 KPIs limit reached"
+  "maxKPIsLimitReached": "Maximum 5 KPIs limit reached",
+  "saving": "Saving...",
+  "saveAsPublished": "Save as Published",
+  "saveAsDraft": "Save as Draft"
 }

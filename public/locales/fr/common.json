@@ -242,5 +242,8 @@
   "maxMilestonesReached": "Maximum 5 jalons autorisés",
   "maxMilestonesLimitReached": "Limite maximale de 5 jalons atteinte",
   "maxKPIsReached": "Maximum 5 KPI autorisés",
-  "maxKPIsLimitReached": "Limite maximale de 5 KPI atteinte"
+  "maxKPIsLimitReached": "Limite maximale de 5 KPI atteinte",
+  "saving": "Enregistrement...",
+  "saveAsPublished": "Enregistrer comme publié",
+  "saveAsDraft": "Enregistrer comme brouillon"
 }

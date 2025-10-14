@@ -261,5 +261,8 @@
   "maxMilestonesReached": "الحد الأقصى 5 معالم مسموح",
   "maxMilestonesLimitReached": "تم الوصول للحد الأقصى من 5 معالم",
   "maxKPIsReached": "الحد الأقصى 5 مؤشرات أداء مسموح",
-  "maxKPIsLimitReached": "تم الوصول للحد الأقصى من 5 مؤشرات أداء"
+  "maxKPIsLimitReached": "تم الوصول للحد الأقصى من 5 مؤشرات أداء",
+  "saving": "جاري الحفظ...",
+  "saveAsPublished": "حفظ كمنشور",
+  "saveAsDraft": "حفظ كمسودة"
 }

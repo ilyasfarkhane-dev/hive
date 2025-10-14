@@ -25,6 +25,7 @@ if (!i18n.isInitialized) {
     resources: {
       en: {
         common: {
+          "saveAsPublished": "Save as Published",
           "saving": "Saving...",
           "saveAsDraft": "Save as Draft",
           "editProject": "Edit Project",
@@ -277,6 +278,7 @@ if (!i18n.isInitialized) {
       },
       fr: {
         common: {
+          "saveAsPublished": "Enregistrer comme Publié",
           "noDocuments": "Aucun document disponible",
           "saving": "Enregistrement...",
           online: "En ligne",
@@ -530,6 +532,7 @@ if (!i18n.isInitialized) {
       },
       ar: {
         common: {
+          "saveAsPublished": "حفظ كمنشور",
           online: "عبر الإنترنت",
           offline: "دون اتصال",
           hybrid: "هجين",

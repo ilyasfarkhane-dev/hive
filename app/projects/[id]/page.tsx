@@ -2094,10 +2094,10 @@ const ProjectDetailsPage = () => {
                         {isSaving ? (
                           <>
                             <div className="w-3 h-3 mx-1.5 border border-white border-t-transparent rounded-full animate-spin"></div>
-                            Saving...
+                            {t('saving')}
                           </>
                         ) : (
-                          'Save as Published'
+                          t('saveAsPublished')
                         )}
                       </button>
                       <button
@@ -2108,17 +2108,17 @@ const ProjectDetailsPage = () => {
                         {isDraftSaving ? (
                           <>
                             <div className="w-3 h-3 mx-1.5 border border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                            Saving...
+                            {t('saving')}
                           </>
                         ) : (
-                          'Save as Draft'
+                          t('saveAsDraft')
                         )}
                       </button>
                       <button
                         onClick={handleCancelEditing}
                         className="inline-flex items-center px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors duration-150"
                       >
-                        Cancel
+                        {t('cancel')}
                       </button>
                     </div>
                   )}

@@ -295,6 +295,19 @@ export async function POST(request: NextRequest) {
       console.log('🔗 Final URLs:', finalUrls);
     }
     
+    // Process individual document fields (document1_c, document2_c, document3_c, document4_c)
+    // These come from the draft save which already uploaded the files
+    console.log('📄 Checking individual document fields in project data...');
+    for (let i = 1; i <= 4; i++) {
+      const crmField = `document${i}_c`;
+      if (projectData[crmField]) {
+        console.log(`✅ Found ${crmField}:`, projectData[crmField]);
+        // Field already has the URL, just ensure it's in the data
+      } else {
+        console.log(`📄 No data for ${crmField}`);
+      }
+    }
+    
     const crmData = mapProjectDataToCRM(projectData);
     
     // Debug logging for partners, milestones, and KPIs
@@ -350,17 +363,25 @@ export async function POST(request: NextRequest) {
       'contact_email',
       'contact_phone',
       'contact_role',
-      'contact_id'
+      'contact_id',
+      // Document fields
+      'document_c',
+      'documents_icesc_project_suggestions_1_name',
+      'document1_c',
+      'document2_c',
+      'document3_c',
+      'document4_c'
     ];
     
-    // Keep contact fields even if empty (to allow clearing them)
+    // Keep contact fields and document fields even if empty (to allow clearing them)
     const contactFields = ['contact_name', 'contact_email', 'contact_phone', 'contact_role', 'contact_id'];
+    const documentFields = ['document_c', 'documents_icesc_project_suggestions_1_name', 'document1_c', 'document2_c', 'document3_c', 'document4_c'];
     
     const filteredCrmData = crmData.filter(field => {
       if (!allowedFields.includes(field.name)) return false;
       
-      // Always include contact fields (even if empty)
-      if (contactFields.includes(field.name)) {
+      // Always include contact fields and document fields (even if empty to allow clearing)
+      if (contactFields.includes(field.name) || documentFields.includes(field.name)) {
         return field.value !== null && field.value !== undefined;
       }
       
@@ -371,14 +392,33 @@ export async function POST(request: NextRequest) {
     console.log('Total fields:', filteredCrmData.length);
     console.log('Field names:', filteredCrmData.map(f => f.name));
     
+    // Log document fields specifically
+    const docFieldsInUpdate = filteredCrmData.filter(f => f.name.includes('document'));
+    console.log('📄 Document fields in CRM update:', docFieldsInUpdate.map(f => ({
+      name: f.name,
+      value: f.value ? (f.value.length > 50 ? `${f.value.substring(0, 50)}...` : f.value) : 'EMPTY',
+      isEmpty: f.value === ''
+    })));
+    
     // Additional validation - ensure all values are clean
     filteredCrmData.forEach(field => {
-      if (field.value === '' || field.value === null || field.value === undefined) {
-        field.value = '';
-      }
-      // Ensure string values are trimmed
-      if (typeof field.value === 'string') {
-        field.value = field.value.trim();
+      // For document fields, preserve empty strings to allow clearing
+      if (documentFields.includes(field.name)) {
+        if (field.value === '' || field.value === null || field.value === undefined) {
+          field.value = ''; // Keep as empty string to clear in CRM
+          console.log(`🗑️ Document field ${field.name} will be cleared in CRM (set to empty string)`);
+        } else if (typeof field.value === 'string') {
+          field.value = field.value.trim();
+        }
+      } else {
+        // For non-document fields
+        if (field.value === '' || field.value === null || field.value === undefined) {
+          field.value = '';
+        }
+        // Ensure string values are trimmed
+        if (typeof field.value === 'string') {
+          field.value = field.value.trim();
+        }
       }
     });
     
@@ -406,6 +446,17 @@ export async function POST(request: NextRequest) {
     console.log('Project ID being updated:', projectData.id);
     console.log('Project ID type:', typeof projectData.id);
     console.log('Project ID length:', projectData.id?.length);
+    
+    // Log document fields in the final request
+    const docFieldsInFinalRequest = updateData.name_value_list.filter((f: any) => f.name.includes('document'));
+    console.log('📄 Document fields in FINAL CRM request:', docFieldsInFinalRequest.map((f: any) => ({
+      name: f.name,
+      value: f.value || 'EMPTY_STRING',
+      valueLength: f.value ? f.value.length : 0,
+      isEmpty: f.value === '',
+      isNull: f.value === null,
+      isUndefined: f.value === undefined
+    })));
     
     // Validate update data
     if (!updateData.session || !updateData.module_name || !updateData.name_value_list) {

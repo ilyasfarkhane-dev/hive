@@ -73,6 +73,10 @@ export async function GET(request: NextRequest) {
                 'otherbeneficiary',
                 'documents_icesc_project_suggestions_1_name',
                 'document_c',
+                'document1_c',
+                'document2_c',
+                'document3_c',
+                'document4_c',
                 'date_start',
                 'date_end',
                 'project_frequency',
@@ -181,6 +185,10 @@ export async function GET(request: NextRequest) {
               'otherbeneficiary',
               'documents_icesc_project_suggestions_1_name',
               'document_c',
+              'document1_c',
+              'document2_c',
+              'document3_c',
+              'document4_c',
           'date_start',
           'date_end',
               'project_frequency',
@@ -466,6 +474,11 @@ export async function GET(request: NextRequest) {
             // If it's still an object or null/undefined, set to empty string
             flattenedEntry[key] = field || '';
           }
+          
+          // Debug logging for document fields
+          if (key.includes('document')) {
+            console.log(`  📄 Extracted ${key}:`, flattenedEntry[key] ? `${flattenedEntry[key].substring(0, 50)}...` : 'EMPTY');
+          }
         });
       }
       
@@ -601,9 +614,21 @@ export async function GET(request: NextRequest) {
         // Document fields
         document_c: entry.document_c || '',
         documents_icesc_project_suggestions_1_name: entry.documents_icesc_project_suggestions_1_name || '',
+        // Individual document fields
+        document1_c: entry.document1_c || '',
+        document2_c: entry.document2_c || '',
+        document3_c: entry.document3_c || '',
+        document4_c: entry.document4_c || '',
         
         // Parse files from document fields if they exist
         files: (() => {
+          // Debug log individual document fields
+          console.log('📄 Document fields in transformed project:', {
+            document1_c: entry.document1_c ? `${entry.document1_c.substring(0, 50)}...` : 'EMPTY',
+            document2_c: entry.document2_c ? `${entry.document2_c.substring(0, 50)}...` : 'EMPTY',
+            document3_c: entry.document3_c ? `${entry.document3_c.substring(0, 50)}...` : 'EMPTY',
+            document4_c: entry.document4_c ? `${entry.document4_c.substring(0, 50)}...` : 'EMPTY'
+          });
           const documentPaths = entry.document_c || '';
           const documentNames = entry.documents_icesc_project_suggestions_1_name || '';
           

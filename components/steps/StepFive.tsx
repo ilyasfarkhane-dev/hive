@@ -85,12 +85,35 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
       phone: "",
       role: "",
     },
-    files: [] as any[],
+    document1: null as File | null,
+    document2: null as File | null,
+    document3: null as File | null,
+    document4: null as File | null,
     comments: "",
   });
   
   // Store actual File objects separately to avoid serialization issues
   const fileObjectsRef = useRef(new Map());
+
+  // File handling functions for individual documents
+  const handleDocumentChange = (documentNumber: 1 | 2 | 3 | 4, file: File | null) => {
+    const fieldName = `document${documentNumber}` as keyof typeof formValues;
+    setFormValues(prev => ({
+      ...prev,
+      [fieldName]: file
+    }));
+    
+    // Store file object in ref for later use
+    if (file) {
+      fileObjectsRef.current.set(fieldName, file);
+    } else {
+      fileObjectsRef.current.delete(fieldName);
+    }
+  };
+
+  const handleRemoveDocument = (documentNumber: 1 | 2 | 3 | 4) => {
+    handleDocumentChange(documentNumber, null);
+  };
 
   const [emailError, setEmailError] = useState("");
 
@@ -115,8 +138,7 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
           setFormValues(prev => {
             const newFormValues = {
               ...prev,
-              ...parsedData,
-              files: prev.files || []
+              ...parsedData
             };
             
             return newFormValues;
@@ -155,18 +177,9 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
 
 
     // Don't save File objects to localStorage as they can't be serialized
-    // Only save file metadata for persistence
-    const serializableFiles = formValues.files.map((file) => ({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified,
-      // Don't include the actual File object as it can't be serialized
-    }));
-
+    // Save form data (individual documents will be handled separately)
     const dataToSave = {
       ...formValues,
-      files: serializableFiles,
     };
 
     localStorage.setItem("projectDetails", JSON.stringify(dataToSave));
@@ -182,99 +195,22 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
     ref,
     () => ({
       getFormValues: () => {
-        // Return files with actual File objects from ref
+        // Return form values with individual document files
         console.log('=== StepFive getFormValues called ===');
-        console.log('Files in state:', formValues.files.length);
-        console.log('Files in ref:', fileObjectsRef.current.size);
-        console.log('Ref keys:', Array.from(fileObjectsRef.current.keys()));
-        
-        const filesWithFileObjects = formValues.files.map((fileMetadata, index) => {
-          const fileObject = fileMetadata.id ? fileObjectsRef.current.get(fileMetadata.id) : null;
-          console.log(`File ${index}:`, {
-            id: fileMetadata.id,
-            name: fileMetadata.name,
-            hasFileObject: !!fileObject,
-            isFile: fileObject instanceof File,
-            fileObjectType: typeof fileObject
-          });
-          
-          return {
-            ...fileMetadata,
-            fileObject: fileObject || null
-          };
-        });
-        
-        console.log('Files with File objects:', filesWithFileObjects);
+        console.log('Document 1:', formValues.document1?.name || 'None');
+        console.log('Document 2:', formValues.document2?.name || 'None');
+        console.log('Document 3:', formValues.document3?.name || 'None');
+        console.log('Document 4:', formValues.document4?.name || 'None');
         console.log('=====================================');
         
         return {
           ...formValues,
-          files: filesWithFileObjects,
         };
       },
     }),
     [formValues]
   );
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const selectedFiles = Array.from(e.target.files);
-    const validFiles = selectedFiles.filter((file) => file.size <= 10 * 1024 * 1024);
-    
-    if (validFiles.length === 0) {
-      console.warn('No valid files selected');
-      return;
-    }
-
-    try {
-     
-      // Store files temporarily without uploading
-      // Store File objects in ref to avoid serialization issues
-      const filesWithMetadata = validFiles.map((file: File, index: number) => {
-        const fileId = `${file.name}_${file.size}_${Date.now()}_${index}`;
-        
-        // Store the actual File object in the ref
-        fileObjectsRef.current.set(fileId, file);
-        
-        // Return only metadata for state
-        return {
-          id: fileId,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified,
-        };
-      });
-
-      setFormValues((prev) => ({
-        ...prev,
-        files: [...prev.files, ...filesWithMetadata],
-      }));
-      
-      console.log('Files stored temporarily for later upload');
-      console.log('File objects stored in ref:', fileObjectsRef.current.size);
-    } catch (error) {
-      console.error('Error storing files:', error);
-      alert('Error storing files. Please try again.');
-    }
-
-    e.target.value = "";
-  };
-
-  const handleRemoveFile = (index: number) => {
-    setFormValues((prev) => {
-      const fileToRemove = prev.files[index];
-      if (fileToRemove && fileToRemove.id) {
-        // Remove from ref
-        fileObjectsRef.current.delete(fileToRemove.id);
-      }
-      
-      return {
-        ...prev,
-        files: prev.files.filter((_, i) => i !== index),
-      };
-    });
-  };
 
   // Email validation function
   const validateEmail = (email: string) => {
@@ -1220,64 +1156,187 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
             <p className="text-sm text-gray-600 mt-1">{t('supportingDocumentsDesc')}</p>
           </div>
 
-          <div
-            id="upload-area"
-            className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors duration-200 cursor-pointer"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Document 1 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Document 1 <span className="text-gray-400 text-xs">(Optional)</span>
+              </label>
+              <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors duration-200 cursor-pointer">
             <input
               type="file"
-              id="file-input"
-              multiple
               accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              onChange={handleFileChange}
-            />
-            <div className="upload-content flex flex-col items-center justify-center gap-3 pointer-events-none">
-              <svg
-                className="w-10 h-10 text-gray-400"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+                  onChange={(e) => handleDocumentChange(1, e.target.files?.[0] || null)}
+                />
+                <div className="upload-content flex flex-col items-center justify-center gap-2 pointer-events-none">
+                  <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
               <div>
-                <p className="text-sm font-medium text-gray-700">{t('uploadDropOrBrowse')}</p>
-                <p className="text-xs text-gray-500">{t('uploadTypesLimit')}</p>
+                    <p className="text-xs font-medium text-gray-700">Upload Document 1</p>
+                    <p className="text-xs text-gray-500">PDF, DOC, Images</p>
               </div>
             </div>
-          </div>
-
-          {formValues.files.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</h4>
-              {formValues.files.map((file, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg"
-                >
+              </div>
+              {formValues.document1 && (
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                       <polyline points="14,2 14,8 20,8" />
                     </svg>
-                    <span className="text-sm text-gray-700">{file.name}</span>
-                    <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                    <span className="text-sm text-gray-700">{formValues.document1.name}</span>
+                    <span className="text-xs text-gray-500">({(formValues.document1.size / 1024).toFixed(1)} KB)</span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleRemoveFile(i)}
+                    onClick={() => handleRemoveDocument(1)}
                     className="text-red-500 hover:text-red-700 text-sm"
                   >
                     ×
                   </button>
                 </div>
-              ))}
+              )}
+          </div>
+
+            {/* Document 2 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Document 2 <span className="text-gray-400 text-xs">(Optional)</span>
+              </label>
+              <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors duration-200 cursor-pointer">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  onChange={(e) => handleDocumentChange(2, e.target.files?.[0] || null)}
+                />
+                <div className="upload-content flex flex-col items-center justify-center gap-2 pointer-events-none">
+                  <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">Upload Document 2</p>
+                    <p className="text-xs text-gray-500">PDF, DOC, Images</p>
+                  </div>
+                </div>
+              </div>
+              {formValues.document2 && (
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14,2 14,8 20,8" />
+                    </svg>
+                    <span className="text-sm text-gray-700">{formValues.document2.name}</span>
+                    <span className="text-xs text-gray-500">({(formValues.document2.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDocument(2)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Document 3 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Document 3 <span className="text-gray-400 text-xs">(Optional)</span>
+              </label>
+              <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors duration-200 cursor-pointer">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  onChange={(e) => handleDocumentChange(3, e.target.files?.[0] || null)}
+                />
+                <div className="upload-content flex flex-col items-center justify-center gap-2 pointer-events-none">
+                  <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">Upload Document 3</p>
+                    <p className="text-xs text-gray-500">PDF, DOC, Images</p>
+                  </div>
+                </div>
+              </div>
+              {formValues.document3 && (
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14,2 14,8 20,8" />
+                    </svg>
+                    <span className="text-sm text-gray-700">{formValues.document3.name}</span>
+                    <span className="text-xs text-gray-500">({(formValues.document3.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDocument(3)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Document 4 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Document 4 <span className="text-gray-400 text-xs">(Optional)</span>
+              </label>
+              <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors duration-200 cursor-pointer">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  onChange={(e) => handleDocumentChange(4, e.target.files?.[0] || null)}
+                />
+                <div className="upload-content flex flex-col items-center justify-center gap-2 pointer-events-none">
+                  <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">Upload Document 4</p>
+                    <p className="text-xs text-gray-500">PDF, DOC, Images</p>
+                  </div>
+                </div>
+              </div>
+              {formValues.document4 && (
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14,2 14,8 20,8" />
+                    </svg>
+                    <span className="text-sm text-gray-700">{formValues.document4.name}</span>
+                    <span className="text-xs text-gray-500">({(formValues.document4.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDocument(4)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    ×
+                  </button>
             </div>
           )}
+            </div>
+          </div>
         </div>
 
         {/* comments */}

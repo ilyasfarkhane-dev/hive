@@ -1469,8 +1469,46 @@ useEffect(() => {
 
     setIsDraftSaving(true);
     try {
-      // Upload files first to get file paths for draft submission
-      const uploadedFilePaths = await uploadFilesAndGetPaths(currentProjectDetails.files || []);
+      // Collect files from individual document fields (document1, document2, etc.)
+      // Track which document number each file came from
+      const filesWithDocNumber: Array<{ file: any; docNumber: number }> = [];
+      for (let i = 1; i <= 4; i++) {
+        const docKey = `document${i}` as keyof typeof currentProjectDetails;
+        const doc = currentProjectDetails[docKey];
+        if (doc) {
+          // Wrap File objects in the expected format and track doc number
+          filesWithDocNumber.push({
+            file: {
+              fileObject: doc,
+              name: doc instanceof File ? doc.name : 'document',
+              size: doc instanceof File ? doc.size : 0
+            },
+            docNumber: i
+          });
+        }
+      }
+      
+      console.log('🔍 Collected files from individual document fields:', filesWithDocNumber.length);
+      filesWithDocNumber.forEach((item, idx) => {
+        console.log(`  Document ${item.docNumber}:`, item.file.name, `(${item.file.size} bytes)`);
+      });
+      
+      // Upload files and get URLs mapped to their document numbers
+      const uploadedDocuments: Record<string, string> = {};
+      for (const item of filesWithDocNumber) {
+        try {
+          const paths = await uploadFilesAndGetPaths([item.file]);
+          if (paths.length > 0) {
+            uploadedDocuments[`document${item.docNumber}_c`] = paths[0];
+            console.log(`✅ Uploaded document${item.docNumber}_c:`, paths[0]);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to upload document${item.docNumber}:`, error);
+        }
+      }
+      
+      // Also collect all paths for backward compatibility with existing fields
+      const uploadedFilePaths = Object.values(uploadedDocuments);
       
       // Prepare project data for draft submission (with file paths)
       const projectData = {
@@ -1654,7 +1692,10 @@ useEffect(() => {
         // Supporting documents - will be uploaded after project creation
         supporting_documents: [],
         
-        // Document fields for CRM storage - use uploaded file paths
+        // Individual document fields for CRM storage (one URL per field)
+        ...uploadedDocuments,
+        
+        // Combined document fields for CRM storage (backward compatibility)
         ...(uploadedFilePaths.length > 0 ? {
           document_c: uploadedFilePaths.join('; '),
           documents_icesc_project_suggestions_1_name: uploadedFilePaths.join('; ')
@@ -1665,6 +1706,10 @@ useEffect(() => {
       // Debug: Log document fields being sent to CRM
       console.log('🔍 DEBUG: Document fields in submission data:', {
         uploadedFilePaths: uploadedFilePaths,
+        document1_c: uploadedDocuments.document1_c || 'EMPTY',
+        document2_c: uploadedDocuments.document2_c || 'EMPTY',
+        document3_c: uploadedDocuments.document3_c || 'EMPTY',
+        document4_c: uploadedDocuments.document4_c || 'EMPTY',
         document_c: uploadedFilePaths.length > 0 ? uploadedFilePaths.join('; ') : 'EMPTY',
         documents_icesc_project_suggestions_1_name: uploadedFilePaths.length > 0 ? uploadedFilePaths.join('; ') : 'EMPTY'
       });

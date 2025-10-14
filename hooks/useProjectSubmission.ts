@@ -63,6 +63,11 @@ export interface ProjectSubmissionData {
   // Additional info
   comments?: string;
   supporting_documents?: File[];
+  // Individual document fields
+  document1?: File;
+  document2?: File;
+  document3?: File;
+  document4?: File;
   status?: string;
 }
 
@@ -167,27 +172,78 @@ export const useProjectSubmission = () => {
     }
 
     try {
-      // Prepare data for submission
-      const submissionData = {
-        ...projectData,
-        session_id: sessionId,
-        language: currentLanguage,
-        submission_date: new Date().toISOString(),
-        status: 'Published', // Set status to Published by default
-      };
+      // Check if there are any files to upload
+      const hasFiles = projectData.document1 || projectData.document2 || projectData.document3 || projectData.document4;
+      
+      let response;
+      
+      if (hasFiles) {
+        // Use FormData for submissions with files
+        console.log('📄 Files detected, using FormData for submission...');
+        const formData = new FormData();
+        
+        // Add all project data fields
+        const submissionData = {
+          ...projectData,
+          session_id: sessionId,
+          language: currentLanguage,
+          submission_date: new Date().toISOString(),
+          status: 'Published', // Set status to Published by default
+        };
+        
+        // Add non-file fields to FormData
+        Object.entries(submissionData).forEach(([key, value]) => {
+          if (key.startsWith('document') && value instanceof File) {
+            // Add files with proper field names
+            formData.append(key, value);
+          } else if (value !== null && value !== undefined && !(value instanceof File)) {
+            // Add other fields as JSON strings
+            if (typeof value === 'object') {
+              formData.append(key, JSON.stringify(value));
+            } else {
+              formData.append(key, String(value));
+            }
+          }
+        });
+        
+        console.log('📄 FormData prepared with files');
+        console.log('Files in FormData:', {
+          document1: projectData.document1?.name || 'None',
+          document2: projectData.document2?.name || 'None', 
+          document3: projectData.document3?.name || 'None',
+          document4: projectData.document4?.name || 'None'
+        });
+        
+        // Log the project submission
+        logProjectSubmission(submissionData);
 
-      // Log the project submission
-      logProjectSubmission(submissionData);
+        console.log('Sending FormData request to /api/submit-project-simple...');
+        response = await fetch('/api/submit-project-simple', {
+          method: 'POST',
+          body: formData, // No Content-Type header - let browser set it with boundary
+        });
+      } else {
+        // Use JSON for submissions without files
+        const submissionData = {
+          ...projectData,
+          session_id: sessionId,
+          language: currentLanguage,
+          submission_date: new Date().toISOString(),
+          status: 'Published', // Set status to Published by default
+        };
 
-      console.log('Sending request to /api/submit-project-simple...');
-      console.log('Current window location:', window.location.href);
-      const response = await fetch('/api/submit-project-simple', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submissionData),
-      });
+        // Log the project submission
+        logProjectSubmission(submissionData);
+
+        console.log('Sending JSON request to /api/submit-project-simple...');
+        response = await fetch('/api/submit-project-simple', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(submissionData),
+        });
+      }
 
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);

@@ -92,6 +92,11 @@ type AnyProject = {
   // Document fields
   document_c?: string;
   documents_icesc_project_suggestions_1_name?: string;
+  // Individual document fields
+  document1_c?: string;
+  document2_c?: string;
+  document3_c?: string;
+  document4_c?: string;
 };
 
 const ProjectDetailsPage = () => {
@@ -111,6 +116,17 @@ const ProjectDetailsPage = () => {
   const [showOtherBeneficiaryInput, setShowOtherBeneficiaryInput] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [draftMessage, setDraftMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  
+  // Track individual document changes
+  const [changedDocuments, setChangedDocuments] = useState<{
+    document1?: File;
+    document2?: File;
+    document3?: File;
+    document4?: File;
+  }>({});
+  
+  // Track which documents have been marked for removal
+  const [removedDocuments, setRemovedDocuments] = useState<Set<number>>(new Set());
 
   // Retry state management
   const [retryCount, setRetryCount] = useState(0);
@@ -203,8 +219,15 @@ const ProjectDetailsPage = () => {
           });
           console.log('📄 Document info in project:', {
             document_c: projectData.document_c,
-            documents_icesc_project_suggestions_1_name: projectData.documents_icesc_project_suggestions_1_name
+            documents_icesc_project_suggestions_1_name: projectData.documents_icesc_project_suggestions_1_name,
+            document1_c: projectData.document1_c,
+            document2_c: projectData.document2_c,
+            document3_c: projectData.document3_c,
+            document4_c: projectData.document4_c
           });
+          console.log('📄 All document-related fields in projectData:', 
+            Object.keys(projectData).filter(key => key.toLowerCase().includes('document'))
+          );
           setProject(projectData);
         } else {
           setError('Project not found');
@@ -225,36 +248,85 @@ const ProjectDetailsPage = () => {
 
   // Function to parse documents from CRM fields
   const parseDocumentsFromCRM = (project: AnyProject) => {
-    const documentPaths = project.document_c || '';
-    const documentNames = project.documents_icesc_project_suggestions_1_name || '';
+    const documents: any[] = [];
     
-    if (!documentPaths || !documentNames) {
-      return [];
+    // Check individual document fields first (document1_c, document2_c, document3_c, document4_c)
+    for (let i = 1; i <= 4; i++) {
+      const docField = `document${i}_c` as keyof AnyProject;
+      const docUrl = project[docField] as string;
+      
+      if (docUrl && docUrl.trim()) {
+        console.log(`📄 Found ${docField}:`, docUrl);
+        
+        // Extract filename from URL
+        let fileName = `Document ${i}`;
+        try {
+          // Try to extract filename from URL path
+          const urlParts = docUrl.split('/');
+          const lastPart = urlParts[urlParts.length - 1];
+          // Remove query parameters
+          const fileNamePart = lastPart.split('?')[0];
+          if (fileNamePart && fileNamePart.length > 0) {
+            // Remove timestamp prefix if exists (e.g., "1234567890_myfile.pdf")
+            const cleanFileName = fileNamePart.replace(/^\d+_/, '');
+            fileName = cleanFileName || `Document ${i}`;
+          }
+        } catch (error) {
+          console.warn(`Failed to extract filename from ${docField}:`, error);
+        }
+        
+        // Check if the URL is already a full Azure URL with SAS token
+        const isAzureUrl = docUrl.includes('blob.core.windows.net');
+        
+        documents.push({
+          name: fileName,
+          fileName: fileName,
+          filePath: docUrl,
+          downloadURL: isAzureUrl ? docUrl : '',
+          url: isAzureUrl ? docUrl : '',
+          size: 0,
+          type: 'application/octet-stream',
+          documentNumber: i
+        });
+      }
     }
     
-    // Split the semicolon-separated values
-    const paths = documentPaths.split('; ').filter((path: string) => path.trim());
-    const names = documentNames.split('; ').filter((name: string) => name.trim());
+    // If no individual documents found, fall back to legacy combined fields
+    if (documents.length === 0) {
+      const documentPaths = project.document_c || '';
+      const documentNames = project.documents_icesc_project_suggestions_1_name || '';
+      
+      if (documentPaths && documentNames) {
+        console.log('📄 Using legacy combined document fields');
+        
+        // Split the semicolon-separated values
+        const paths = documentPaths.split('; ').filter((path: string) => path.trim());
+        const names = documentNames.split('; ').filter((name: string) => name.trim());
+        
+        // Create file objects from the paths and names
+        paths.forEach((path: string, index: number) => {
+          const name = names[index] || `Document ${index + 1}`;
+          // Extract filename from path for display
+          const fileName = path.split('\\').pop() || path.split('/').pop() || name;
+          
+          // Check if the path is already a full Azure URL with SAS token
+          const isAzureUrl = path.includes('blob.core.windows.net') && path.includes('sv=');
+          
+          documents.push({
+            name: fileName,
+            fileName: fileName,
+            filePath: path,
+            downloadURL: isAzureUrl ? path : '',
+            url: isAzureUrl ? path : '',
+            size: 0,
+            type: 'application/octet-stream'
+          });
+        });
+      }
+    }
     
-    // Create file objects from the paths and names
-    return paths.map((path: string, index: number) => {
-      const name = names[index] || `Document ${index + 1}`;
-      // Extract filename from path for display
-      const fileName = path.split('\\').pop() || path.split('/').pop() || name;
-      
-      // Check if the path is already a full Azure URL with SAS token
-      const isAzureUrl = path.includes('blob.core.windows.net') && path.includes('sv=');
-      
-      return {
-        name: fileName,
-        fileName: fileName,
-        filePath: path,
-        downloadURL: isAzureUrl ? path : '', // Use the path as downloadURL if it's already a full Azure URL
-        url: isAzureUrl ? path : '', // Also set url field for compatibility
-        size: 0, // Size not available from CRM
-        type: 'application/octet-stream' // Default type
-      };
-    });
+    console.log(`📄 Total documents found: ${documents.length}`);
+    return documents;
   };
 
   // Function to get download URL for a file
@@ -756,6 +828,8 @@ const ProjectDetailsPage = () => {
     
     setIsEditing(true);
     setEditedProject({ ...project });
+    setChangedDocuments({}); // Clear any previous document changes
+    setRemovedDocuments(new Set()); // Clear any marked removals
     
     // Check if "Other" beneficiary is selected to show the input
     const hasOtherBeneficiary = project.beneficiaries?.includes(t('beneficiaryOther')) || false;
@@ -765,6 +839,10 @@ const ProjectDetailsPage = () => {
     console.log('📄 Project document fields:', {
       document_c: project.document_c || '',
       documents_icesc_project_suggestions_1_name: project.documents_icesc_project_suggestions_1_name || '',
+      document1_c: project.document1_c || '',
+      document2_c: project.document2_c || '',
+      document3_c: project.document3_c || '',
+      document4_c: project.document4_c || '',
       filesCount: project.files?.length || 0
     });
   };
@@ -847,6 +925,8 @@ const ProjectDetailsPage = () => {
     try {
       console.log('💾 Saving project changes to CRM:', editedProject);
       console.log('📋 Original project data:', project);
+      console.log('📄 Changed documents:', changedDocuments);
+      console.log('🗑️ Removed documents:', Array.from(removedDocuments));
       console.log('🎯 Strategic data from project:', {
         strategic_goal: project?.strategic_goal,
         strategic_goal_id: project?.strategic_goal_id,
@@ -858,10 +938,12 @@ const ProjectDetailsPage = () => {
         sub_service_id: project?.sub_service_id
       });
 
-      // Document fields are now handled directly from editedProject.document_c and editedProject.documents_icesc_project_suggestions_1_name
-      console.log('📁 Using document fields from edited project:', {
-        document_c: editedProject.document_c || '',
-        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || ''
+      // Log current document field values in editedProject BEFORE building update data
+      console.log('📄 Current document field values in editedProject:', {
+        document1_c: editedProject.document1_c !== undefined ? (editedProject.document1_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document1_c.substring(0, 50)}...`) : '❌ UNDEFINED',
+        document2_c: editedProject.document2_c !== undefined ? (editedProject.document2_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document2_c.substring(0, 50)}...`) : '❌ UNDEFINED',
+        document3_c: editedProject.document3_c !== undefined ? (editedProject.document3_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document3_c.substring(0, 50)}...`) : '❌ UNDEFINED',
+        document4_c: editedProject.document4_c !== undefined ? (editedProject.document4_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document4_c.substring(0, 50)}...`) : '❌ UNDEFINED'
       });
       
       // Get contact ID from localStorage if not available in project data
@@ -876,14 +958,64 @@ const ProjectDetailsPage = () => {
         final_contact_id: editedProject.contact_id || project?.contact_id || contactIdFromStorage || ''
       });
       
-      // Prepare the data for CRM update
+      // Upload changed documents to Azure
+      const uploadedDocumentUrls: Record<string, string> = {};
+      if (Object.keys(changedDocuments).length > 0) {
+        console.log('📤 Uploading changed documents to Azure...', changedDocuments);
+        
+        for (const [key, file] of Object.entries(changedDocuments)) {
+          if (file) {
+            try {
+              const formData = new FormData();
+              formData.append('files', file);
+              
+              // Get user email for folder naming
+              let userEmail = 'unknown';
+              try {
+                const contactInfo = localStorage.getItem('contactInfo');
+                if (contactInfo) {
+                  const contact = JSON.parse(contactInfo);
+                  userEmail = contact.email || 'unknown';
+                }
+              } catch (e) {
+                console.warn('Could not get contact email:', e);
+              }
+              
+              formData.append('userEmail', userEmail);
+              formData.append('projectId', editedProject.id);
+              
+              const uploadResponse = await fetch('/api/upload-documents', {
+                method: 'POST',
+                body: formData,
+              });
+              
+              const uploadResult = await uploadResponse.json();
+              
+              if (uploadResult.success && uploadResult.files && uploadResult.files.length > 0) {
+                const uploadedFile = uploadResult.files[0];
+                const azureUrl = uploadedFile.downloadURL || uploadedFile.filePath;
+                const documentNumber = key.replace('document', '');
+                const crmField = `document${documentNumber}_c`;
+                uploadedDocumentUrls[crmField] = azureUrl;
+                console.log(`✅ Uploaded ${key} to Azure:`, azureUrl);
+              } else {
+                console.error(`❌ Failed to upload ${key}:`, uploadResult.error);
+              }
+            } catch (uploadError) {
+              console.error(`❌ Error uploading ${key}:`, uploadError);
+            }
+          }
+        }
+      }
+      
+      // Prepare the data for CRM update - merge editedProject with original project to preserve unchanged fields
       const updateData = {
         id: editedProject.id,
-        name: editedProject.name,
-        description: editedProject.description || editedProject.brief || '',
-        project_brief: editedProject.brief || editedProject.description || '',
-        problem_statement: editedProject.problem_statement1_c || editedProject.problem_statement || '',
-        rationale_impact: editedProject.rationale_impact || editedProject.rationale || '',
+        name: editedProject.name || project?.name || '',
+        description: editedProject.description || project?.description || editedProject.brief || project?.brief || '',
+        project_brief: editedProject.brief || project?.brief || editedProject.description || project?.description || '',
+        problem_statement: editedProject.problem_statement1_c || project?.problem_statement1_c || editedProject.problem_statement || project?.problem_statement || '',
+        rationale_impact: editedProject.rationale_impact || project?.rationale_impact || editedProject.rationale || project?.rationale || '',
         
         // Strategic selections (preserve existing values if not changed)
         strategic_goal: editedProject.strategic_goal || project?.strategic_goal || 'Strategic Goal',
@@ -895,38 +1027,54 @@ const ProjectDetailsPage = () => {
         sub_service: editedProject.sub_service || project?.sub_service || 'Subservice',
         sub_service_id: editedProject.sub_service_id || project?.sub_service_id || '',
         
-        // Beneficiaries
-        beneficiaries: editedProject.beneficiaries || [],
-        other_beneficiaries: editedProject.other_beneficiary || '',
+        // Beneficiaries - preserve original if not edited
+        beneficiaries: editedProject.beneficiaries || project?.beneficiaries || [],
+        other_beneficiaries: editedProject.other_beneficiary || project?.other_beneficiary || '',
         
-        // Budget and timeline
-        budget_icesco: parseFloat(editedProject.budget?.icesco || '0') || 0,
-        budget_member_state: parseFloat(editedProject.budget?.member_state || '0') || 0,
-        budget_sponsorship: parseFloat(editedProject.budget?.sponsorship || '0') || 0,
-        start_date: editedProject.start_date || '',
-        end_date: editedProject.end_date || '',
-        frequency: editedProject.project_frequency || editedProject.frequency || '',
-        frequency_duration: editedProject.frequency_duration || '',
+        // Budget and timeline - preserve original if not edited
+        // Check both nested budget object and flat budget_* fields
+        budget_icesco: (() => {
+          const value = editedProject.budget?.icesco || (editedProject as any).budget_icesco || project?.budget?.icesco || project?.budget_icesco || '0';
+          const parsed = parseFloat(String(value));
+          console.log('💰 SAVE budget_icesco:', { editedNested: editedProject.budget?.icesco, editedFlat: (editedProject as any).budget_icesco, projectNested: project?.budget?.icesco, projectFlat: project?.budget_icesco, final: parsed });
+          return isNaN(parsed) ? 0 : parsed;
+        })(),
+        budget_member_state: (() => {
+          const value = editedProject.budget?.member_state || (editedProject as any).budget_member_state || project?.budget?.member_state || project?.budget_member_state || '0';
+          const parsed = parseFloat(String(value));
+          console.log('💰 SAVE budget_member_state:', { editedNested: editedProject.budget?.member_state, editedFlat: (editedProject as any).budget_member_state, projectNested: project?.budget?.member_state, projectFlat: project?.budget_member_state, final: parsed });
+          return isNaN(parsed) ? 0 : parsed;
+        })(),
+        budget_sponsorship: (() => {
+          const value = editedProject.budget?.sponsorship || (editedProject as any).budget_sponsorship || project?.budget?.sponsorship || project?.budget_sponsorship || '0';
+          const parsed = parseFloat(String(value));
+          console.log('💰 SAVE budget_sponsorship:', { editedNested: editedProject.budget?.sponsorship, editedFlat: (editedProject as any).budget_sponsorship, projectNested: project?.budget?.sponsorship, projectFlat: project?.budget_sponsorship, final: parsed });
+          return isNaN(parsed) ? 0 : parsed;
+        })(),
+        start_date: editedProject.start_date || project?.start_date || '',
+        end_date: editedProject.end_date || project?.end_date || '',
+        frequency: editedProject.project_frequency || editedProject.frequency || project?.project_frequency || project?.frequency || '',
+        frequency_duration: editedProject.frequency_duration || project?.frequency_duration || '',
         
-        // Partners and scope
-        partners: editedProject.partners || [],
-        institutions: editedProject.partners || [], // Same as partners for CRM
-        delivery_modality: editedProject.delivery_modality || '',
-        geographic_scope: editedProject.geographic_scope || '',
-        convening_method: editedProject.convening_method || '',
-        project_type: editedProject.convening_method || '',
-        project_type_other: editedProject.convening_method_other || '',
+        // Partners and scope - preserve original if not edited
+        partners: editedProject.partners || project?.partners || [],
+        institutions: editedProject.partners || project?.partners || [], // Same as partners for CRM
+        delivery_modality: editedProject.delivery_modality || project?.delivery_modality || '',
+        geographic_scope: editedProject.geographic_scope || project?.geographic_scope || '',
+        convening_method: editedProject.convening_method || project?.convening_method || '',
+        project_type: editedProject.convening_method || project?.convening_method || '',
+        project_type_other: editedProject.convening_method_other || project?.convening_method_other || '',
         
-        // Monitoring and evaluation
-        milestones: editedProject.milestones || [],
-        expected_outputs: editedProject.expected_outputs || '',
-        kpis: editedProject.kpis || [],
+        // Monitoring and evaluation - preserve original if not edited
+        milestones: editedProject.milestones || project?.milestones || [],
+        expected_outputs: editedProject.expected_outputs || project?.expected_outputs || '',
+        kpis: editedProject.kpis || project?.kpis || [],
         
-        // Contact information
-        contact_name: editedProject.contact?.name || '',
-        contact_email: editedProject.contact?.email || '',
-        contact_phone: editedProject.contact?.phone || '',
-        contact_role: editedProject.contact?.role || '',
+        // Contact information - preserve original if not edited
+        contact_name: editedProject.contact?.name || project?.contact?.name || project?.contact_name || '',
+        contact_email: editedProject.contact?.email || project?.contact?.email || project?.contact_email || '',
+        contact_phone: editedProject.contact?.phone || project?.contact?.phone || project?.contact_phone || '',
+        contact_role: editedProject.contact?.role || project?.contact?.role || project?.contact_role || '',
         contact_id: editedProject.contact_id || project?.contact_id || contactIdFromStorage || '',
         
         // Account information
@@ -934,11 +1082,16 @@ const ProjectDetailsPage = () => {
         account_name: editedProject.account_name || project?.account_name || '',
         
         // Additional info
-        comments: editedProject.comments || '',
+        comments: editedProject.comments || project?.comments || '',
         
         // Document fields - use the document fields from edited project
-        document_c: editedProject.document_c || '',
-        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || '',
+        document_c: editedProject.document_c !== undefined ? editedProject.document_c : (project?.document_c || ''),
+        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name !== undefined ? editedProject.documents_icesc_project_suggestions_1_name : (project?.documents_icesc_project_suggestions_1_name || ''),
+        // Individual document fields - use uploaded URLs if available, otherwise use editedProject value (including empty strings for deletion)
+        document1_c: uploadedDocumentUrls.document1_c !== undefined ? uploadedDocumentUrls.document1_c : (editedProject.document1_c !== undefined ? editedProject.document1_c : (project?.document1_c || '')),
+        document2_c: uploadedDocumentUrls.document2_c !== undefined ? uploadedDocumentUrls.document2_c : (editedProject.document2_c !== undefined ? editedProject.document2_c : (project?.document2_c || '')),
+        document3_c: uploadedDocumentUrls.document3_c !== undefined ? uploadedDocumentUrls.document3_c : (editedProject.document3_c !== undefined ? editedProject.document3_c : (project?.document3_c || '')),
+        document4_c: uploadedDocumentUrls.document4_c !== undefined ? uploadedDocumentUrls.document4_c : (editedProject.document4_c !== undefined ? editedProject.document4_c : (project?.document4_c || '')),
         
         // Metadata
         session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
@@ -951,7 +1104,35 @@ const ProjectDetailsPage = () => {
       console.log('🔑 Session ID in update data:', updateData.session_id ? 'Present' : 'Missing');
       console.log('📄 Document fields being sent to CRM:', {
         document_c: updateData.document_c,
-        documents_icesc_project_suggestions_1_name: updateData.documents_icesc_project_suggestions_1_name
+        documents_icesc_project_suggestions_1_name: updateData.documents_icesc_project_suggestions_1_name,
+        document1_c: updateData.document1_c ? `${updateData.document1_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)',
+        document2_c: updateData.document2_c ? `${updateData.document2_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)',
+        document3_c: updateData.document3_c ? `${updateData.document3_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)',
+        document4_c: updateData.document4_c ? `${updateData.document4_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)'
+      });
+      console.log('🔍 Document field details:', {
+        document1_c: { value: updateData.document1_c, isEmpty: updateData.document1_c === '', wasUploaded: !!uploadedDocumentUrls.document1_c },
+        document2_c: { value: updateData.document2_c, isEmpty: updateData.document2_c === '', wasUploaded: !!uploadedDocumentUrls.document2_c },
+        document3_c: { value: updateData.document3_c, isEmpty: updateData.document3_c === '', wasUploaded: !!uploadedDocumentUrls.document3_c },
+        document4_c: { value: updateData.document4_c, isEmpty: updateData.document4_c === '', wasUploaded: !!uploadedDocumentUrls.document4_c }
+      });
+      
+      // Verify document fields are in the object being sent
+      console.log('🔍 ALL FIELDS in updateData object:', Object.keys(updateData));
+      console.log('🔍 Document-related keys in updateData:', Object.keys(updateData).filter(k => k.includes('document')));
+      
+      // Stringify and check what's actually being sent
+      const updateDataJson = JSON.stringify(updateData);
+      console.log('📦 JSON string being sent (first 500 chars):', updateDataJson.substring(0, 500));
+      console.log('📦 JSON includes all document fields:', {
+        document1_c: updateDataJson.includes('document1_c'),
+        document2_c: updateDataJson.includes('document2_c'),
+        document3_c: updateDataJson.includes('document3_c'),
+        document4_c: updateDataJson.includes('document4_c'),
+        hasEmptyDoc1: updateDataJson.includes('"document1_c":""'),
+        hasEmptyDoc2: updateDataJson.includes('"document2_c":""'),
+        hasEmptyDoc3: updateDataJson.includes('"document3_c":""'),
+        hasEmptyDoc4: updateDataJson.includes('"document4_c":""')
       });
       
       // Try initial save
@@ -961,21 +1142,28 @@ const ProjectDetailsPage = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(updateData),
+          body: updateDataJson,
         });
         
         const result = await response.json();
         console.log('📥 CRM update response:', result);
         
         if (result.success) {
-          // Update local state with the saved changes
-          setProject(editedProject);
+          // Update local state with the saved changes (merge uploaded document URLs and update status)
+          const updatedProject = {
+            ...editedProject,
+            ...uploadedDocumentUrls,
+            status: 'Published' // Update status to Published
+          };
+          setProject(updatedProject as any);
           setIsEditing(false);
           setEditedProject(null);
+          setChangedDocuments({}); // Clear changed documents
+          setRemovedDocuments(new Set()); // Clear removed documents
           
           // Show success message
           setSaveMessage({ type: 'success', message: 'Project updated successfully' });
-          console.log('✅ Project updated successfully in CRM');
+          console.log('✅ Project updated successfully in CRM, status set to Published');
           
           // Clear success message after 3 seconds
           setTimeout(() => setSaveMessage(null), 3000);
@@ -985,10 +1173,17 @@ const ProjectDetailsPage = () => {
           const retryResult = await retrySaveChanges(updateData);
           
           if (retryResult.success) {
-            // Update local state with the saved changes
-            setProject(editedProject);
+            // Update local state with the saved changes (merge uploaded document URLs and update status)
+            const updatedProject = {
+              ...editedProject,
+              ...uploadedDocumentUrls,
+              status: 'Published' // Update status to Published
+            };
+            setProject(updatedProject as any);
             setIsEditing(false);
             setEditedProject(null);
+            setChangedDocuments({}); // Clear changed documents
+            setRemovedDocuments(new Set()); // Clear removed documents
             
             // Show success message
             setSaveMessage({ type: 'success', message: 'Project updated successfully' });
@@ -1007,14 +1202,21 @@ const ProjectDetailsPage = () => {
         const retryResult = await retrySaveChanges(updateData);
         
         if (retryResult.success) {
-          // Update local state with the saved changes
-          setProject(editedProject);
+          // Update local state with the saved changes (merge uploaded document URLs and update status)
+          const updatedProject = {
+            ...editedProject,
+            ...uploadedDocumentUrls,
+            status: 'Published' // Update status to Published
+          };
+          setProject(updatedProject as any);
           setIsEditing(false);
           setEditedProject(null);
+          setChangedDocuments({}); // Clear changed documents
+          setRemovedDocuments(new Set()); // Clear removed documents
           
           // Show success message
           setSaveMessage({ type: 'success', message: 'Project updated successfully' });
-          console.log('✅ Project updated successfully after retry');
+          console.log('✅ Project updated successfully after network retry, status set to Published');
           
           // Clear success message after 3 seconds
           setTimeout(() => setSaveMessage(null), 3000);
@@ -1093,6 +1295,17 @@ const ProjectDetailsPage = () => {
     }
   };
 
+  // Handle cancel editing
+  const handleCancelEditing = () => {
+    setIsEditing(false);
+    setEditedProject(null);
+    setChangedDocuments({});
+    setRemovedDocuments(new Set());
+    setSaveMessage(null);
+    setDraftMessage(null);
+    console.log('❌ Cancelled editing, reset all states');
+  };
+
   // Handle save as draft
   const handleSaveAsDraft = async () => {
     if (!editedProject) return;
@@ -1112,25 +1325,79 @@ const ProjectDetailsPage = () => {
     
     try {
       console.log('💾 Saving project as draft:', editedProject);
+      console.log('📄 Changed documents:', changedDocuments);
+      console.log('🗑️ Removed documents:', Array.from(removedDocuments));
       
-      // Document fields are now handled directly from editedProject.document_c and editedProject.documents_icesc_project_suggestions_1_name
-      console.log('📁 Using document fields from edited project for draft:', {
-        document_c: editedProject.document_c || '',
-        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || ''
+      // Log current document field values in editedProject
+      console.log('📄 Current document field values in editedProject:', {
+        document1_c: editedProject.document1_c !== undefined ? (editedProject.document1_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document1_c.substring(0, 50)}...`) : '❌ UNDEFINED',
+        document2_c: editedProject.document2_c !== undefined ? (editedProject.document2_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document2_c.substring(0, 50)}...`) : '❌ UNDEFINED',
+        document3_c: editedProject.document3_c !== undefined ? (editedProject.document3_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document3_c.substring(0, 50)}...`) : '❌ UNDEFINED',
+        document4_c: editedProject.document4_c !== undefined ? (editedProject.document4_c === '' ? '🗑️ EMPTY STRING' : `${editedProject.document4_c.substring(0, 50)}...`) : '❌ UNDEFINED'
       });
+      
+      // Upload changed documents to Azure first
+      const uploadedDocumentUrls: Record<string, string> = {};
+      if (Object.keys(changedDocuments).length > 0) {
+        console.log('📤 Uploading changed documents to Azure for draft save...', changedDocuments);
+        
+        for (const [key, file] of Object.entries(changedDocuments)) {
+          if (file) {
+            try {
+              const formData = new FormData();
+              formData.append('files', file);
+              
+              // Get user email for folder naming
+              let userEmail = 'unknown';
+              try {
+                const contactInfo = localStorage.getItem('contactInfo');
+                if (contactInfo) {
+                  const contact = JSON.parse(contactInfo);
+                  userEmail = contact.email || 'unknown';
+                }
+              } catch (e) {
+                console.warn('Could not get contact email:', e);
+              }
+              
+              formData.append('userEmail', userEmail);
+              formData.append('projectId', editedProject.id);
+              
+              const uploadResponse = await fetch('/api/upload-documents', {
+                method: 'POST',
+                body: formData,
+              });
+              
+              const uploadResult = await uploadResponse.json();
+              
+              if (uploadResult.success && uploadResult.files && uploadResult.files.length > 0) {
+                const uploadedFile = uploadResult.files[0];
+                const azureUrl = uploadedFile.downloadURL || uploadedFile.filePath;
+                const documentNumber = key.replace('document', '');
+                const crmField = `document${documentNumber}_c`;
+                uploadedDocumentUrls[crmField] = azureUrl;
+                console.log(`✅ Uploaded ${key} to Azure for draft:`, azureUrl);
+              } else {
+                console.error(`❌ Failed to upload ${key} for draft:`, uploadResult.error);
+              }
+            } catch (uploadError) {
+              console.error(`❌ Error uploading ${key} for draft:`, uploadError);
+            }
+          }
+        }
+      }
       
       // Get contact ID from localStorage if not available in project data
       const contactInfo = localStorage.getItem('contactInfo');
       const contactIdFromStorage = contactInfo ? JSON.parse(contactInfo).id : null;
       
-      // Prepare the data for draft update (same as save changes but with Draft status)
+      // Prepare the data for draft update - merge editedProject with original project to preserve unchanged fields
       const draftData = {
         id: editedProject.id,
-        name: editedProject.name,
-        description: editedProject.description || editedProject.brief || '',
-        project_brief: editedProject.brief || editedProject.description || '',
-        problem_statement1_c1_c: editedProject.rationale || '',
-        rationale_impact: editedProject.rationale || '',
+        name: editedProject.name || project?.name || '',
+        description: editedProject.description || project?.description || editedProject.brief || project?.brief || '',
+        project_brief: editedProject.brief || project?.brief || editedProject.description || project?.description || '',
+        problem_statement1_c: editedProject.problem_statement1_c || project?.problem_statement1_c || editedProject.rationale || project?.rationale || '',
+        rationale_impact: editedProject.rationale_impact || project?.rationale_impact || editedProject.rationale || project?.rationale || '',
         
         // Strategic selections (preserve existing values if not changed)
         strategic_goal: editedProject.strategic_goal || project?.strategic_goal || 'Strategic Goal',
@@ -1142,38 +1409,54 @@ const ProjectDetailsPage = () => {
         sub_service: editedProject.sub_service || project?.sub_service || 'Subservice',
         sub_service_id: editedProject.sub_service_id || project?.sub_service_id || '',
         
-        // Beneficiaries
-        beneficiaries: editedProject.beneficiaries || [],
-        other_beneficiaries: editedProject.other_beneficiary || '',
+        // Beneficiaries - preserve original if not edited
+        beneficiaries: editedProject.beneficiaries || project?.beneficiaries || [],
+        other_beneficiaries: editedProject.other_beneficiary || project?.other_beneficiary || '',
         
-        // Budget and timeline
-        budget_icesco: parseFloat(editedProject.budget?.icesco || '0') || 0,
-        budget_member_state: parseFloat(editedProject.budget?.member_state || '0') || 0,
-        budget_sponsorship: parseFloat(editedProject.budget?.sponsorship || '0') || 0,
-        start_date: editedProject.start_date || '',
-        end_date: editedProject.end_date || '',
-        frequency: editedProject.project_frequency || editedProject.frequency || '',
-        frequency_duration: editedProject.frequency_duration || '',
+        // Budget and timeline - preserve original if not edited
+        // Check both nested budget object and flat budget_* fields
+        budget_icesco: (() => {
+          const value = editedProject.budget?.icesco || (editedProject as any).budget_icesco || project?.budget?.icesco || project?.budget_icesco || '0';
+          const parsed = parseFloat(String(value));
+          console.log('💰 DRAFT budget_icesco:', { editedNested: editedProject.budget?.icesco, editedFlat: (editedProject as any).budget_icesco, projectNested: project?.budget?.icesco, projectFlat: project?.budget_icesco, final: parsed });
+          return isNaN(parsed) ? 0 : parsed;
+        })(),
+        budget_member_state: (() => {
+          const value = editedProject.budget?.member_state || (editedProject as any).budget_member_state || project?.budget?.member_state || project?.budget_member_state || '0';
+          const parsed = parseFloat(String(value));
+          console.log('💰 DRAFT budget_member_state:', { editedNested: editedProject.budget?.member_state, editedFlat: (editedProject as any).budget_member_state, projectNested: project?.budget?.member_state, projectFlat: project?.budget_member_state, final: parsed });
+          return isNaN(parsed) ? 0 : parsed;
+        })(),
+        budget_sponsorship: (() => {
+          const value = editedProject.budget?.sponsorship || (editedProject as any).budget_sponsorship || project?.budget?.sponsorship || project?.budget_sponsorship || '0';
+          const parsed = parseFloat(String(value));
+          console.log('💰 DRAFT budget_sponsorship:', { editedNested: editedProject.budget?.sponsorship, editedFlat: (editedProject as any).budget_sponsorship, projectNested: project?.budget?.sponsorship, projectFlat: project?.budget_sponsorship, final: parsed });
+          return isNaN(parsed) ? 0 : parsed;
+        })(),
+        start_date: editedProject.start_date || project?.start_date || '',
+        end_date: editedProject.end_date || project?.end_date || '',
+        frequency: editedProject.project_frequency || editedProject.frequency || project?.project_frequency || project?.frequency || '',
+        frequency_duration: editedProject.frequency_duration || project?.frequency_duration || '',
         
-        // Partners and scope
-        partners: editedProject.partners || [],
-        institutions: editedProject.partners || [], // Same as partners for CRM
-        delivery_modality: editedProject.delivery_modality || '',
-        geographic_scope: editedProject.geographic_scope || '',
-        convening_method: editedProject.convening_method || '',
-        project_type: editedProject.convening_method || '',
-        project_type_other: editedProject.convening_method_other || '',
+        // Partners and scope - preserve original if not edited
+        partners: editedProject.partners || project?.partners || [],
+        institutions: editedProject.partners || project?.partners || [], // Same as partners for CRM
+        delivery_modality: editedProject.delivery_modality || project?.delivery_modality || '',
+        geographic_scope: editedProject.geographic_scope || project?.geographic_scope || '',
+        convening_method: editedProject.convening_method || project?.convening_method || '',
+        project_type: editedProject.convening_method || project?.convening_method || '',
+        project_type_other: editedProject.convening_method_other || project?.convening_method_other || '',
         
-        // Monitoring and evaluation
-        milestones: editedProject.milestones || [],
-        expected_outputs: editedProject.expected_outputs || '',
-        kpis: editedProject.kpis || [],
+        // Monitoring and evaluation - preserve original if not edited
+        milestones: editedProject.milestones || project?.milestones || [],
+        expected_outputs: editedProject.expected_outputs || project?.expected_outputs || '',
+        kpis: editedProject.kpis || project?.kpis || [],
         
-        // Contact information
-        contact_name: editedProject.contact?.name || '',
-        contact_email: editedProject.contact?.email || '',
-        contact_phone: editedProject.contact?.phone || '',
-        contact_role: editedProject.contact?.role || '',
+        // Contact information - preserve original if not edited
+        contact_name: editedProject.contact?.name || project?.contact?.name || project?.contact_name || '',
+        contact_email: editedProject.contact?.email || project?.contact?.email || project?.contact_email || '',
+        contact_phone: editedProject.contact?.phone || project?.contact?.phone || project?.contact_phone || '',
+        contact_role: editedProject.contact?.role || project?.contact?.role || project?.contact_role || '',
         contact_id: editedProject.contact_id || project?.contact_id || contactIdFromStorage || '',
         
         // Account information
@@ -1181,11 +1464,16 @@ const ProjectDetailsPage = () => {
         account_name: editedProject.account_name || project?.account_name || '',
         
         // Additional info
-        comments: editedProject.comments || '',
+        comments: editedProject.comments || project?.comments || '',
         
         // Document fields - use the document fields from edited project
-        document_c: editedProject.document_c || '',
-        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name || '',
+        document_c: editedProject.document_c !== undefined ? editedProject.document_c : (project?.document_c || ''),
+        documents_icesc_project_suggestions_1_name: editedProject.documents_icesc_project_suggestions_1_name !== undefined ? editedProject.documents_icesc_project_suggestions_1_name : (project?.documents_icesc_project_suggestions_1_name || ''),
+        // Individual document fields - use uploaded URLs if available, otherwise use editedProject value (including empty strings for deletion)
+        document1_c: uploadedDocumentUrls.document1_c !== undefined ? uploadedDocumentUrls.document1_c : (editedProject.document1_c !== undefined ? editedProject.document1_c : (project?.document1_c || '')),
+        document2_c: uploadedDocumentUrls.document2_c !== undefined ? uploadedDocumentUrls.document2_c : (editedProject.document2_c !== undefined ? editedProject.document2_c : (project?.document2_c || '')),
+        document3_c: uploadedDocumentUrls.document3_c !== undefined ? uploadedDocumentUrls.document3_c : (editedProject.document3_c !== undefined ? editedProject.document3_c : (project?.document3_c || '')),
+        document4_c: uploadedDocumentUrls.document4_c !== undefined ? uploadedDocumentUrls.document4_c : (editedProject.document4_c !== undefined ? editedProject.document4_c : (project?.document4_c || '')),
         
         // Metadata
         session_id: typeof window !== 'undefined' ? localStorage.getItem('session_id') || '' : '',
@@ -1196,6 +1484,36 @@ const ProjectDetailsPage = () => {
       
       console.log('📤 Sending draft update data to CRM:', draftData);
       console.log('🔑 Session ID in draft data:', draftData.session_id ? 'Present' : 'Missing');
+      console.log('📄 Individual document fields in draft:', {
+        document1_c: draftData.document1_c ? `${draftData.document1_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)',
+        document2_c: draftData.document2_c ? `${draftData.document2_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)',
+        document3_c: draftData.document3_c ? `${draftData.document3_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)',
+        document4_c: draftData.document4_c ? `${draftData.document4_c.substring(0, 50)}...` : '🗑️ EMPTY (WILL CLEAR IN CRM)'
+      });
+      console.log('🔍 Document field types and values:', {
+        document1_c: { value: draftData.document1_c, type: typeof draftData.document1_c, isEmpty: draftData.document1_c === '' },
+        document2_c: { value: draftData.document2_c, type: typeof draftData.document2_c, isEmpty: draftData.document2_c === '' },
+        document3_c: { value: draftData.document3_c, type: typeof draftData.document3_c, isEmpty: draftData.document3_c === '' },
+        document4_c: { value: draftData.document4_c, type: typeof draftData.document4_c, isEmpty: draftData.document4_c === '' }
+      });
+      
+      // Verify document fields are in the object being sent
+      console.log('🔍 ALL FIELDS in draftData object:', Object.keys(draftData));
+      console.log('🔍 Document-related keys in draftData:', Object.keys(draftData).filter(k => k.includes('document')));
+      
+      // Stringify and check what's actually being sent
+      const draftDataJson = JSON.stringify(draftData);
+      console.log('📦 JSON string being sent (first 500 chars):', draftDataJson.substring(0, 500));
+      console.log('📦 JSON includes all document fields:', {
+        document1_c: draftDataJson.includes('document1_c'),
+        document2_c: draftDataJson.includes('document2_c'),
+        document3_c: draftDataJson.includes('document3_c'),
+        document4_c: draftDataJson.includes('document4_c'),
+        hasEmptyDoc1: draftDataJson.includes('"document1_c":""'),
+        hasEmptyDoc2: draftDataJson.includes('"document2_c":""'),
+        hasEmptyDoc3: draftDataJson.includes('"document3_c":""'),
+        hasEmptyDoc4: draftDataJson.includes('"document4_c":""')
+      });
       
       // Try initial draft update using the update API (not create API)
       try {
@@ -1204,21 +1522,67 @@ const ProjectDetailsPage = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(draftData),
+          body: draftDataJson,
         });
         
         const result = await response.json();
         console.log('📥 CRM draft update response:', result);
         
         if (result.success) {
-          // Update local state with the saved changes
-          setProject(editedProject);
+          // Upload files to Azure AFTER project update (using project ID for folder name)
+          if (editedProject.files && Array.isArray(editedProject.files) && editedProject.files.length > 0) {
+            console.log('📄 Uploading files to Azure with project ID folder:', {
+              projectId: result.projectId || editedProject.id,
+              fileCount: editedProject.files.length
+            });
+
+            try {
+              const uploadFormData = new FormData();
+              uploadFormData.append('projectId', result.projectId || editedProject.id);
+              uploadFormData.append('userEmail', editedProject.contact?.email || 'unknown@example.com');
+              
+              editedProject.files.forEach((file: any) => {
+                if (file.fileObject instanceof File) {
+                  uploadFormData.append('files', file.fileObject);
+                }
+              });
+              
+              const uploadResponse = await fetch('/api/upload-documents', {
+                method: 'POST',
+                body: uploadFormData
+              });
+              
+              if (uploadResponse.ok) {
+                const uploadResult = await uploadResponse.json();
+                console.log('✅ Files uploaded to Azure with project ID folder:', uploadResult);
+                
+                // Update the editedProject with document URLs for local state
+                if (uploadResult.success && uploadResult.files) {
+                  const documentUrls = uploadResult.files.map((file: any) => file.downloadURL || file.filePath).filter(Boolean);
+                  editedProject.document_c = documentUrls.join('; ');
+                  editedProject.documents_icesc_project_suggestions_1_name = documentUrls.join('; ');
+                }
+              }
+            } catch (uploadError) {
+              console.error('❌ File upload failed:', uploadError);
+            }
+          }
+          
+          // Update local state with the saved changes (merge uploaded document URLs and update status)
+          const updatedDraftProject = {
+            ...editedProject,
+            ...uploadedDocumentUrls,
+            status: 'Draft' // Update status to Draft
+          };
+          setProject(updatedDraftProject as any);
           setIsEditing(false);
           setEditedProject(null);
+          setChangedDocuments({}); // Clear changed documents
+          setRemovedDocuments(new Set()); // Clear removed documents
           
           // Show success message
           setDraftMessage({ type: 'success', message: 'Project saved as draft successfully' });
-          console.log('✅ Project saved as draft successfully');
+          console.log('✅ Project saved as draft successfully, status set to Draft');
           
           // Clear success message after 3 seconds
           setTimeout(() => setDraftMessage(null), 3000);
@@ -1228,14 +1592,21 @@ const ProjectDetailsPage = () => {
           const retryResult = await retrySaveAsDraft(draftData);
           
           if (retryResult.success) {
-            // Update local state with the saved changes
-            setProject(editedProject);
+            // Update local state with the saved changes (merge uploaded document URLs and update status)
+            const updatedDraftProject = {
+              ...editedProject,
+              ...uploadedDocumentUrls,
+              status: 'Draft' // Update status to Draft
+            };
+            setProject(updatedDraftProject as any);
             setIsEditing(false);
             setEditedProject(null);
+            setChangedDocuments({}); // Clear changed documents
+            setRemovedDocuments(new Set()); // Clear removed documents
             
             // Show success message
             setDraftMessage({ type: 'success', message: 'Project saved as draft successfully' });
-            console.log('✅ Project saved as draft successfully after retry');
+            console.log('✅ Project saved as draft successfully after retry, status set to Draft');
             
             // Clear success message after 3 seconds
             setTimeout(() => setDraftMessage(null), 3000);
@@ -1250,14 +1621,21 @@ const ProjectDetailsPage = () => {
         const retryResult = await retrySaveAsDraft(draftData);
         
         if (retryResult.success) {
-          // Update local state with the saved changes
-          setProject(editedProject);
+          // Update local state with the saved changes (merge uploaded document URLs and update status)
+          const updatedDraftProject = {
+            ...editedProject,
+            ...uploadedDocumentUrls,
+            status: 'Draft' // Update status to Draft
+          };
+          setProject(updatedDraftProject as any);
           setIsEditing(false);
           setEditedProject(null);
+          setChangedDocuments({}); // Clear changed documents
+          setRemovedDocuments(new Set()); // Clear removed documents
           
           // Show success message
           setDraftMessage({ type: 'success', message: 'Project saved as draft successfully' });
-          console.log('✅ Project saved as draft successfully after retry');
+          console.log('✅ Project saved as draft successfully after network retry, status set to Draft');
           
           // Clear success message after 3 seconds
           setTimeout(() => setDraftMessage(null), 3000);
@@ -1273,13 +1651,6 @@ const ProjectDetailsPage = () => {
     } finally {
       setIsDraftSaving(false); // Always reset loading state
     }
-  };
-
-  // Handle cancel editing
-  const handleCancelEditing = () => {
-    setIsEditing(false);
-    setEditedProject(null);
-    console.log('❌ Cancelled editing');
   };
 
   // Handle field changes
@@ -2621,177 +2992,189 @@ const ProjectDetailsPage = () => {
               <div className="p-8">
                 <div className="space-y-4">
                   <label className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('supportingDocuments')}</label>
-                  {isEditing ? (
-                    <div className="space-y-4">
-                      {/* Display current files */}
-                      {(() => {
-                        const documents = editedProject ? parseDocumentsFromCRM(editedProject) : [];
-                        return documents.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-700">{t('currentDocuments')}:</p>
-                            {documents.map((file: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                              <div className="flex items-center gap-3">
-                                <a
-                                  href={getDownloadUrl(file)}
-                                  download={file.name || file.fileName || 'document'}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="w-5 h-5 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
-                                  title="Download file"
-                                >
-                                  <Download className="w-4 h-4" />
-                                </a>
-                                <FileText className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm text-gray-600">Document {index + 1}</span>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    {isEditing ? (
+                        // Editable document list with individual replace buttons
+                        <div className="space-y-3">
+                          {[1, 2, 3, 4].map((docNum) => {
+                            const docField = `document${docNum}_c` as keyof AnyProject;
+                            const existingDoc = editedProject?.[docField] as string;
+                            const changedDoc = changedDocuments[`document${docNum}` as keyof typeof changedDocuments];
+                            const isRemoved = removedDocuments.has(docNum);
+                            
+                            // Determine what to display
+                            const hasDocument = !isRemoved && (changedDoc || (existingDoc && existingDoc.trim() !== ''));
+                            
+                            return (
+                              <div key={docNum} className="bg-white rounded-lg border border-gray-200 p-3">
+                                <div className="flex items-center gap-3">
+                                  <FileText className="flex-shrink-0 w-5 h-5 text-teal-500" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-gray-500 uppercase">
+                                      Document {docNum}
+                                    </p>
+                                    {isRemoved ? (
+                                      <p className="text-sm text-red-500 italic">
+                                        Marked for deletion ❌
+                                      </p>
+                                    ) : changedDoc ? (
+                                      <p className="text-sm font-medium text-teal-600 truncate">
+                                        {changedDoc.name} (New ✨)
+                                      </p>
+                                    ) : existingDoc && existingDoc.trim() !== '' ? (
+                                      <p className="text-sm font-medium text-gray-700 truncate">
+                                        {(() => {
+                                          try {
+                                            const urlParts = existingDoc.split('/');
+                                            const lastPart = urlParts[urlParts.length - 1];
+                                            const fileNamePart = lastPart.split('?')[0];
+                                            const cleanFileName = fileNamePart.replace(/^\d+_/, '');
+                                            return cleanFileName || `Document ${docNum}`;
+                                          } catch {
+                                            return `Document ${docNum}`;
+                                          }
+                                        })()}
+                                      </p>
+                                    ) : (
+                                      <p className="text-sm text-gray-400">No document uploaded</p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {!isRemoved && (
+                                      <>
+                                        <input
+                                          type="file"
+                                          accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
+                                          className="hidden"
+                                          id={`document${docNum}-upload`}
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                              console.log(`📤 Selected new file for document${docNum}:`, file.name);
+                                              setChangedDocuments(prev => ({
+                                                ...prev,
+                                                [`document${docNum}`]: file
+                                              }));
+                                              // Clear removed flag if file was previously marked for removal
+                                              if (removedDocuments.has(docNum)) {
+                                                setRemovedDocuments(prev => {
+                                                  const updated = new Set(prev);
+                                                  updated.delete(docNum);
+                                                  return updated;
+                                                });
+                                              }
+                                            }
+                                          }}
+                                        />
+                                        <label
+                                          htmlFor={`document${docNum}-upload`}
+                                          className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-teal-500 text-white rounded-lg hover:bg-teal-600 cursor-pointer transition-colors"
+                                        >
+                                          {changedDoc || existingDoc ? 'Replace' : 'Upload'}
+                                        </label>
+                                      </>
+                                    )}
+                                    {hasDocument && (
+                                      <button
+                                        onClick={() => {
+                                          console.log(`🗑️ Removing document${docNum}`, {
+                                            hasChangedDoc: !!changedDoc,
+                                            hasExistingDoc: !!existingDoc,
+                                            existingDocUrl: existingDoc,
+                                            isRemoved: isRemoved
+                                          });
+                                          
+                                          if (changedDoc) {
+                                            // Remove the changed file from pending changes
+                                            console.log(`🗑️ Removing changed document${docNum} from pending changes`);
+                                            setChangedDocuments(prev => {
+                                              const updated = { ...prev };
+                                              delete updated[`document${docNum}` as keyof typeof changedDocuments];
+                                              console.log('✅ Updated changedDocuments:', updated);
+                                              return updated;
+                                            });
+                                          } else if (existingDoc && existingDoc.trim() !== '' && editedProject) {
+                                            // Mark existing document for deletion
+                                            console.log(`🗑️ Marking document${docNum} for deletion`);
+                                            console.log(`   Before: ${docField} =`, editedProject[docField]);
+                                            setRemovedDocuments(prev => {
+                                              const updated = new Set(prev);
+                                              updated.add(docNum);
+                                              console.log('✅ Updated removedDocuments:', Array.from(updated));
+                                              return updated;
+                                            });
+                                            // Also set field to empty in editedProject
+                                            const updatedProject = {
+                                              ...editedProject,
+                                              [docField]: ''
+                                            };
+                                            const newValue = updatedProject[docField];
+                                            console.log(`   After: ${docField} =`, newValue);
+                                            console.log(`   Explicitly set to: "${newValue}" (type: ${typeof newValue}, length: ${typeof newValue === 'string' ? newValue.length : 'N/A'})`);
+                                            setEditedProject(updatedProject);
+                                          }
+                                        }}
+                                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Remove document"
+                                      >
+                                        <FileX className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {isRemoved && (
+                                      <button
+                                        onClick={() => {
+                                          console.log(`↩️ Undoing removal of document${docNum}`);
+                                          setRemovedDocuments(prev => {
+                                            const updated = new Set(prev);
+                                            updated.delete(docNum);
+                                            console.log('✅ Restored document, updated removedDocuments:', Array.from(updated));
+                                            return updated;
+                                          });
+                                          // Restore the original value from project
+                                          if (project && editedProject) {
+                                            setEditedProject({
+                                              ...editedProject,
+                                              [docField]: project[docField] || ''
+                                            });
+                                          }
+                                        }}
+                                        className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-gray-500 text-white rounded-lg hover:bg-gray-600 cursor-pointer transition-colors"
+                                      >
+                                        Undo
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveDocument(index)}
-                                className="w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
-                                title="Remove document"
-                              >
-                                ×
-                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        // Read-only view
+                        (() => {
+                          const documents = parseDocumentsFromCRM(project);
+                          return documents.length > 0 ? (
+                            <div className="space-y-2">
+                              {documents.map((file: any, index: number) => (
+                              <div key={index} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-teal-300 transition-colors">
+                                <FileText className="flex-shrink-0 w-5 h-5 text-teal-500" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-700 truncate">
+                                    {file.name || file.fileName || `Document ${index + 1}`}
+                                  </p>
+                                  {file.documentNumber && (
+                                    <p className="text-xs text-gray-500">Document {file.documentNumber}</p>
+                                  )}
+                                </div>
+                              </div>
+                              ))}
                             </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                      
-                      {/* File upload for editing */}
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-teal-400 transition-colors">
-                        <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 mb-2">{t('addNewDocuments')}</p>
-                        <input
-                          type="file"
-                          multiple
-                          accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.pptx"
-                          onChange={async (e) => {
-                            if (!editedProject) return;
-                            const newFiles = Array.from(e.target.files || []);
-                            
-                            if (newFiles.length === 0) return;
-                            
-                            setIsUploadingFiles(true);
-                            console.log('📁 Uploading new files:', newFiles.map(f => f.name));
-                            
-                            try {
-                              // Parse existing documents from CRM fields
-                              const existingDocuments = parseDocumentsFromCRM(editedProject);
-                              
-                              // Upload new files to Azure
-                              const uploadedFiles = [];
-                              for (const file of newFiles) {
-                                try {
-                                  const formData = new FormData();
-                                  formData.append('files', file);
-                                  formData.append('userEmail', 'project-edit@example.com'); // You might want to get this from user context
-                                  
-                                  const response = await fetch('/api/upload-documents', {
-                                    method: 'POST',
-                                    body: formData,
-                                  });
-                                  
-                                  if (response.ok) {
-                                    const result = await response.json();
-                                    if (result.files && result.files.length > 0) {
-                                      uploadedFiles.push({
-                                        name: file.name,
-                                        fileName: result.files[0].fileName,
-                                        filePath: result.files[0].filePath,
-                                        downloadURL: result.files[0].downloadURL,
-                                        url: result.files[0].downloadURL,
-                                        size: file.size,
-                                        type: file.type
-                                      });
-                                      console.log('✅ File uploaded successfully:', file.name, '->', result.files[0].filePath);
-                                    }
-                                  } else {
-                                    console.error('❌ File upload failed:', file.name);
-                                  }
-                                } catch (error) {
-                                  console.error('❌ Error uploading file:', file.name, error);
-                                }
-                              }
-                              
-                              // Combine existing documents with newly uploaded files
-                              const updatedFiles = [...existingDocuments, ...uploadedFiles];
-                              
-                              // Update document fields with proper Azure URLs
-                              const updatedDocumentPaths = updatedFiles.map(file => file.filePath || file.downloadURL || file.url).join('; ');
-                              const updatedDocumentNames = updatedFiles.map(file => file.name || file.fileName).join('; ');
-                              
-                              console.log('🔄 Updated document fields:', {
-                                document_c: updatedDocumentPaths,
-                                documents_icesc_project_suggestions_1_name: updatedDocumentNames
-                              });
-                              
-                              setEditedProject(prev => {
-                                const updated = {
-                                  ...prev!,
-                                  files: updatedFiles,
-                                  document_c: updatedDocumentPaths,
-                                  documents_icesc_project_suggestions_1_name: updatedDocumentNames
-                                };
-                                console.log('🔄 Setting editedProject with document fields:', {
-                                  document_c: updated.document_c,
-                                  documents_icesc_project_suggestions_1_name: updated.documents_icesc_project_suggestions_1_name
-                                });
-                                return updated;
-                              });
-                              
-                            } catch (error) {
-                              console.error('❌ Error processing file uploads:', error);
-                              alert('Error uploading files. Please try again.');
-                            } finally {
-                              setIsUploadingFiles(false);
-                            }
-                          }}
-                          className="hidden"
-                          id="file-upload-edit"
-                        />
-                        <label
-                          htmlFor="file-upload-edit"
-                          className={`inline-block px-4 py-2 rounded-lg transition-colors text-sm ${
-                            isUploadingFiles 
-                              ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                              : 'bg-teal-500 text-white hover:bg-teal-600 cursor-pointer'
-                          }`}
-                        >
-                          {isUploadingFiles ? 'Uploading...' : t('selectFiles')}
-                        </label>
-                      </div>
+                          ) : (
+                            <p className="text-gray-500 text-sm">{t('noDocuments')}</p>
+                          );
+                        })()
+                      )}
                     </div>
-                  ) : (
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      {(() => {
-                        const documents = parseDocumentsFromCRM(project);
-                        return documents.length > 0 ? (
-                          <div className="space-y-2">
-                            {documents.map((file: any, index: number) => (
-                            <div key={index} className="flex items-center gap-3 p-2 bg-white rounded-lg">
-                              <a
-                                href={getDownloadUrl(file)}
-                                download={file.name || file.fileName || 'document'}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-5 h-5 flex items-center justify-center text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors"
-                                title="Download file"
-                              >
-                                <Download className="w-4 h-4" />
-                              </a>
-                              <FileText className="w-4 h-4 text-gray-400" />
-                              <span className="text-sm text-gray-600">Document {index + 1}</span>
-                            </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 text-sm">{t('noDocuments')}</p>
-                        );
-                      })()}
-                    </div>
-                  )}
                 </div>
               </div>
             </motion.div>
@@ -2942,73 +3325,7 @@ const ProjectDetailsPage = () => {
               </motion.div>
             )}
 
-            {/* Contact Information */}
-            {!loading && !error && project && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 }}
-                className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-              >
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-100">
-                  <h2 className="text-lg font-sans font-bold text-gray-900 flex items-center">
-                    <div className={`w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center ${currentLanguage === 'ar' ? 'ml-3' : 'mr-3'}`}>
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                    {t('contactInformation') || 'Contact Information'}
-                  </h2>
-                </div>
-                <div className="p-6 space-y-4">
-                  {/* Contact Name */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      {t('contactName') || 'Name'}
-                    </label>
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                      <p className="text-sm text-gray-900 font-medium">
-                        {project.contact_name || t('notSpecified')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Contact Email */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      {t('contactEmail') || 'Email'}
-                    </label>
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                      <p className="text-sm text-gray-900 font-medium">
-                        {project.contact_email || t('notSpecified')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Contact Phone */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      {t('contactPhone') || 'Phone'}
-                    </label>
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                      <p className="text-sm text-gray-900 font-medium">
-                        {project.contact_phone || t('notSpecified')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Contact Role */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      {t('contactRole') || 'Role'}
-                    </label>
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                      <p className="text-sm text-gray-900 font-medium">
-                        {project.contact_role || t('notSpecified')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+           
             
           </div>
 

@@ -12,9 +12,11 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const userEmail = formData.get('userEmail') as string || 'unknown';
+    const projectId = formData.get('projectId') as string || null;
     
     console.log('=== FILE UPLOAD DEBUG ===');
     console.log('User email from formData:', userEmail);
+    console.log('Project ID from formData:', projectId);
     console.log('Number of files:', files.length);
     console.log('First file type:', files[0]?.constructor?.name);
     console.log('First file instanceof File:', files[0] instanceof File);
@@ -79,11 +81,20 @@ export async function POST(request: NextRequest) {
         });
         
         console.log('🔄 About to call uploadToAzure function...');
+        
+        // Use projectId for folder name if provided, otherwise fall back to email
+        const folderName = projectId 
+          ? `hive-documents/${projectId}` 
+          : `hive-documents/${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        
+        console.log('📁 Upload folder:', folderName);
+        
         const azureResult: AzureUploadResult = await uploadToAzure(file, {
-          folder: `hive-documents/${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          folder: folderName,
           metadata: {
             originalName: file.name,
             userEmail: userEmail,
+            projectId: projectId || 'unknown',
             uploadedAt: new Date().toISOString()
           }
         });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionId, getModuleEntries } from '@/utils/crm';
 import { mapProjectDataToCRM, validateProjectData } from '@/utils/crmFieldMapping';
-import { getAzureDownloadURL } from '@/services/azureService';
+import { getAzureDownloadURL, moveBlob } from '@/services/azureService';
 
 const CRM_BASE_URL = 'https://crm.icesco.org';
 
@@ -20,7 +20,49 @@ async function getFreshSessionId(): Promise<string> {
 export async function POST(request: NextRequest) {
   try {
     
-    const projectData = await request.json();
+    let projectData: any;
+    
+    // Check if request is FormData or JSON
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('multipart/form-data')) {
+      console.log('📄 Processing FormData request with files...');
+      const formData = await request.formData();
+      
+      // Convert FormData to object
+      projectData = {};
+      
+      // Convert FormData to object
+      const formDataEntries = Array.from(formData.entries());
+      
+      formDataEntries.forEach(([key, value]) => {
+        if (key.startsWith('document') && value instanceof File) {
+          // Keep File objects as-is
+          projectData[key] = value;
+          console.log(`📄 File received: ${key} = ${value.name} (${value.size} bytes)`);
+        } else {
+          // Parse other fields
+          try {
+            // Try to parse as JSON first
+            projectData[key] = JSON.parse(value as string);
+          } catch {
+            // If not JSON, keep as string
+            projectData[key] = value;
+          }
+        }
+      });
+      
+      console.log('📄 FormData processed:', {
+        hasDocument1: !!projectData.document1,
+        hasDocument2: !!projectData.document2,
+        hasDocument3: !!projectData.document3,
+        hasDocument4: !!projectData.document4,
+        projectName: projectData.name
+      });
+    } else {
+      console.log('📄 Processing JSON request...');
+      projectData = await request.json();
+    }
     
     
     // CLEANUP: Remove document URLs from text fields if they were added by old code
@@ -67,7 +109,7 @@ export async function POST(request: NextRequest) {
      
     }
     
-   
+    
     // Validate project data - use different validation for drafts
     const isDraft = projectData.status === 'Draft';
     const validation = validateProjectData(projectData, isDraft);
@@ -153,6 +195,54 @@ export async function POST(request: NextRequest) {
       
     } else {
       console.log('⚠️ No document fields found in project data');
+    }
+
+    // Process individual document fields (document1_c, document2_c, document3_c, document4_c)
+    console.log('📄 Processing individual document fields...');
+    for (let i = 1; i <= 4; i++) {
+      const documentField = `document${i}`;
+      const crmField = `document${i}_c`;
+      
+      if (projectData[documentField] && projectData[documentField] instanceof File) {
+        console.log(`📄 Processing ${documentField} -> ${crmField}`);
+        const file = projectData[documentField];
+        
+        try {
+          // Import Azure service for direct upload
+          const { uploadToAzure } = await import('@/services/azureService');
+          
+          // Generate unique filename
+          const timestamp = Date.now();
+          const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const fileName = `${timestamp}_${sanitizedName}`;
+          const folder = `hive-documents/individual-docs`;
+          const fullPath = `${folder}/${fileName}`;
+          
+          console.log(`📤 Uploading ${documentField} directly to Azure: ${fullPath}`);
+          
+          // Upload directly to Azure
+          const uploadResult = await uploadToAzure(file, {
+            folder: folder,
+            fileName: fileName,
+            metadata: {
+              originalName: file.name,
+              userEmail: projectData.contact_email || 'unknown@example.com',
+              projectName: projectData.name || 'untitled_project',
+              uploadedAt: new Date().toISOString(),
+              documentField: documentField
+            }
+          });
+          
+          // Set the CRM field with the Azure URL
+          projectData[crmField] = uploadResult.downloadURL;
+          console.log(`✅ ${documentField} uploaded successfully: ${uploadResult.downloadURL}`);
+          
+        } catch (uploadError) {
+          console.error(`❌ Error uploading ${documentField}:`, uploadError);
+        }
+      } else {
+        console.log(`📄 No file provided for ${documentField}`);
+      }
     }
    
     const crmData = mapProjectDataToCRM(projectData);
@@ -356,7 +446,7 @@ export async function POST(request: NextRequest) {
    
    
     
-   
+
     
     const submissionData = {
       session: sessionId,
@@ -1111,6 +1201,170 @@ export async function POST(request: NextRequest) {
         }
       }
       
+      // Move uploaded files from email folder to project ID folder
+      console.log('📄 Checking if files need to be moved to project ID folder...');
+      console.log('📄 document_c value:', projectData.document_c);
+      
+      if (projectData.document_c && (projectData.document_c.includes('demo_icesco_org') || projectData.document_c.includes('_icesco_org'))) {
+        console.log('📄 Files were uploaded to email folder, moving to project ID folder...');
+        console.log('📄 Project ID for new folder:', data.id);
+        
+        try {
+          // Split multiple URLs
+          const documentUrls = projectData.document_c.split('; ').filter((url: string) => url.trim());
+          const newUrls: string[] = [];
+          
+          for (const oldUrl of documentUrls) {
+            // Extract filename from old URL
+            const urlParts = oldUrl.split('?')[0]; // Remove query string
+            const pathParts = urlParts.split('/');
+            const fileName = pathParts[pathParts.length - 1];
+            
+            // Create new path with project ID folder
+            const newPath = `hive-documents/${data.id}/${fileName}`;
+            
+            console.log(`📦 Moving file: ${fileName}`);
+            console.log(`   From: ${oldUrl.substring(0, 100)}...`);
+            console.log(`   To: ${newPath}`);
+            
+            // Move the blob
+            const newUrl = await moveBlob(oldUrl, newPath);
+            
+            // Add SAS token to new URL
+            const newUrlWithSas = await getAzureDownloadURL(newPath);
+            newUrls.push(newUrlWithSas);
+            
+            console.log(`✅ File moved: ${fileName}`);
+          }
+          
+          // Update project with new URLs
+          if (newUrls.length > 0) {
+            const newUrlsJoined = newUrls.join('; ');
+            console.log('📄 Updating project with new URLs in project ID folder...');
+            
+            const updateData = {
+              session: sessionId,
+              module_name: 'icesc_project_suggestions',
+              name_value_list: [
+                { name: 'id', value: data.id },
+                { name: 'document_c', value: newUrlsJoined },
+                { name: 'documents_icesc_project_suggestions_1_name', value: newUrlsJoined }
+              ]
+            };
+            
+            const updateResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                method: 'set_entry',
+                input_type: 'JSON',
+                response_type: 'JSON',
+                rest_data: JSON.stringify(updateData)
+              })
+            });
+            
+            if (updateResponse.ok) {
+              const updateResult = await updateResponse.json();
+              console.log('✅ Project updated with new URLs:', updateResult);
+            } else {
+              console.error('❌ Failed to update project with new URLs:', updateResponse.status);
+            }
+          }
+          
+          console.log('✅ All files moved to project ID folder successfully');
+        } catch (moveError) {
+          console.error('❌ Failed to move files to project ID folder:', moveError);
+          // Don't fail the submission if file moving fails - files will remain in email folder
+        }
+      }
+      
+      // Upload files to Azure AFTER project creation (using project ID for folder name)
+      console.log('📄 Checking for files to upload AFTER project creation...');
+      console.log('📄 projectData.files:', projectData.files);
+      console.log('📄 Has files:', !!projectData.files);
+      console.log('📄 Is array:', Array.isArray(projectData.files));
+      console.log('📄 Length:', projectData.files?.length);
+      
+      if (projectData.files && Array.isArray(projectData.files) && projectData.files.length > 0) {
+        console.log('📄 Uploading files to Azure with project ID folder:', {
+          projectId: data.id,
+          fileCount: projectData.files.length,
+          files: projectData.files.map((f: any) => ({ name: f.name || f.fileName, size: f.size, hasFileObject: !!f.fileObject }))
+        });
+
+        try {
+          const formData = new FormData();
+          
+          // Add project ID for folder naming
+          formData.append('projectId', data.id);
+          formData.append('userEmail', projectData.contact?.email || projectData.contact_email || 'unknown@example.com');
+          
+          // Add all files
+          projectData.files.forEach((file: any) => {
+            if (file.fileObject instanceof File) {
+              formData.append('files', file.fileObject);
+            }
+          });
+
+          const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/upload-documents`, {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`File upload failed: ${uploadResponse.statusText}`);
+          }
+
+          const uploadResult = await uploadResponse.json();
+          console.log('✅ Files uploaded to Azure with project ID folder:', uploadResult);
+
+          // Update project with document URLs
+          if (uploadResult.success && uploadResult.files && uploadResult.files.length > 0) {
+            const documentUrls = uploadResult.files.map((file: any) => file.downloadURL || file.filePath).filter(Boolean);
+            const documentNames = uploadResult.files.map((file: any) => file.fileName || file.originalName).filter(Boolean);
+            
+            console.log('📄 Updating project with document URLs...');
+            
+            // Update the project with document fields
+            const updateData = {
+              session: sessionId,
+              module_name: 'icesc_project_suggestions',
+              name_value_list: [
+                { name: 'id', value: data.id },
+                { name: 'document_c', value: documentUrls.join('; ') },
+                { name: 'documents_icesc_project_suggestions_1_name', value: documentUrls.join('; ') },
+                { name: 'document_name_c', value: documentNames.join('; ') },
+                { name: 'document_url_c', value: documentUrls.join('; ') }
+              ]
+            };
+            
+            const updateResponse = await fetch(`${CRM_BASE_URL}/service/v4_1/rest.php`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                method: 'set_entry',
+                input_type: 'JSON',
+                response_type: 'JSON',
+                rest_data: JSON.stringify(updateData)
+              })
+            });
+            
+            if (updateResponse.ok) {
+              const updateResult = await updateResponse.json();
+              console.log('✅ Project updated with document URLs:', updateResult);
+            } else {
+              console.error('❌ Failed to update project with document URLs:', updateResponse.status);
+            }
+          }
+        } catch (uploadError) {
+          console.error('❌ File upload failed:', uploadError);
+          // Don't fail the entire submission if file upload fails
+        }
+      }
     
       return NextResponse.json({
         success: true,

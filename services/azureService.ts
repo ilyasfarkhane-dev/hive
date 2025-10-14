@@ -272,6 +272,51 @@ export async function listAzureFiles(folder?: string): Promise<any[]> {
 }
 
 /**
+ * Move/copy a blob from one path to another in Azure
+ */
+export async function moveBlob(sourceUrl: string, destinationPath: string): Promise<string> {
+  try {
+    console.log('📦 Moving blob in Azure:', { sourceUrl, destinationPath });
+    
+    // Initialize Azure client
+    const { containerClient } = await initializeAzureClient();
+    
+    // Extract source path from URL
+    const sourcePath = extractPathFromAzureURL(sourceUrl);
+    if (!sourcePath) {
+      throw new Error('Failed to extract source path from URL');
+    }
+    
+    console.log('📦 Source path:', sourcePath);
+    console.log('📦 Destination path:', destinationPath);
+    
+    // Get source and destination blob clients
+    const sourceBlob = containerClient.getBlockBlobClient(sourcePath);
+    const destBlob = containerClient.getBlockBlobClient(destinationPath);
+    
+    // Copy the blob
+    console.log('📦 Starting blob copy...');
+    const copyResult = await destBlob.beginCopyFromURL(sourceBlob.url);
+    await copyResult.pollUntilDone();
+    console.log('✅ Blob copied successfully');
+    
+    // Delete the source blob
+    console.log('📦 Deleting source blob...');
+    await sourceBlob.delete();
+    console.log('✅ Source blob deleted');
+    
+    // Return the new URL
+    const newUrl = destBlob.url;
+    console.log('✅ Blob moved successfully. New URL:', newUrl);
+    
+    return newUrl;
+  } catch (error) {
+    console.error('❌ Failed to move blob:', error);
+    throw error;
+  }
+}
+
+/**
  * Extract file path from Azure blob URL
  */
 export function extractPathFromAzureURL(url: string): string | null {

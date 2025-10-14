@@ -367,6 +367,27 @@ export const ICESC_FIELD_MAPPING: CRMFieldMapping = {
     crmField: 'document_url',
     type: 'string',
     maxLength: 2000
+  },
+  // Individual document fields
+  document1_c: {
+    crmField: 'document1_c',
+    type: 'string',
+    maxLength: 2000
+  },
+  document2_c: {
+    crmField: 'document2_c',
+    type: 'string',
+    maxLength: 2000
+  },
+  document3_c: {
+    crmField: 'document3_c',
+    type: 'string',
+    maxLength: 2000
+  },
+  document4_c: {
+    crmField: 'document4_c',
+    type: 'string',
+    maxLength: 2000
   }
 };
 
@@ -377,9 +398,20 @@ export function mapProjectDataToCRM(projectData: any): any[] {
   const nameValueList: any[] = [];
 
   // Helper function to add field
-  const addField = (name: string, value: any) => {
-    if (value !== undefined && value !== null && value !== '') {
-      nameValueList.push({ name, value });
+  const addField = (name: string, value: any, forceInclude: boolean = false) => {
+    // Allow empty strings for document fields (to clear them) or if forceInclude is true
+    const isDocumentField = name.includes('document');
+    
+    if (forceInclude || isDocumentField) {
+      // For document fields, include even empty strings
+      if (value !== undefined && value !== null) {
+        nameValueList.push({ name, value });
+      }
+    } else {
+      // For other fields, skip empty values
+      if (value !== undefined && value !== null && value !== '') {
+        nameValueList.push({ name, value });
+      }
     }
   };
 
@@ -387,15 +419,17 @@ export function mapProjectDataToCRM(projectData: any): any[] {
   Object.entries(ICESC_FIELD_MAPPING).forEach(([projectField, mapping]) => {
     const value = projectData[projectField];
     
-    // Debug: Log document field processing
-    if (projectField.includes('document')) {
-      console.log(`🔍 DEBUG: Processing document field ${projectField}:`, {
+    // Debug: Log document, contact, and budget field processing
+    if (projectField.includes('document') || projectField.startsWith('contact_') || projectField.startsWith('budget_')) {
+      const willSkip = value === undefined || value === null;
+      console.log(`🔍 DEBUG: Processing ${projectField.includes('document') ? 'document' : projectField.startsWith('contact_') ? 'contact' : 'budget'} field ${projectField}:`, {
         value: value,
         type: typeof value,
         isUndefined: value === undefined,
         isNull: value === null,
-        isEmpty: value === '',
-        willSkip: value === undefined || value === null || value === ''
+        isEmpty: value === '' || value === 0,
+        willSkip: willSkip,
+        willIncludeIfEmpty: (value === '' || value === 0) && !willSkip
       });
     }
     
@@ -404,7 +438,25 @@ export function mapProjectDataToCRM(projectData: any): any[] {
       console.log(`📏 DEBUG: ${projectField} length:`, typeof value === 'string' ? value.length : 'N/A', 'characters');
     }
     
-    if (value === undefined || value === null || value === '') {
+    // For document and contact fields, allow empty strings to clear them in CRM
+    const isDocumentField = projectField.includes('document');
+    const isContactField = projectField.startsWith('contact_');
+    const isBudgetField = projectField.startsWith('budget_');
+    const shouldIncludeEmpty = isDocumentField || isContactField || isBudgetField;
+    
+    if (value === undefined || value === null) {
+      return; // Skip undefined/null for all fields
+    }
+    
+    // Skip empty values for fields that shouldn't include empty
+    if (value === '' && !shouldIncludeEmpty) {
+      return; // Skip empty strings for regular fields
+    }
+    
+    // For document, contact, and budget fields with empty/zero values, add them directly
+    if (shouldIncludeEmpty && (value === '' || value === 0)) {
+      console.log(`✅ Including ${isDocumentField ? 'document' : isContactField ? 'contact' : 'budget'} field ${projectField} (${mapping.crmField}) with value:`, value);
+      nameValueList.push({ name: mapping.crmField, value: value });
       return;
     }
 

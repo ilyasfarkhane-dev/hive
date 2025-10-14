@@ -1921,8 +1921,28 @@ useEffect(() => {
     }
     
     try {
-      // Upload files first to get file paths for CRM submission
-      const uploadedFilePaths = await uploadFilesAndGetPaths(projectDetails.files || []);
+      // Extract individual File objects from projectDetails.files for direct Azure upload in API
+      console.log('🔍 Extracting File objects from projectDetails.files for submission...');
+      const documentFiles: any = {};
+      if (projectDetails.files && Array.isArray(projectDetails.files)) {
+        projectDetails.files.forEach((fileItem: any, index: number) => {
+          if (fileItem && fileItem.fileObject instanceof File && index < 4) {
+            const docKey = `document${index + 1}`;
+            documentFiles[docKey] = fileItem.fileObject;
+            console.log(`✅ Added ${docKey} File object:`, fileItem.fileObject.name);
+          }
+        });
+      }
+      console.log('📄 Document files extracted:', {
+        document1: documentFiles.document1?.name || 'None',
+        document2: documentFiles.document2?.name || 'None',
+        document3: documentFiles.document3?.name || 'None',
+        document4: documentFiles.document4?.name || 'None'
+      });
+      
+      // NOTE: Files will be uploaded to Azure by the API endpoint (submit-project-simple)
+      // No need to pre-upload them here - just pass the File objects
+      const uploadedFilePaths: string[] = []; // Empty - files will be handled by API
       
       // Prepare project data for CRM submission (with file paths)
       const projectData = {
@@ -2079,10 +2099,23 @@ useEffect(() => {
           documents_icesc_project_suggestions_1_name: uploadedFilePaths.join('; ')
         } : {}),
         
+        // Individual document File objects - these will be uploaded to Azure in the API
+        ...documentFiles,
         
         // Status - Published for normal submission, Draft for save as draft
         status: 'Published'
       };
+      
+      console.log('📄 Final projectData with document files:', {
+        hasDocument1: !!projectData.document1,
+        hasDocument2: !!projectData.document2,
+        hasDocument3: !!projectData.document3,
+        hasDocument4: !!projectData.document4,
+        document1Name: projectData.document1?.name || 'None',
+        document2Name: projectData.document2?.name || 'None',
+        document3Name: projectData.document3?.name || 'None',
+        document4Name: projectData.document4?.name || 'None'
+      });
 
    
       

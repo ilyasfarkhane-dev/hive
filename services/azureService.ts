@@ -5,6 +5,7 @@ import {
   BlobDeleteResponse,
   BlobProperties
 } from '@azure/storage-blob';
+import { logToFile, logError } from '@/utils/logger';
 
 // Azure Storage configuration
 let blobServiceClient: BlobServiceClient;
@@ -94,11 +95,13 @@ export async function uploadToAzure(
   options: AzureUploadOptions = {}
 ): Promise<AzureUploadResult> {
   try {
-    console.log('☁️ Starting Azure upload...', {
+    const uploadInfo = {
       fileName: file instanceof File ? file.name : 'Buffer',
       fileSize: file instanceof File ? file.size : file.length,
       options
-    });
+    };
+    console.log('☁️ Starting Azure upload...', uploadInfo);
+    logToFile('☁️ Starting Azure upload', uploadInfo);
 
     // Initialize Azure client
     console.log('🔄 Initializing Azure client...');
@@ -114,7 +117,28 @@ export async function uploadToAzure(
       const arrayBuffer = await file.arrayBuffer();
       buffer = new Uint8Array(arrayBuffer);
       originalName = file.name;
+      
+      // Determine content type - fallback to extension-based detection if file.type is empty
       contentType = file.type;
+      if (!contentType || contentType === 'application/octet-stream') {
+        const ext = originalName.toLowerCase().split('.').pop();
+        const mimeTypes: Record<string, string> = {
+          'pdf': 'application/pdf',
+          'doc': 'application/msword',
+          'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'xls': 'application/vnd.ms-excel',
+          'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'ppt': 'application/vnd.ms-powerpoint',
+          'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'png': 'image/png',
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'gif': 'image/gif',
+          'txt': 'text/plain'
+        };
+        contentType = mimeTypes[ext || ''] || 'application/octet-stream';
+        console.log(`📄 Content type detected from extension: ${contentType} for file: ${originalName}`);
+      }
     } else {
       buffer = new Uint8Array(file);
       originalName = options.fileName || 'uploaded_file';
@@ -123,20 +147,57 @@ export async function uploadToAzure(
 
     // Generate a unique file path
     const timestamp = Date.now();
-    const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    
+    // Better sanitization: preserve file extension, use timestamp as base name if too many special chars
+    const fileExtension = originalName.substring(originalName.lastIndexOf('.'));
+    const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.'));
+    let sanitizedBase = nameWithoutExt.replace(/[^a-zA-Z0-9-]/g, '_');
+    
+    // If sanitization resulted in mostly underscores or empty, use a generic name
+    if (sanitizedBase.length === 0 || sanitizedBase.replace(/_/g, '').length < 3) {
+      sanitizedBase = 'document';
+      console.log(`📄 Filename "${originalName}" has too many special characters, using generic name`);
+    }
+    
+    const sanitizedName = `${sanitizedBase}${fileExtension}`;
     const folder = options.folder || 'hive-documents';
     const fileName = options.fileName || `${timestamp}_${sanitizedName}`;
     const fullPath = `${folder}/${fileName}`;
+    
+    console.log(`📄 File naming:`, {
+      original: originalName,
+      sanitizedBase,
+      sanitizedName,
+      finalFileName: fileName,
+      fullPath
+    });
 
     // Get blob client
     const blockBlobClient = containerClient.getBlockBlobClient(fullPath);
 
-    // Prepare metadata
-    const blobMetadata = {
-      originalName: originalName,
-      uploadedAt: new Date().toISOString(),
-      ...options.metadata
+    // Prepare metadata - encode values to handle non-ASCII characters (Arabic, etc.)
+    const encodedMetadata: Record<string, string> = {
+      originalName: encodeURIComponent(originalName), // Encode to handle Arabic/special characters
+      uploadedAt: new Date().toISOString()
     };
+    
+    // Encode any custom metadata values that might have non-ASCII characters
+    if (options.metadata) {
+      Object.keys(options.metadata).forEach(key => {
+        const value = options.metadata![key];
+        if (typeof value === 'string') {
+          encodedMetadata[key] = encodeURIComponent(value);
+        } else {
+          encodedMetadata[key] = String(value);
+        }
+      });
+    }
+    
+    logToFile('📋 Blob metadata prepared', { 
+      originalName, 
+      encodedName: encodedMetadata.originalName,
+      metadata: encodedMetadata 
+    });
 
     // Upload the file
     const uploadResponse: BlobUploadCommonResponse = await blockBlobClient.upload(
@@ -146,20 +207,22 @@ export async function uploadToAzure(
         blobHTTPHeaders: {
           blobContentType: contentType
         },
-        metadata: blobMetadata
+        metadata: encodedMetadata
       }
     );
 
     // Get the download URL (using SAS token for authenticated access)
     const downloadURL = blockBlobClient.url;
 
-    console.log('✅ Azure upload successful:', {
+    const successInfo = {
       fileName: fileName,
       fullPath: fullPath,
       downloadURL: downloadURL,
       size: buffer.length,
       etag: uploadResponse.etag
-    });
+    };
+    console.log('✅ Azure upload successful:', successInfo);
+    logToFile('✅ Azure upload successful', successInfo);
 
     return {
       fileName: fileName,
@@ -174,6 +237,7 @@ export async function uploadToAzure(
 
   } catch (error) {
     console.error('❌ Azure upload failed:', error);
+    logError('❌ Azure upload failed', error);
     throw new Error(`Azure upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

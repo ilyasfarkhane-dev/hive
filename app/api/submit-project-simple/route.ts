@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionId, getModuleEntries } from '@/utils/crm';
 import { mapProjectDataToCRM, validateProjectData } from '@/utils/crmFieldMapping';
 import { getAzureDownloadURL, moveBlob } from '@/services/azureService';
+import { logToFile, logError } from '@/utils/logger';
 
 const CRM_BASE_URL = 'https://crm.icesco.org';
 
@@ -199,31 +200,46 @@ export async function POST(request: NextRequest) {
 
     // Process individual document fields (document1_c, document2_c, document3_c, document4_c)
     console.log('📄 Processing individual document fields...');
+    const docFieldsCheck = {
+      document1: projectData.document1 ? `${projectData.document1.name} (${projectData.document1.size} bytes)` : 'NOT PROVIDED',
+      document2: projectData.document2 ? `${projectData.document2.name} (${projectData.document2.size} bytes)` : 'NOT PROVIDED',
+      document3: projectData.document3 ? `${projectData.document3.name} (${projectData.document3.size} bytes)` : 'NOT PROVIDED',
+      document4: projectData.document4 ? `${projectData.document4.name} (${projectData.document4.size} bytes)` : 'NOT PROVIDED'
+    };
+    console.log('📄 Document fields check:', docFieldsCheck);
+    logToFile('📄 NEW PROJECT SUBMISSION - Document fields check', docFieldsCheck);
+    
     for (let i = 1; i <= 4; i++) {
       const documentField = `document${i}`;
       const crmField = `document${i}_c`;
       
+      console.log(`\n🔍 Checking ${documentField}:`, {
+        exists: !!projectData[documentField],
+        isFile: projectData[documentField] instanceof File,
+        value: projectData[documentField]
+      });
+      
       if (projectData[documentField] && projectData[documentField] instanceof File) {
         console.log(`📄 Processing ${documentField} -> ${crmField}`);
         const file = projectData[documentField];
+        console.log(`📄 File details:`, {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
         
         try {
           // Import Azure service for direct upload
           const { uploadToAzure } = await import('@/services/azureService');
           
-          // Generate unique filename
-          const timestamp = Date.now();
-          const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const fileName = `${timestamp}_${sanitizedName}`;
-          const folder = `hive-documents/individual-docs`;
-          const fullPath = `${folder}/${fileName}`;
+          const folder = `hive-documents/new-submissions`;
           
-          console.log(`📤 Uploading ${documentField} directly to Azure: ${fullPath}`);
+          console.log(`📤 Uploading ${documentField} to Azure: ${folder}/`);
+          console.log(`📤 File name: ${file.name}`);
           
-          // Upload directly to Azure
+          // Upload directly to Azure (let azureService handle filename sanitization)
           const uploadResult = await uploadToAzure(file, {
             folder: folder,
-            fileName: fileName,
             metadata: {
               originalName: file.name,
               userEmail: projectData.contact_email || 'unknown@example.com',
@@ -235,15 +251,44 @@ export async function POST(request: NextRequest) {
           
           // Set the CRM field with the Azure URL
           projectData[crmField] = uploadResult.downloadURL;
-          console.log(`✅ ${documentField} uploaded successfully: ${uploadResult.downloadURL}`);
+          const successInfo = {
+            documentField,
+            crmField,
+            azureURL: uploadResult.downloadURL,
+            fileName: file.name,
+            fileSize: file.size
+          };
+          console.log(`✅ ${documentField} uploaded successfully!`);
+          console.log(`✅ Azure URL: ${uploadResult.downloadURL}`);
+          console.log(`✅ Will save to CRM field: ${crmField}`);
+          logToFile(`✅ NEW PROJECT - ${documentField} uploaded to Azure`, successInfo);
           
         } catch (uploadError) {
           console.error(`❌ Error uploading ${documentField}:`, uploadError);
+          const errorDetails = {
+            documentField,
+            crmField,
+            fileName: file.name,
+            message: uploadError instanceof Error ? uploadError.message : 'Unknown error',
+            stack: uploadError instanceof Error ? uploadError.stack : undefined
+          };
+          console.error(`❌ Error details:`, errorDetails);
+          logError(`❌ NEW PROJECT - ${documentField} upload failed`, errorDetails);
         }
       } else {
         console.log(`📄 No file provided for ${documentField}`);
       }
     }
+    
+    console.log('\n📄 Final document URLs that will be sent to CRM:');
+    const finalDocUrls = {
+      document1_c: projectData.document1_c || 'NOT SET',
+      document2_c: projectData.document2_c || 'NOT SET',
+      document3_c: projectData.document3_c || 'NOT SET',
+      document4_c: projectData.document4_c || 'NOT SET'
+    };
+    console.log(finalDocUrls);
+    logToFile('📄 NEW PROJECT - Final document URLs for CRM', finalDocUrls);
    
     const crmData = mapProjectDataToCRM(projectData);
    

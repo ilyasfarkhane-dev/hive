@@ -3048,9 +3048,20 @@ const ProjectDetailsPage = () => {
                                           className="hidden"
                                           id={`document${docNum}-upload`}
                                           onChange={(e) => {
+                                            console.log(`🔍 File input onChange triggered for document${docNum}`);
+                                            console.log('🔍 e.target.files:', e.target.files);
+                                            console.log('🔍 e.target.files?.length:', e.target.files?.length);
+                                            
                                             const file = e.target.files?.[0];
+                                            console.log('🔍 Selected file:', file);
+                                            
                                             if (file) {
-                                              console.log(`📤 Selected new file for document${docNum}:`, file.name);
+                                              console.log(`📤 Selected new file for document${docNum}:`, {
+                                                name: file.name,
+                                                size: file.size,
+                                                type: file.type,
+                                                lastModified: file.lastModified
+                                              });
                                               setChangedDocuments(prev => ({
                                                 ...prev,
                                                 [`document${docNum}`]: file
@@ -3063,6 +3074,8 @@ const ProjectDetailsPage = () => {
                                                   return updated;
                                                 });
                                               }
+                                            } else {
+                                              console.error('❌ No file selected or file is undefined');
                                             }
                                           }}
                                         />

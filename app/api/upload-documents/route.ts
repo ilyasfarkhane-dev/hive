@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { sanitizeFileName, generateUniqueFileName } from '@/utils/fileUtils';
 import { uploadToAzure, AzureUploadResult } from '@/services/azureService';
+import { logToFile, logError } from '@/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
       console.log('=== UPLOADING TO AZURE ===');
       console.log('Original filename:', file.name);
       console.log('File size:', file.size);
-      console.log('File type:', file.type);
+      console.log('File type (from browser):', file.type);
+      console.log('File extension:', path.extname(file.name).toLowerCase());
       console.log('User email:', userEmail);
       console.log('Azure config check:', {
         hasAccount: !!process.env.AZURE_STORAGE_ACCOUNT,
@@ -118,11 +120,16 @@ export async function POST(request: NextRequest) {
 
       } catch (azureError) {
         console.error('❌ Azure upload failed, falling back to local storage:', azureError);
-        console.error('❌ Azure error details:', {
+        const errorInfo = {
           message: azureError instanceof Error ? azureError.message : 'Unknown error',
           stack: azureError instanceof Error ? azureError.stack : undefined,
-          name: azureError instanceof Error ? azureError.name : undefined
-        });
+          name: azureError instanceof Error ? azureError.name : undefined,
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type
+        };
+        console.error('❌ Azure error details:', errorInfo);
+        logError('❌ Azure upload failed, falling back to local storage', errorInfo);
         
         // Check if it's a configuration error
         if (azureError instanceof Error && azureError.message.includes('Azure Storage configuration missing')) {

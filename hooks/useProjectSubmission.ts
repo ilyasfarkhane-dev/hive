@@ -172,8 +172,17 @@ export const useProjectSubmission = () => {
     }
 
     try {
+      // Debug: Log projectData to see if files were included
+      console.log('🔍 PROJECT SUBMISSION - Received files:');
+      console.log('document1:', projectData.document1?.name || 'None');
+      console.log('document2:', projectData.document2?.name || 'None');
+      console.log('document3:', projectData.document3?.name || 'None');
+      console.log('document4:', projectData.document4?.name || 'None');
+      
       // Check if there are any files to upload
       const hasFiles = projectData.document1 || projectData.document2 || projectData.document3 || projectData.document4;
+      
+      console.log('🔍 hasFiles:', hasFiles);
       
       let response;
       

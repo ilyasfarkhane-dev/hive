@@ -201,10 +201,29 @@ const StepFive = forwardRef<StepFiveRef, Step5Props>(({ onNext, onPrevious, onSa
         console.log('Document 2:', formValues.document2?.name || 'None');
         console.log('Document 3:', formValues.document3?.name || 'None');
         console.log('Document 4:', formValues.document4?.name || 'None');
+        
+        // Convert individual documents to files array for StepSix
+        const files: any[] = [];
+        for (let i = 1; i <= 4; i++) {
+          const docKey = `document${i}` as keyof typeof formValues;
+          const file = formValues[docKey] as File | null;
+          if (file) {
+            files.push({
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              fileObject: file // Store actual File object for upload
+            });
+            console.log(`✅ Document ${i} added to files array:`, file.name);
+          }
+        }
+        
+        console.log('Total files collected:', files.length);
         console.log('=====================================');
         
         return {
           ...formValues,
+          files // Add files array for StepSix display
         };
       },
     }),
